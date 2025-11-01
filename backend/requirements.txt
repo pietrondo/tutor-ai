@@ -1,0 +1,42 @@
+# Core dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.17
+httpx==0.28.0
+
+# AI/ML dependencies
+openai>=1.55.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+chromadb==0.5.20
+sentence-transformers==3.3.1
+transformers>=4.45.0
+torch>=2.5.0
+
+# PDF processing
+PyPDF2==3.0.1
+pymupdf==1.24.12
+pdfplumber==0.11.0
+
+# Database
+sqlalchemy>=2.0.36
+aiosqlite>=0.20.0
+
+# Utilities
+python-dotenv==1.0.1
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+requests>=2.32.3
+aiofiles>=24.1.0
+
+# Async and performance
+asyncio-mqtt==0.16.2
+redis>=5.2.0
+
+# File processing
+Pillow>=11.0.0
+python-magic>=0.4.27
+
+# Monitoring and logging
+structlog>=24.4.0

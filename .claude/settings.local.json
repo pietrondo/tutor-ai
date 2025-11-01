@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "mcp__web-search-prime__webSearchPrime",
+      "WebFetch(domain:platform.openai.com)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm outdated)",
+      "Bash(npm update)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(rm:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(npm run dev)",
+      "Bash(curl:*)",
+      "Bash(docker-compose stop:*)",
+      "Bash(docker-compose rm:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(npm run dev:*)",
+      "WebSearch",
+      "Bash(chmod:*)",
+      "Bash(DOCKER_BUILDKIT=0 docker-compose build:*)",
+      "Bash(sed:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

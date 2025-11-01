@@ -1,0 +1,35 @@
+[
+  {
+    "id": "cf109951-929c-4dc6-9584-fa7bcce3fc9d",
+    "name": "Geografia storica",
+    "description": "ds",
+    "subject": "Storia",
+    "created_at": "2025-11-01T09:17:48.260253",
+    "updated_at": "2025-11-01T09:17:48.260263",
+    "materials": [],
+    "study_sessions": 0,
+    "total_study_time": 0
+  },
+  {
+    "id": "67dbe2fa-cea2-4609-bb77-5d9d24b06e78",
+    "name": "Geografia storica",
+    "description": "ds",
+    "subject": "Storia",
+    "created_at": "2025-11-01T09:17:53.684465",
+    "updated_at": "2025-11-01T09:17:53.684476",
+    "materials": [],
+    "study_sessions": 0,
+    "total_study_time": 0
+  },
+  {
+    "id": "370004e7-5fc6-4c87-8faf-c685b6d747ce",
+    "name": "Geografia storica",
+    "description": "ds",
+    "subject": "Storia",
+    "created_at": "2025-11-01T09:17:59.683506",
+    "updated_at": "2025-11-01T09:17:59.683514",
+    "materials": [],
+    "study_sessions": 0,
+    "total_study_time": 0
+  }
+]
