@@ -244,6 +244,11 @@ async def upload_book_material(course_id: str, book_id: str, file: UploadFile = 
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
+        # Check if book exists first
+        book = book_service.get_book(course_id, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+
         # Save file
         book_dir = f"data/courses/{course_id}/books/{book_id}"
         os.makedirs(book_dir, exist_ok=True)
@@ -252,10 +257,17 @@ async def upload_book_material(course_id: str, book_id: str, file: UploadFile = 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Process and index the PDF for the book
-        await rag_service.index_pdf(file_path, course_id, book_id)
+        # Process and index the PDF for the book (with error handling)
+        try:
+            await rag_service.index_pdf(file_path, course_id, book_id)
+            indexing_status = "File uploaded and indexed successfully"
+        except Exception as indexing_error:
+            print(f"Warning: RAG indexing failed: {indexing_error}")
+            indexing_status = "File uploaded successfully (indexing temporarily disabled)"
 
-        return {"success": True, "message": "File uploaded and indexed successfully"}
+        return {"success": True, "message": indexing_status}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

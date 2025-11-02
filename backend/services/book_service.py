@@ -16,13 +16,13 @@ class BookService:
 
         if not os.path.exists(self.courses_file):
             with open(self.courses_file, 'w') as f:
-                json.dump({"courses": []}, f)
+                json.dump([], f)
 
     def create_book(self, course_id: str, book_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new book within a course"""
         try:
             courses_data = self._get_courses_data()
-            course = next((c for c in courses_data["courses"] if c["id"] == course_id), None)
+            course = next((c for c in courses_data if c["id"] == course_id), None)
 
             if not course:
                 raise Exception(f"Course {course_id} not found")
@@ -119,7 +119,7 @@ class BookService:
         """Update book information"""
         try:
             courses_data = self._get_courses_data()
-            course = next((c for c in courses_data["courses"] if c["id"] == course_id), None)
+            course = next((c for c in courses_data if c["id"] == course_id), None)
 
             if not course:
                 return None
@@ -153,7 +153,7 @@ class BookService:
         """Delete a book and all its materials"""
         try:
             courses_data = self._get_courses_data()
-            course = next((c for c in courses_data["courses"] if c["id"] == course_id), None)
+            course = next((c for c in courses_data if c["id"] == course_id), None)
 
             if not course:
                 return False
@@ -183,7 +183,7 @@ class BookService:
         """Update book statistics after a study session"""
         try:
             courses_data = self._get_courses_data()
-            course = next((c for c in courses_data["courses"] if c["id"] == course_id), None)
+            course = next((c for c in courses_data if c["id"] == course_id), None)
 
             if course and "books" in course:
                 book_index = next((i for i, b in enumerate(course["books"]) if b["id"] == book_id), None)
@@ -219,15 +219,15 @@ class BookService:
         except Exception as e:
             raise Exception(f"Error searching books: {e}")
 
-    def _get_courses_data(self) -> Dict[str, Any]:
+    def _get_courses_data(self) -> List[Dict[str, Any]]:
         """Get courses data from file"""
         try:
             with open(self.courses_file, 'r') as f:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            return {"courses": []}
+            return []
 
-    def _save_courses_data(self, data: Dict[str, Any]):
+    def _save_courses_data(self, data: List[Dict[str, Any]]):
         """Save courses data to file"""
         with open(self.courses_file, 'w') as f:
             json.dump(data, f, indent=2)
@@ -235,4 +235,4 @@ class BookService:
     def _get_course_by_id(self, course_id: str) -> Optional[Dict[str, Any]]:
         """Get course by ID"""
         courses_data = self._get_courses_data()
-        return next((c for c in courses_data["courses"] if c["id"] == course_id), None)
+        return next((c for c in courses_data if c["id"] == course_id), None)

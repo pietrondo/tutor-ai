@@ -9,6 +9,7 @@ interface Book {
   id: string
   title: string
   author: string
+  isbn: string
   description: string
   year: string
   publisher: string
@@ -72,35 +73,61 @@ export default function BookPage() {
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const files = event.target.files
+    if (!files || files.length === 0) return
 
-    if (!file.name.endsWith('.pdf')) {
-      alert('Sono ammessi solo file PDF')
-      return
+    // Validate all files are PDFs
+    for (let i = 0; i < files.length; i++) {
+      if (!files[i].name.endsWith('.pdf')) {
+        alert('Sono ammessi solo file PDF')
+        return
+      }
     }
 
     setUploading(true)
+    let successCount = 0
+    let errorCount = 0
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // Upload each file sequentially
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const formData = new FormData()
+        formData.append('file', file)
 
-      const response = await fetch(`/api/courses/${courseId}/books/${bookId}/upload`, {
-        method: 'POST',
-        body: formData,
-      })
+        try {
+          const response = await fetch(`/api/courses/${courseId}/books/${bookId}/upload`, {
+            method: 'POST',
+            body: formData,
+          })
 
-      if (response.ok) {
-        fetchBook() // Refresh book data
-        alert('Materiale caricato con successo!')
+          if (response.ok) {
+            successCount++
+          } else {
+            errorCount++
+          }
+        } catch (error) {
+          errorCount++
+        }
+      }
+
+      // Refresh book data
+      await fetchBook()
+
+      // Show results
+      if (successCount > 0 && errorCount === 0) {
+        alert(`${successCount} materiale/i caricato con successo!`)
+      } else if (successCount > 0 && errorCount > 0) {
+        alert(`${successCount} materiale/i caricato con successo, ${errorCount} fallito/i`)
       } else {
-        alert('Errore durante il caricamento del materiale')
+        alert('Errore durante il caricamento dei materiali')
       }
     } catch (error) {
-      alert('Errore durante il caricamento del materiale')
+      alert('Errore durante il caricamento dei materiali')
     } finally {
       setUploading(false)
+      // Clear the file input
+      event.target.value = ''
     }
   }
 
@@ -253,6 +280,7 @@ export default function BookPage() {
                   <input
                     type="file"
                     accept=".pdf"
+                    multiple
                     onChange={handleFileUpload}
                     className="hidden"
                     disabled={uploading}
@@ -290,6 +318,7 @@ export default function BookPage() {
                     <input
                       type="file"
                       accept=".pdf"
+                      multiple
                       onChange={handleFileUpload}
                       className="hidden"
                       disabled={uploading}

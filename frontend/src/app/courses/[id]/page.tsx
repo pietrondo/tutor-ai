@@ -3,9 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Upload, FileText, MessageSquare, BarChart3, Trash2, Download } from 'lucide-react'
-import { useDropzone } from 'react-dropzone'
-import { CourseMaterials } from '@/components/CourseMaterials'
+import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen } from 'lucide-react'
 import { StudyProgress } from '@/components/StudyProgress'
 
 interface Course {
@@ -17,12 +15,21 @@ interface Course {
   study_sessions: number
   total_study_time: number
   created_at: string
-  materials?: Array<{
-    filename: string
-    size: number
-    uploaded_at: string
-    file_path: string
-  }>
+}
+
+interface Book {
+  id: string
+  title: string
+  author: string
+  description: string
+  year: string
+  publisher: string
+  materials_count: number
+  study_sessions: number
+  total_study_time: number
+  created_at: string
+  chapters: string[]
+  tags: string[]
 }
 
 export default function CourseDetailPage() {
@@ -31,13 +38,14 @@ export default function CourseDetailPage() {
   const courseId = params.id as string
 
   const [course, setCourse] = useState<Course | null>(null)
+  const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'materials' | 'progress' | 'quiz'>('materials')
+  const [activeTab, setActiveTab] = useState<'books' | 'progress' | 'quiz'>('books')
 
   useEffect(() => {
     fetchCourse()
+    fetchBooks()
   }, [courseId])
 
   const fetchCourse = async () => {
@@ -57,58 +65,26 @@ export default function CourseDetailPage() {
     } catch (error) {
       console.error('Errore nel caricamento del corso:', error)
       setError('Errore di connessione al server')
+    }
+  }
+
+  const fetchBooks = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/courses/${courseId}/books`)
+      if (response.ok) {
+        const data = await response.json()
+        setBooks(data.books || [])
+      } else {
+        console.error('Errore nel caricamento dei libri')
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento dei libri:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const onDrop = async (acceptedFiles: File[]) => {
-    const pdfFiles = acceptedFiles.filter(file => file.type === 'application/pdf')
-
-    if (pdfFiles.length === 0) {
-      setError('Solo i file PDF sono ammessi')
-      return
-    }
-
-    if (pdfFiles.length !== acceptedFiles.length) {
-      setError('Alcuni file non sono PDF e sono stati ignorati')
-    }
-
-    setUploading(true)
-    setError('')
-
-    for (const file of pdfFiles) {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      try {
-        const response = await fetch(`http://localhost:8000/courses/${courseId}/upload`, {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const data = await response.json()
-          throw new Error(data.detail || `Errore nell'upload di ${file.name}`)
-        }
-      } catch (error) {
-        console.error(`Errore nell'upload di ${file.name}:`, error)
-        setError(`Errore nell'upload di ${file.name}`)
-      }
-    }
-
-    setUploading(false)
-    fetchCourse() // Refresh course data
-  }
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf']
-    },
-    disabled: uploading
-  })
-
+  
   const handleDeleteCourse = async () => {
     if (!confirm(`Sei sicuro di voler eliminare il corso "${course?.name}"? Questa azione non può essere annullata.`)) {
       return
@@ -180,25 +156,33 @@ export default function CourseDetailPage() {
               <p className="text-lg text-gray-600 mb-4">{course.subject}</p>
               <p className="text-gray-700 mb-6">{course.description}</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <FileText className="h-6 w-6 text-blue-600 mb-2" />
-                  <div className="text-2xl font-bold text-blue-900">{course.materials_count}</div>
-                  <div className="text-sm text-blue-700">Materiali caricati</div>
+                  <BookOpen className="h-6 w-6 text-blue-600 mb-2" />
+                  <div className="text-2xl font-bold text-blue-900">{books.length}</div>
+                  <div className="text-sm text-blue-700">Libri</div>
                 </div>
 
                 <div className="bg-green-50 rounded-lg p-4">
-                  <MessageSquare className="h-6 w-6 text-green-600 mb-2" />
-                  <div className="text-2xl font-bold text-green-900">{course.study_sessions}</div>
-                  <div className="text-sm text-green-700">Sessioni di studio</div>
+                  <FileText className="h-6 w-6 text-green-600 mb-2" />
+                  <div className="text-2xl font-bold text-green-900">
+                    {books.reduce((sum, book) => sum + book.materials_count, 0)}
+                  </div>
+                  <div className="text-sm text-green-700">Materiali totali</div>
                 </div>
 
                 <div className="bg-purple-50 rounded-lg p-4">
-                  <BarChart3 className="h-6 w-6 text-purple-600 mb-2" />
-                  <div className="text-2xl font-bold text-purple-900">
+                  <MessageSquare className="h-6 w-6 text-purple-600 mb-2" />
+                  <div className="text-2xl font-bold text-purple-900">{course.study_sessions}</div>
+                  <div className="text-sm text-purple-700">Sessioni di studio</div>
+                </div>
+
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <BarChart3 className="h-6 w-6 text-orange-600 mb-2" />
+                  <div className="text-2xl font-bold text-orange-900">
                     {Math.floor(course.total_study_time / 60)}h {course.total_study_time % 60}m
                   </div>
-                  <div className="text-sm text-purple-700">Tempo totale di studio</div>
+                  <div className="text-sm text-orange-700">Tempo totale di studio</div>
                 </div>
               </div>
             </div>
@@ -207,8 +191,16 @@ export default function CourseDetailPage() {
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-4 mt-6 pt-6 border-t border-gray-200">
             <Link
-              href={`/chat?course=${course.id}`}
+              href={`/courses/${course.id}/books`}
               className="btn btn-primary flex items-center space-x-2"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span>Gestisci Libri</span>
+            </Link>
+
+            <Link
+              href={`/chat?course=${course.id}`}
+              className="btn btn-secondary flex items-center space-x-2"
             >
               <MessageSquare className="h-4 w-4" />
               <span>Chat con Tutor</span>
@@ -230,14 +222,14 @@ export default function CourseDetailPage() {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6" aria-label="Tabs">
             <button
-              onClick={() => setActiveTab('materials')}
+              onClick={() => setActiveTab('books')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'materials'
+                activeTab === 'books'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Materiali del Corso
+              Libri del Corso
             </button>
 
             <button
@@ -265,50 +257,111 @@ export default function CourseDetailPage() {
         </div>
 
         <div className="p-6">
-          {activeTab === 'materials' && (
+          {activeTab === 'books' && (
             <div className="space-y-6">
-              {/* Upload Area */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Carica Nuovi Materiali</h3>
-                <div
-                  {...getRootProps()}
-                  className={`upload-area ${isDragActive ? 'dragover' : ''} ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <input {...getInputProps()} />
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  {uploading ? (
-                    <div className="text-center">
-                      <div className="loading-spinner mx-auto mb-2"></div>
-                      <p className="text-gray-600">Caricamento in corso...</p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-gray-600 mb-2">
-                        {isDragActive
-                          ? 'Rilascia i file qui...'
-                          : 'Trascina i file PDF qui o clicca per selezionare'
-                        }
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Solo file PDF sono supportati
-                      </p>
-                    </div>
-                  )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Libri del Corso</h3>
+                  <p className="text-sm text-gray-600">Gestisci i libri e i materiali specifici per questo corso</p>
                 </div>
+                <Link
+                  href={`/courses/${courseId}/books`}
+                  className="btn btn-primary flex items-center space-x-2"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  <span>Gestisci Libri</span>
+                </Link>
               </div>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {error}
+              {books.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <BookOpen className="h-10 w-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun libro ancora aggiunto</h3>
+                  <p className="text-gray-600 mb-6">
+                    Inizia aggiungendo il primo libro per questo corso
+                  </p>
+                  <Link
+                    href={`/courses/${courseId}/books`}
+                    className="btn btn-primary"
+                  >
+                    Aggiungi Libro
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {books.map((book) => (
+                    <div key={book.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-1">{book.title}</h4>
+                          <p className="text-sm text-gray-600">{book.author}</p>
+                        </div>
+                        <BookOpen className="h-5 w-5 text-blue-600" />
+                      </div>
+
+                      {book.description && (
+                        <p className="text-gray-700 text-sm mb-4 line-clamp-2">{book.description}</p>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                        <div className="flex items-center space-x-4">
+                          <span className="flex items-center space-x-1">
+                            <FileText className="h-4 w-4" />
+                            <span>{book.materials_count}</span>
+                          </span>
+                          <span className="flex items-center space-x-1">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>{book.study_sessions}</span>
+                          </span>
+                        </div>
+                        {book.year && <span>{book.year}</span>}
+                      </div>
+
+                      <div className="flex space-x-2">
+                        <Link
+                          href={`/courses/${courseId}/books/${book.id}`}
+                          className="flex-1 btn btn-secondary text-sm"
+                        >
+                          Dettagli
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Materials List */}
-              <CourseMaterials
-                materials={course.materials || []}
-                onRefresh={fetchCourse}
-                courseId={courseId}
-              />
+              {/* Stats */}
+              {books.length > 0 && (
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistiche Libri</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Totale Libri</p>
+                      <p className="text-2xl font-bold text-gray-900">{books.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Materiali Caricati</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {books.reduce((sum, book) => sum + book.materials_count, 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Sessioni di Studio</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {books.reduce((sum, book) => sum + book.study_sessions, 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Tempo Totale</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {Math.round(books.reduce((sum, book) => sum + book.total_study_time, 0) / 60)}h
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
