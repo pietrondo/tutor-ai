@@ -15,12 +15,24 @@ logger = structlog.get_logger()
 
 class RAGService:
     def __init__(self):
-        # Usa un modello più recente e multilingue
-        self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        # Lazy loading - non caricare il modello all'avvio
+        self.embedding_model = None
+        self.model_name = 'paraphrase-multilingual-MiniLM-L12-v2'
         self.chroma_client = chromadb.PersistentClient(path="data/vector_db")
         self.collection = None
         self.setup_collection()
-        logger.info("RAG Service initialized", model="paraphrase-multilingual-MiniLM-L12-v2")
+        logger.info("RAG Service initialized (model will be loaded on demand)", model=self.model_name)
+
+    def _load_embedding_model(self):
+        """Carica il modello di embedding solo quando necessario"""
+        if self.embedding_model is None:
+            logger.info("Loading embedding model...")
+            try:
+                self.embedding_model = SentenceTransformer(self.model_name)
+                logger.info("Embedding model loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load embedding model: {e}")
+                raise
 
     def setup_collection(self):
         """Setup or get the ChromaDB collection"""
@@ -32,7 +44,7 @@ class RAGService:
                 metadata={"hnsw:space": "cosine"}
             )
 
-    async def index_pdf(self, file_path: str, course_id: str):
+    async def index_pdf(self, file_path: str, course_id: str, book_id: Optional[str] = None):
         """Extract text from PDF and index it in the vector database"""
         try:
             # Extract text from PDF
@@ -50,17 +62,21 @@ class RAGService:
             ids = []
 
             for i, chunk in enumerate(chunks):
-                doc_id = f"{course_id}_{uuid.uuid4().hex[:8]}_{i}"
+                doc_id = f"{course_id}_{book_id if book_id else 'general'}_{uuid.uuid4().hex[:8]}_{i}"
                 documents.append(chunk)
-                metadatas.append({
+                metadata = {
                     "course_id": course_id,
                     "source": os.path.basename(file_path),
                     "chunk_index": i,
                     "total_chunks": len(chunks)
-                })
+                }
+                if book_id:
+                    metadata["book_id"] = book_id
+                metadatas.append(metadata)
                 ids.append(doc_id)
 
             # Generate embeddings
+            self._load_embedding_model()
             embeddings = self.embedding_model.encode(documents).tolist()
 
             # Add to ChromaDB
@@ -135,17 +151,23 @@ class RAGService:
 
         return [chunk.strip() for chunk in chunks if chunk.strip()]
 
-    async def retrieve_context(self, query: str, course_id: str, k: int = 5) -> Dict[str, Any]:
+    async def retrieve_context(self, query: str, course_id: str, book_id: Optional[str] = None, k: int = 5) -> Dict[str, Any]:
         """Retrieve relevant context for a query"""
         try:
             # Generate query embedding
+            self._load_embedding_model()
             query_embedding = self.embedding_model.encode([query]).tolist()
 
-            # Search in ChromaDB with course filter
+            # Build filter based on course_id and optional book_id
+            where_filter = {"course_id": course_id}
+            if book_id:
+                where_filter["book_id"] = book_id
+
+            # Search in ChromaDB with course and book filter
             results = self.collection.query(
                 query_embeddings=query_embedding,
                 n_results=k,
-                where={"course_id": course_id}
+                where=where_filter
             )
 
             if not results['documents'][0]:
@@ -186,6 +208,7 @@ class RAGService:
         try:
             if search_query:
                 # Semantic search
+                self._load_embedding_model()
                 query_embedding = self.embedding_model.encode([search_query]).tolist()
                 results = self.collection.query(
                     query_embeddings=query_embedding,
@@ -236,6 +259,16 @@ class RAGService:
             print(f"Deleted all documents for course {course_id}")
         except Exception as e:
             print(f"Error deleting course documents: {e}")
+
+    def delete_book_documents(self, course_id: str, book_id: str):
+        """Delete all documents for a specific book"""
+        try:
+            self.collection.delete(
+                where={"course_id": course_id, "book_id": book_id}
+            )
+            print(f"Deleted all documents for book {book_id} in course {course_id}")
+        except Exception as e:
+            print(f"Error deleting book documents: {e}")
 
     def get_collection_stats(self) -> Dict[str, Any]:
         """Get statistics about the indexed documents"""

@@ -61,7 +61,7 @@ export default function StudyTimer() {
 
       // Calculate total study time for today
       const workTime = todaySessions
-        .filter(s => s.type === 'work' && s.completed)
+        .filter((s: TimerSession) => s.type === 'work' && s.completed)
         .reduce((acc: number, s: TimerSession) => acc + s.duration, 0)
       setTotalStudyTime(workTime)
     }
@@ -141,7 +141,7 @@ export default function StudyTimer() {
     }
 
     setCurrentSession(nextSession)
-    setTimeLeft(settings[getDurationKey(nextSession)] * 60)
+    setTimeLeft(Number(settings[getDurationKey(nextSession)]) * 60)
 
     // Auto-start next session if enabled
     if ((nextSession !== 'work' && settings.autoStartBreaks) ||
@@ -204,7 +204,7 @@ export default function StudyTimer() {
     setIsRunning(false)
     const nextSession = currentSession === 'work' ? 'break' : 'work'
     setCurrentSession(nextSession)
-    setTimeLeft(settings[getDurationKey(nextSession)] * 60)
+    setTimeLeft(Number(settings[getDurationKey(nextSession)]) * 60)
   }
 
   const requestNotificationPermission = async () => {

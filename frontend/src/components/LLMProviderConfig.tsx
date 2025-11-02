@@ -134,7 +134,7 @@ export function LLMProviderConfig({ onConfigurationChange }: LLMProviderConfigPr
               : 'bg-gradient-to-br from-gray-100 to-slate-100 text-gray-600 shadow-md group-hover:shadow-lg'
           }`}>
             <div className="transition-transform duration-300 group-hover:rotate-12">
-              {getProviderIcon(provider.type)}
+              {getProviderIcon(provider)}
             </div>
           </div>
           <div className="flex-1">
@@ -392,6 +392,7 @@ export function LLMProviderConfig({ onConfigurationChange }: LLMProviderConfigPr
         <div className="text-sm text-gray-600">
           <span className="font-medium">Context Window:</span> {provider.contextWindow.toLocaleString()} tokens
         </div>
+      </div>
       </div>
     </div>
   )

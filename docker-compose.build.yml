@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend-builder:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      cache_from:
+        - tutor-ai-backend:cache
+      cache_to:
+        - type=local,dest=/tmp/.buildx-cache,mode=max
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: tutor-ai-backend:latest
+    volumes:
+      - docker-cache:/tmp/.buildx-cache
+    profiles:
+      - build
+
+  frontend-builder:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      cache_from:
+        - tutor-ai-frontend:cache
+      cache_to:
+        - type=local,dest=/tmp/.buildx-cache,mode=max
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+        - NODE_ENV=production
+    image: tutor-ai-frontend:latest
+    volumes:
+      - docker-cache:/tmp/.buildx-cache
+    profiles:
+      - build
+
+volumes:
+  docker-cache:
+    driver: local

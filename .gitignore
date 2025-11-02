@@ -322,6 +322,7 @@ data/courses/*/
 data/vector_db/*
 data/uploads/*
 data/tracking/*
+data/study_plans.json
 !data/courses/.gitkeep
 !data/vector_db/.gitkeep
 !data/uploads/.gitkeep

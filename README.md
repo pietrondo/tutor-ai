@@ -239,6 +239,8 @@ Questo progetto è rilasciato sotto licenza MIT. Vedi il file LICENSE per dettag
 
 I contributi sono benvenuti! Si prega di:
 
+Consulta [Repository Guidelines](AGENTS.md) per istruzioni dettagliate su struttura del progetto, stile e processi di review.
+
 1. Fare fork del repository
 2. Creare una feature branch
 3. Commit delle modifiche

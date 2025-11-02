@@ -3,12 +3,16 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      cache_from:
+        - tutor-ai-backend:cache
+    image: tutor-ai-backend:latest
     container_name: tutor-ai-backend
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./backend/.env:/app/.env
+      - ./backend:/app
     environment:
       - PYTHONPATH=/app
     restart: unless-stopped
@@ -22,6 +26,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      cache_from:
+        - tutor-ai-frontend:cache
+    image: tutor-ai-frontend:latest
     container_name: tutor-ai-frontend
     ports:
       - "3000:3000"

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Download, Trash2, Calendar, HardDrive } from 'lucide-react'
+import Link from 'next/link'
+import { FileText, Download, Trash2, Calendar, HardDrive, Eye } from 'lucide-react'
 
 interface Material {
   filename: string
@@ -13,9 +14,10 @@ interface Material {
 interface CourseMaterialsProps {
   materials: Material[]
   onRefresh: () => void
+  courseId: string
 }
 
-export function CourseMaterials({ materials, onRefresh }: CourseMaterialsProps) {
+export function CourseMaterials({ materials, onRefresh, courseId }: CourseMaterialsProps) {
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const formatFileSize = (bytes: number) => {
@@ -34,6 +36,10 @@ export function CourseMaterials({ materials, onRefresh }: CourseMaterialsProps) 
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const isPDF = (filename: string) => {
+    return filename.toLowerCase().endsWith('.pdf')
   }
 
   const handleDownload = async (filename: string) => {
@@ -111,6 +117,16 @@ export function CourseMaterials({ materials, onRefresh }: CourseMaterialsProps) 
               </div>
 
               <div className="flex items-center space-x-2 ml-4">
+                {isPDF(material.filename) && (
+                  <Link
+                    href={`/courses/${courseId}/materials/${encodeURIComponent(material.filename)}`}
+                    className="text-gray-400 hover:text-green-600 transition-colors p-2 rounded-lg hover:bg-green-50"
+                    title="Visualizza PDF con annotazioni"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Link>
+                )}
+
                 <button
                   onClick={() => handleDownload(material.filename)}
                   className="text-gray-400 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50"
@@ -138,7 +154,8 @@ export function CourseMaterials({ materials, onRefresh }: CourseMaterialsProps) 
       </div>
 
       <div className="mt-4 text-sm text-gray-500 text-center">
-        Tutti i materiali vengono indicizzati automaticamente per la ricerca e il tutoring AI
+        Tutti i materiali vengono indicizzati automaticamente per la ricerca e il tutoring AI.
+        I file PDF possono essere visualizzati con annotazioni, evidenziature e note.
       </div>
     </div>
   )

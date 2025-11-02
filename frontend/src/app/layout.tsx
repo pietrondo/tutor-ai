@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Navigation } from '@/components/Navigation'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -85,7 +86,8 @@ export default function RootLayout({
   return (
     <html lang="it" className="scroll-smooth">
       <body className={`${inter.className} antialiased`}>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden">
+        <ThemeProvider>
+          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900">
           {/* Animated background elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float"></div>
@@ -127,6 +129,7 @@ export default function RootLayout({
             </footer>
           </div>
         </div>
+        </ThemeProvider>
       </body>
     </html>
   )

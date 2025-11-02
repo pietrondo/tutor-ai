@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, Clock, FileText, MessageSquare, Trash2, Edit } from 'lucide-react'
+import { BookOpen, Clock, FileText, MessageSquare, Trash2, Edit, Library } from 'lucide-react'
 import { useState } from 'react'
 
 interface Course {
@@ -76,7 +76,7 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
                 <span className="text-xs font-semibold text-blue-700">{course.subject}</span>
               </div>
             </div>
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{course.description}</p>
+            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{course.description || 'Nessuna descrizione disponibile'}</p>
           </div>
 
           <div className="flex space-x-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -151,22 +151,32 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex space-x-3">
+        <div className="grid grid-cols-1 gap-3">
           <Link
             href={`/courses/${course.id}`}
-            className="flex-1 btn btn-primary group/btn hover-lift"
+            className="btn btn-primary group/btn hover-lift"
           >
             <BookOpen className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-200" />
             Apri Corso
           </Link>
 
-          <Link
-            href={`/chat?course=${course.id}`}
-            className="flex-1 btn btn-success group/btn hover-lift"
-          >
-            <MessageSquare className="h-4 w-4 mr-2 group-hover/btn:scale-110 transition-transform duration-200" />
-            Chat Tutor
-          </Link>
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href={`/courses/${course.id}/books`}
+              className="btn btn-secondary group/btn hover-lift text-sm"
+            >
+              <Library className="h-4 w-4 mr-1 group-hover/btn:scale-110 transition-transform duration-200" />
+              Libri
+            </Link>
+
+            <Link
+              href={`/chat?course=${course.id}`}
+              className="btn btn-success group/btn hover-lift text-sm"
+            >
+              <MessageSquare className="h-4 w-4 mr-1 group-hover/btn:scale-110 transition-transform duration-200" />
+              Chat
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -307,6 +307,7 @@ export default function CourseDetailPage() {
               <CourseMaterials
                 materials={course.materials || []}
                 onRefresh={fetchCourse}
+                courseId={courseId}
               />
             </div>
           )}

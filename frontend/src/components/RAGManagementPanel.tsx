@@ -101,25 +101,62 @@ export function RAGManagementPanel() {
 
   const loadDocuments = async () => {
     try {
-      const response = await fetch('/api/rag/documents')
+      const response = await fetch('http://localhost:8000/rag/documents')
       if (response.ok) {
         const data = await response.json()
-        setDocuments(data.documents || [])
+        // Transform backend data to frontend format
+        const transformedDocuments = data.documents.map((doc: any, index: number) => ({
+          id: `${doc.course_id}_${index}`,
+          title: doc.source,
+          content: doc.chunks[0]?.content || '',
+          type: 'pdf' as const,
+          size: doc.chunks.length * 1000, // Estimate size
+          source: doc.source,
+          uploadDate: new Date().toISOString(),
+          lastModified: new Date().toISOString(),
+          courseId: doc.course_id,
+          chunks: doc.total_chunks || doc.chunks.length,
+          indexed: true,
+          metadata: {
+            tags: ['imported'],
+            estimatedReadTime: Math.ceil(doc.chunks.length * 2) // Estimate read time
+          }
+        }))
+        setDocuments(transformedDocuments)
+      } else {
+        setDocuments([])
       }
     } catch (error) {
       console.error('Error loading documents:', error)
+      setDocuments([])
     }
   }
 
   const loadAnalytics = async () => {
     try {
-      const response = await fetch('/api/rag/analytics')
+      const response = await fetch('http://localhost:8000/rag/analytics')
       if (response.ok) {
         const data = await response.json()
-        setAnalytics(data)
+        // Transform backend data to frontend format
+        const analytics: RAGAnalytics = {
+          totalDocuments: data.analytics.total_documents || 0,
+          indexedChunks: data.analytics.total_documents || 0, // Using total documents as chunks for now
+          averageChunkSize: 1000,
+          totalSearches: 0,
+          averageSearchTime: 0,
+          hitRate: 1.0,
+          popularQueries: [],
+          documentStats: [
+            { type: 'pdf', count: data.analytics.total_documents || 0, totalSize: 0 }
+          ]
+        }
+        setAnalytics(analytics)
+      } else {
+        setAnalytics(null)
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
+      setAnalytics(null)
     }
   }
 
@@ -173,9 +210,48 @@ export function RAGManagementPanel() {
         const data = await response.json()
         setSearchResults(data)
         loadAnalytics() // Update analytics
+      } else {
+        // Show demo message for missing API
+        setSearchResults({
+          query: searchQuery,
+          results: [
+            {
+              documentId: '1',
+              documentTitle: 'Esempio di documento RAG',
+              chunkId: 'chunk-1',
+              content: `Questo è un risultato di esempio per la ricerca: "${searchQuery}". Le API RAG non sono ancora implementate nel backend.`,
+              relevanceScore: 0.85,
+              source: 'demo-document',
+              metadata: { type: 'demo', tags: ['esempio'] }
+            }
+          ],
+          searchTime: 150,
+          totalResults: 1,
+          vectorSearchTime: 100,
+          rerankTime: 50
+        })
       }
     } catch (error) {
       console.error('Error performing search:', error)
+      // Show demo results even on error
+      setSearchResults({
+        query: searchQuery,
+        results: [
+          {
+            documentId: '1',
+            documentTitle: 'Esempio di documento RAG',
+            chunkId: 'chunk-1',
+            content: `Questo è un risultato di esempio per la ricerca: "${searchQuery}". Le API RAG non sono ancora implementate nel backend.`,
+            relevanceScore: 0.85,
+            source: 'demo-document',
+            metadata: { type: 'demo', tags: ['esempio'] }
+          }
+        ],
+        searchTime: 150,
+        totalResults: 1,
+        vectorSearchTime: 100,
+        rerankTime: 50
+      })
     } finally {
       setIsSearching(false)
     }
@@ -250,6 +326,19 @@ export function RAGManagementPanel() {
 
   return (
     <div className="space-y-6">
+      {/* API Warning */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-yellow-800">API RAG in sviluppo</h4>
+            <p className="text-sm text-yellow-700 mt-1">
+              Le API RAG non sono ancora implementate nel backend. I dati mostrati sono demo a scopo illustrativo.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="glass rounded-2xl p-6 border border-gray-200/50">
         <div className="flex items-center justify-between mb-4">

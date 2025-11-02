@@ -39,13 +39,13 @@ export default function CoursesPage() {
   }
 
   const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = course.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         course.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterSubject === 'all' || course.subject === filterSubject
     return matchesSearch && matchesFilter
   })
 
-  const subjects = ['all', ...Array.from(new Set(courses.map(course => course.subject)))]
+  const subjects = ['all', ...Array.from(new Set(courses.map(course => course.subject).filter(Boolean)))]
 
   if (loading) {
     return (
@@ -109,7 +109,7 @@ export default function CoursesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Materiali</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {courses.reduce((sum, course) => sum + course.materials_count, 0)}
+                  {courses.reduce((sum, course) => sum + (course.materials_count || 0), 0)}
                 </p>
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function CoursesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Studio Totale</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {Math.round(courses.reduce((sum, course) => sum + course.total_study_time, 0) / 60)}h
+                  {Math.round(courses.reduce((sum, course) => sum + (course.total_study_time || 0), 0) / 60)}h
                 </p>
               </div>
             </div>
@@ -186,7 +186,7 @@ export default function CoursesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
-              <CourseCard key={course.id} course={course} />
+              <CourseCard key={course.id} course={course} onUpdate={fetchCourses} />
             ))}
           </div>
         )}

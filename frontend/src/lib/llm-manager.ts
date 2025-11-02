@@ -411,12 +411,16 @@ class LLMManager {
       } catch (fetchError) {
         clearTimeout(timeoutId)
 
-        if (fetchError.name === 'AbortError') {
-          console.warn(`⏰ Provider ${providerId} check timed out`)
-        } else if (fetchError.message.includes('Failed to fetch')) {
-          console.warn(`🌐 Provider ${providerId} network error - CORS or connection issue`)
+        if (fetchError instanceof Error) {
+          if (fetchError.name === 'AbortError') {
+            console.warn(`⏰ Provider ${providerId} check timed out`)
+          } else if (fetchError.message.includes('Failed to fetch')) {
+            console.warn(`🌐 Provider ${providerId} network error - CORS or connection issue`)
+          } else {
+            console.warn(`❌ Provider ${providerId} fetch error:`, fetchError.message)
+          }
         } else {
-          console.warn(`❌ Provider ${providerId} fetch error:`, fetchError.message)
+          console.warn(`❌ Provider ${providerId} unknown error:`, fetchError)
         }
 
         this.providers.get(providerId)!.isAvailable = false

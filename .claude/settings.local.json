@@ -29,7 +29,16 @@
       "Bash(chmod:*)",
       "Bash(DOCKER_BUILDKIT=0 docker-compose build:*)",
       "Bash(sed:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)",
+      "Bash(./docker-build.sh:*)",
+      "Bash(docker build:*)",
+      "Bash(jobs:*)",
+      "Bash(docker buildx build:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(python:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker rmi:*)"
     ],
     "deny": [],
     "ask": []

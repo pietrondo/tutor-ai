@@ -12,9 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
 
-# Copia requirements e installa dipendenze Python
+# Copia requirements e installa dipendenze Python con ottimizzazioni
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip cache purge
 
 # Copia il codice dell'applicazione
 COPY . .
@@ -26,4 +28,4 @@ RUN mkdir -p data/{courses,vector_db,uploads,tracking}
 EXPOSE 8000
 
 # Comando per avviare l'applicazione
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
