@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Brain, FileText, Clock, CheckCircle, AlertCircle, Trash2, Edit } from 'lucide-react'
+import { ArrowLeft, Plus, Brain, FileText, Clock, Trash2, Edit } from 'lucide-react'
 
 interface Course {
   id: string
@@ -24,17 +24,6 @@ interface Quiz {
   difficulty: 'facile' | 'medio' | 'difficile'
   created_at: string
   is_active: boolean
-}
-
-interface QuizQuestion {
-  id: string
-  quiz_id: string
-  question: string
-  type: 'multiple_choice' | 'text' | 'true_false'
-  options?: string[]
-  correct_answer: string
-  explanation?: string
-  order_index: number
 }
 
 export default function QuizPage() {
@@ -92,16 +81,16 @@ export default function QuizPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = event.target
     setFormData(prev => ({
       ...prev,
       [name]: value
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
 
     if (!formData.title.trim()) {
       setError('Il titolo è obbligatorio')

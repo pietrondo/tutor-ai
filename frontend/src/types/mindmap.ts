@@ -99,3 +99,40 @@ export interface MindMapAIRequest {
     maxNodes?: number
   }
 }
+
+export interface StudyMindmapNode {
+  id: string
+  title: string
+  summary?: string
+  ai_hint?: string
+  study_actions: string[]
+  priority?: number | null
+  references?: string[]
+  children: StudyMindmapNode[]
+}
+
+export interface StudyPlanPhase {
+  phase: string
+  objective?: string
+  activities: string[]
+  ai_support?: string
+  duration_minutes?: number | null
+}
+
+export interface StudyMindmap {
+  title: string
+  overview?: string
+  nodes: StudyMindmapNode[]
+  study_plan: StudyPlanPhase[]
+  references?: string[]
+}
+
+export interface ExpandedStudyNode {
+  id: string
+  title: string
+  summary?: string
+  ai_hint?: string
+  study_actions: string[]
+  priority?: number | null
+  references?: string[]
+}

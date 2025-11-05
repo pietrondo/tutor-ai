@@ -31,24 +31,40 @@ interface DocumentStats {
   course_id: string
 }
 
+interface CourseSummary {
+  id: string
+  name: string
+  subject?: string
+}
+
+type CoursesResponse = {
+  courses?: Array<{
+    id: string
+    name: string
+    subject?: string
+  }>
+}
+
+type RagStatusResponse = RAGStatus
+
 export default function RAGStatusPage() {
   const [ragStatus, setRagStatus] = useState<RAGStatus | null>(null)
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null)
-  const [courses, setCourses] = useState<any[]>([])
+  const [courses, setCourses] = useState<CourseSummary[]>([])
   const [selectedCourse, setSelectedCourse] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reindexing, setReindexing] = useState(false)
   const [showModelSettings, setShowModelSettings] = useState(false)
-  const [availableModels] = useState([
+  const availableModels = [
     'paraphrase-multilingual-MiniLM-L12-v2',
     'sentence-transformers/paraphrase-multilingual-mpnet-base-v2',
     'BAAI/bge-m3',
     'BAAI/bge-base-en',
     'BAAI/bge-large-en',
     'e5-mistral-7b-instruct'
-  ])
+  ]
 
   useEffect(() => {
     fetchRAGStatus()
@@ -60,7 +76,7 @@ export default function RAGStatusPage() {
       setError(null)
       const response = await fetch('http://localhost:8000/rag/status')
       if (response.ok) {
-        const data = await response.json()
+        const data: RagStatusResponse = await response.json()
         setRagStatus(data)
       } else {
         throw new Error('Failed to fetch RAG status')
@@ -77,10 +93,19 @@ export default function RAGStatusPage() {
     try {
       const response = await fetch('http://localhost:8000/courses')
       if (response.ok) {
-        const data = await response.json()
-        setCourses(data.courses || [])
-        if (data.courses.length > 0) {
-          setSelectedCourse(data.courses[0].id)
+        const data: CoursesResponse = await response.json()
+        const courseList: CourseSummary[] = Array.isArray(data.courses)
+          ? data.courses
+              .filter((course): course is { id: string; name: string; subject?: string } => Boolean(course?.id))
+              .map((course) => ({
+                id: course.id,
+                name: course.name ?? 'Corso',
+                subject: course.subject
+              }))
+          : []
+        setCourses(courseList)
+        if (courseList.length > 0) {
+          setSelectedCourse(courseList[0].id)
         }
       }
     } catch (error) {

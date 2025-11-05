@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Brain, BarChart3, Home, Settings, Sparkles, Timer, Database, BookMarked } from 'lucide-react'
+import { BookOpen, Brain, BarChart3, Home, Settings, Sparkles, Timer, Database, BookMarked, Search } from 'lucide-react'
 
 export function Navigation() {
   const pathname = usePathname()
@@ -14,6 +14,7 @@ export function Navigation() {
     { name: 'Chat Tutor', href: '/chat', icon: Brain, description: 'Chatta con l\'AI tutor' },
     { name: 'Timer', href: '/timer', icon: Timer, description: 'Timer di studio Pomodoro' },
     { name: 'Progressi', href: '/progress', icon: BarChart3, description: 'Traccia i tuoi progressi' },
+    { name: 'Ricerca', href: '/search', icon: Search, description: 'Ricerca avanzata contenuti' },
     { name: 'RAG Status', href: '/rag-status', icon: Database, description: 'Stato sistema RAG' },
     { name: 'Impostazioni', href: '/settings', icon: Settings, description: 'Configura l\'app' },
   ]

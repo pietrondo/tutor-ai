@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BookOpen, Brain, TrendingUp, Clock, Plus, BarChart3, Sparkles, MessageSquare } from 'lucide-react'
+import { BookOpen, Brain, Plus, MessageSquare, Zap, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { CourseCard } from '@/components/CourseCard'
 import { StatsOverview } from '@/components/StatsOverview'
+import { Button } from '@/components/ui/Button'
 
 interface Course {
   id: string
@@ -39,194 +40,192 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-purple-600 rounded-full animate-spin mx-auto" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-          </div>
-          <p className="mt-4 text-gray-600 font-medium animate-pulse">Caricamento corsi...</p>
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Caricamento...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 rounded-3xl opacity-90"></div>
-        <div className="absolute inset-0 bg-[url('/hero-pattern.svg')] opacity-10"></div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section - Pulito e Chiaro */}
+      <section className="bg-gradient-to-br from-blue-600 to-purple-700 py-20">
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="p-3 bg-white/20 rounded-full">
+              <Brain className="h-8 w-8 text-white" />
+            </div>
+          </div>
 
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-full float"></div>
-          <div className="absolute top-20 right-20 w-32 h-32 bg-white/5 rounded-full float" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute bottom-10 left-1/3 w-16 h-16 bg-white/10 rounded-full float" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute top-1/3 right-10 w-24 h-24 bg-white/5 rounded-full float" style={{ animationDelay: '1.5s' }}></div>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            Tutor AI Universitario
+          </h1>
+
+          <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto">
+            Studia in modo intelligente con l'AI che impara dai tuoi materiali.
+            Carica PDF, genera mappe concettuali e slide personalizzate.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/courses">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 shadow-lg">
+                <Plus className="h-5 w-5 mr-2" />
+                Crea Corso
+              </Button>
+            </Link>
+            <Link href="/chat">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                <MessageSquare className="h-5 w-5 mr-2" />
+                Prova Chat AI
+              </Button>
+            </Link>
+          </div>
         </div>
+      </section>
 
-        <div className="relative glass rounded-3xl p-8 md:p-12 text-white">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 space-y-4 sm:space-y-0">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl hover-lift">
-                  <Sparkles className="h-8 w-8 text-yellow-300" />
-                </div>
-                <div className="px-4 py-2 bg-gradient-to-r from-green-400/30 to-emerald-400/30 backdrop-blur-sm rounded-full border border-white/20">
-                  <span className="text-sm font-semibold flex items-center">
-                    <span className="mr-2">🎓</span>
-                    Piattaforma di Studio AI Avanzata
-                  </span>
-                </div>
+      {/* Features Cards - Più semplici e chiari */}
+      <section className="py-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Come funziona
+            </h2>
+            <p className="text-lg text-gray-600">
+              Strumenti intelligenti per migliorare il tuo studio
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="h-6 w-6 text-blue-600" />
               </div>
-              <div className="flex items-center space-x-2 px-3 py-1 bg-white/10 rounded-full">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-xs font-medium">Online</span>
-              </div>
-            </div>
-
-            <div className="text-center mb-12">
-              <h1 className="heading-1 mb-6 text-white">
-                Il Tuo Tutor<br />
-                <span className="bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
-                  Personale AI
-                </span>
-              </h1>
-
-              <p className="body-large text-blue-100 max-w-3xl mx-auto mb-8">
-                Trasforma il tuo studio universitario con l'intelligenza artificiale avanzata.
-                Carica i tuoi materiali, chatta con un tutor esperto e traccia i tuoi progressi in tempo reale.
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                1. Carica Materiali
+              </h3>
+              <p className="text-gray-600">
+                Upload dei tuoi PDF e libri di testo
               </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-                <Link
-                  href="/courses/new"
-                  className="btn btn-lg btn-primary group"
-                >
-                  <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-                  Inizia Subito
-                </Link>
-                <Link
-                  href="/chat"
-                  className="btn btn-lg glass-dark text-white border-white/30 hover:bg-white/20"
-                >
-                  <MessageSquare className="h-5 w-5 mr-2" />
-                  Prova la Chat
-                </Link>
-              </div>
             </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="group glass-dark rounded-2xl p-6 border border-white/20 hover-lift">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-yellow-400/20 rounded-xl">
-                    <Brain className="h-6 w-6 text-yellow-300" />
-                  </div>
-                  <div className="badge badge-success text-green-300">Attivo</div>
-                </div>
-                <h3 className="font-bold text-lg mb-2 text-white">AI Tutor Intelligente</h3>
-                <p className="text-sm text-blue-100 leading-relaxed">Chat avanzata con i tuoi materiali di studio</p>
+            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Brain className="h-6 w-6 text-purple-600" />
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                2. Chatta con l'AI
+              </h3>
+              <p className="text-gray-600">
+                Fai domande sui tuoi materiali di studio
+              </p>
+            </div>
 
-              <div className="group glass-dark rounded-2xl p-6 border border-white/20 hover-lift" style={{ animationDelay: '0.1s' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-green-400/20 rounded-xl">
-                    <BookOpen className="h-6 w-6 text-green-300" />
-                  </div>
-                  <div className="badge badge-primary text-blue-300">Smart</div>
-                </div>
-                <h3 className="font-bold text-lg mb-2 text-white">Gestione Materiali</h3>
-                <p className="text-sm text-blue-100 leading-relaxed">Carica PDF e indicizzazione automatica</p>
+            <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Zap className="h-6 w-6 text-green-600" />
               </div>
-
-              <div className="group glass-dark rounded-2xl p-6 border border-white/20 hover-lift" style={{ animationDelay: '0.2s' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-pink-400/20 rounded-xl">
-                    <TrendingUp className="h-6 w-6 text-pink-300" />
-                  </div>
-                  <div className="badge badge-secondary text-purple-300">Analytics</div>
-                </div>
-                <h3 className="font-bold text-lg mb-2 text-white">Progressi Dettagliati</h3>
-                <p className="text-sm text-blue-100 leading-relaxed">Tracciamento completo dell'apprendimento</p>
-              </div>
-
-              <div className="group glass-dark rounded-2xl p-6 border border-white/20 hover-lift" style={{ animationDelay: '0.3s' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-orange-400/20 rounded-xl">
-                    <BarChart3 className="h-6 w-6 text-orange-300" />
-                  </div>
-                  <div className="badge badge-warning text-orange-300">Auto</div>
-                </div>
-                <h3 className="font-bold text-lg mb-2 text-white">Quiz Personalizzati</h3>
-                <p className="text-sm text-blue-100 leading-relaxed">Test generati automaticamente dai contenuti</p>
-              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                3. Genera Contenuti
+              </h3>
+              <p className="text-gray-600">
+                Crea mappe concettuali e slide automaticamente
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Overview */}
-      <section className="slide-in-up">
-        <StatsOverview courses={courses} />
+      {/* Stats Section */}
+      <section className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <StatsOverview courses={courses} />
+        </div>
       </section>
 
       {/* Courses Section */}
-      <section className="space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="heading-2 mb-2">I tuoi corsi</h2>
-            <p className="text-gray-600">
-              {courses.length === 0
-                ? "Inizia il tuo viaggio di studio creando il primo corso"
-                : `Gestisci i tuoi ${courses.length} cors${courses.length === 1 ? 'o' : 'si'}`
-              }
-            </p>
-          </div>
-          <Link
-            href="/courses/new"
-            className="btn btn-primary group"
-          >
-            <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-            Nuovo Corso
-          </Link>
-        </div>
-
-        {/* Courses Grid */}
-        {courses.length === 0 ? (
-          <div className="text-center py-16 glass rounded-3xl border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors duration-300">
-            <div className="max-w-md mx-auto">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <BookOpen className="h-10 w-10 text-gray-400" />
-              </div>
-              <h3 className="heading-3 mb-4">
-                Nessun corso ancora creato
-              </h3>
-              <p className="body-medium text-gray-600 mb-8 leading-relaxed">
-                Inizia creando il tuo primo corso per caricare materiali didattici e iniziare a studiare con il tuo tutor AI personalizzato.
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                I Tuoi Corsi
+              </h2>
+              <p className="text-gray-600">
+                {courses.length === 0
+                  ? "Crea il tuo primo corso per iniziare a studiare"
+                  : `Hai ${courses.length} cors${courses.length === 1 ? 'o' : 'si'} attivi`
+                }
               </p>
-              <Link
-                href="/courses/new"
-                className="btn btn-primary btn-lg group"
-              >
-                <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-                Crea il tuo primo corso
+            </div>
+            <Link href="/courses/new">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Nuovo Corso
+              </Button>
+            </Link>
+          </div>
+
+          {courses.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Nessun corso ancora
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Inizia creando il tuo primo corso per caricare i materiali di studio
+              </p>
+              <Link href="/courses/new">
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crea Corso
+                </Button>
               </Link>
             </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course, index) => (
+                <div
+                  key={course.id}
+                  className="animate-slide-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <CourseCard course={course} onUpdate={fetchCourses} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 bg-blue-600">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Pronto a trasformare il tuo studio?
+          </h2>
+          <p className="text-xl text-white/90 mb-8">
+            Unisciti a migliaia di studenti che usano già l'AI per migliorare i loro risultati
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/courses/new">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 shadow-lg">
+                <Sparkles className="h-5 w-5 mr-2" />
+                Inizia Ora
+              </Button>
+            </Link>
+            <Link href="/chat">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                <MessageSquare className="h-5 w-5 mr-2" />
+                Prova la Chat
+              </Button>
+            </Link>
           </div>
-        ) : (
-          <div className="grid-responsive">
-            {courses.map((course, index) => (
-              <div
-                key={course.id}
-                className="slide-in-up"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <CourseCard course={course} onUpdate={fetchCourses} />
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
       </section>
     </div>
   )

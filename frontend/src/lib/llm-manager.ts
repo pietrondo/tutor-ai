@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export interface LLMProvider {
   id: string
   name: string
-  type: 'openai' | 'openrouter' | 'local' | 'anthropic' | 'cohere'
+  type: 'openai' | 'openrouter' | 'local' | 'anthropic' | 'cohere' | 'zai'
   apiKey?: string
   baseUrl?: string
   model: string
@@ -83,7 +85,7 @@ export interface VectorSearchResult {
 
 class LLMManager {
   private providers: Map<string, LLMProvider> = new Map()
-  private defaultProvider: string = 'openrouter'
+  private defaultProvider: string = 'zai'
   private fallbackChain: string[] = []
   private ragEnabled: boolean = true
   private vectorStore: VectorStore | null = null
@@ -323,46 +325,29 @@ class LLMManager {
       }
     })
 
-    // Ollama Provider
-    this.providers.set('ollama', {
-      id: 'ollama',
-      name: 'Ollama',
-      type: 'local',
-      baseUrl: 'http://localhost:11434/v1',
-      model: 'llama3.2',
+    // Z.AI Provider
+    this.providers.set('zai', {
+      id: 'zai',
+      name: 'Z.AI',
+      type: 'zai',
+      baseUrl: 'https://api.z.ai/api/paas/v4/',
+      model: 'glm-4.6',
+      apiKey: '53a0e2804093424e97a175b54a289f5f.ZMphW59IaVT7eAya',
       maxTokens: 8192,
       temperature: 0.7,
-      contextWindow: 128000,
-      isAvailable: false,
-      capabilities: {
-        streaming: true,
-        functionCalling: true,
-        imageAnalysis: false,
-        codeExecution: false
-      }
-    })
-
-    // Anthropic Claude Provider
-    this.providers.set('anthropic', {
-      id: 'anthropic',
-      name: 'Anthropic Claude',
-      type: 'anthropic',
-      model: 'claude-3-5-sonnet-20241022',
-      maxTokens: 4096,
-      temperature: 0.7,
       contextWindow: 200000,
-      costPerToken: 0.000015,
+      costPerToken: 0.00001,
       isAvailable: false,
       capabilities: {
         streaming: true,
         functionCalling: true,
         imageAnalysis: true,
-        codeExecution: false
+        codeExecution: true
       }
     })
 
-    // Set fallback chain - prioritize local models, then cost-effective options
-    this.fallbackChain = ['ollama', 'lm-studio', 'openrouter', 'openai-gpt4o-mini', 'openai', 'openai-gpt5', 'openai-gpt4-turbo', 'openai-gpt35-turbo', 'openai-o1-mini', 'anthropic']
+    // Set fallback chain - prioritize Z.AI as default, then other options
+    this.fallbackChain = ['zai', 'lm-studio', 'openrouter', 'openai-gpt4o-mini', 'openai', 'openai-gpt5', 'openai-gpt4-turbo', 'openai-gpt35-turbo', 'openai-o1-mini']
   }
 
   private initializeVectorStore() {
@@ -382,7 +367,7 @@ class LLMManager {
       }
 
       // Skip HTTPS check for local providers during development
-      const isLocalProvider = provider.type === 'local' || provider.id === 'ollama' || provider.id === 'lm-studio'
+      const isLocalProvider = provider.type === 'local' || provider.id === 'lm-studio'
 
       let controller: AbortController | null = new AbortController()
       const timeoutId = setTimeout(() => {
@@ -467,8 +452,8 @@ class LLMManager {
         return 'https://api.openai.com/v1'
       case 'openrouter':
         return 'https://openrouter.ai/api/v1'
-      case 'anthropic':
-        return 'https://api.anthropic.com/v1'
+        case 'zai':
+        return 'https://api.z.ai/api/paas/v4'
       case 'local':
         return 'http://localhost:1234/v1'
       default:
@@ -491,9 +476,8 @@ class LLMManager {
           headers['HTTP-Referer'] = window.location.origin
           headers['X-Title'] = 'AI Tutor System'
           break
-        case 'anthropic':
-          headers['x-api-key'] = provider.apiKey
-          headers['anthropic-version'] = '2023-06-01'
+          case 'zai':
+          headers['Authorization'] = `Bearer ${provider.apiKey}`
           break
       }
     }
@@ -526,7 +510,8 @@ class LLMManager {
     }
   }
 
-  private async generateEmbedding(text: string): Promise<number[]> {
+  private async generateEmbedding(_text: string): Promise<number[]> {
+    void _text
     // This would call an embedding API (OpenAI, local, etc.)
     // For now, return a mock embedding
     return new Array(1536).fill(0).map(() => Math.random() - 0.5)
@@ -585,8 +570,8 @@ class LLMManager {
       case 'local':
         response = await this.callLocalLLM(baseUrl, enhancedRequest, provider)
         break
-      case 'anthropic':
-        response = await this.callAnthropic(baseUrl, enhancedRequest, provider)
+        case 'zai':
+        response = await this.callZAI(baseUrl, enhancedRequest, provider)
         break
       default:
         throw new Error(`Unsupported provider type: ${provider.type}`)
@@ -646,23 +631,18 @@ class LLMManager {
     })
   }
 
-  private async callAnthropic(baseUrl: string, request: LLMRequest, provider: LLMProvider): Promise<Response> {
-    // Convert OpenAI format to Anthropic format
-    const systemMessage = request.messages.find(m => m.role === 'system')
-    const messages = request.messages.filter(m => m.role !== 'system')
-
-    return fetch(`${baseUrl}/messages`, {
+  
+  private async callZAI(baseUrl: string, request: LLMRequest, provider: LLMProvider): Promise<Response> {
+    return fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(provider),
       body: JSON.stringify({
         model: provider.model,
-        max_tokens: request.maxTokens || provider.maxTokens,
+        messages: request.messages,
         temperature: request.temperature || provider.temperature,
-        system: systemMessage?.content,
-        messages: messages.map(m => ({
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: typeof m.content === 'string' ? m.content : m.content
-        }))
+        max_tokens: request.maxTokens || provider.maxTokens,
+        stream: request.stream,
+        functions: request.functions
       })
     })
   }
@@ -675,16 +655,9 @@ class LLMManager {
       case 'openai':
       case 'openrouter':
       case 'local':
+      case 'zai':
         content = data.choices?.[0]?.message?.content || ''
         usage = data.usage
-        break
-      case 'anthropic':
-        content = data.content?.[0]?.text || ''
-        usage = {
-          promptTokens: data.usage?.input_tokens || 0,
-          completionTokens: data.usage?.output_tokens || 0,
-          totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
-        }
         break
     }
 
@@ -858,3 +831,19 @@ class VectorStore {
 }
 
 export const llmManager = new LLMManager()
+
+// Esponi globalmente per sincronizzazione con ModelContext
+if (typeof window !== 'undefined') {
+  ;(window as any).llmManager = llmManager
+}
+
+// Funzione per sincronizzare il modello dal backend
+export function syncModelFromBackend(currentModel: string) {
+  const zaiProvider = llmManager.getProvider('zai')
+  if (zaiProvider && zaiProvider.model !== currentModel) {
+    llmManager.configureProvider('zai', { model: currentModel })
+    console.log(`✅ LLM Manager sincronizzato con modello backend: ${currentModel}`)
+    return true
+  }
+  return false
+}

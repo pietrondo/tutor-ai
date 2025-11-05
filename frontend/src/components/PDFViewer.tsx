@@ -4,13 +4,10 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import {
   FileText,
-  Download,
   ZoomIn,
   ZoomOut,
   Highlighter,
   Edit3,
-  Type,
-  Palette,
   Save,
   X,
   ArrowLeft,
@@ -60,7 +57,6 @@ export function PDFViewer({ pdfUrl, title, onBack, onSave }: PDFViewerProps) {
   const [showSearch, setShowSearch] = useState<boolean>(false)
 
   const pdfContainerRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const colors = {
     highlight: ['#ffff00', '#00ff00', '#ff9900', '#ff6666', '#9966ff'],

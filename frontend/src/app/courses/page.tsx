@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { BookOpen, Plus, Search, Filter, Clock, FileText, TrendingUp } from 'lucide-react'
+import { BookOpen, Plus, Search, Filter, Clock, FileText } from 'lucide-react'
 import { CourseCard } from '@/components/CourseCard'
 
 interface Course {

@@ -10,6 +10,41 @@ class BookService:
         self.courses_file = os.path.join(self.courses_dir, "courses.json")
         self.ensure_courses_directory()
 
+    def _normalize_chapters(self, chapters: List[Any]) -> List[Dict[str, Any]]:
+        """Normalize chapter representations into a consistent structure."""
+        normalized: List[Dict[str, Any]] = []
+
+        for chapter in chapters or []:
+            if isinstance(chapter, dict):
+                title = str(chapter.get("title") or chapter.get("name") or "").strip()
+                summary = str(chapter.get("summary") or "").strip()
+                topics = chapter.get("topics", [])
+                estimated = chapter.get("estimated_minutes")
+            else:
+                title = str(chapter).strip()
+                summary = ""
+                topics = []
+                estimated = None
+
+            if not title:
+                continue
+
+            try:
+                estimated_minutes = int(estimated) if estimated not in (None, "", []) else None
+                if estimated_minutes is not None and estimated_minutes < 0:
+                    estimated_minutes = None
+            except (TypeError, ValueError):
+                estimated_minutes = None
+
+            normalized.append({
+                "title": title,
+                "summary": summary,
+                "estimated_minutes": estimated_minutes,
+                "topics": topics if isinstance(topics, list) else []
+            })
+
+        return normalized
+
     def ensure_courses_directory(self):
         """Ensure the courses directory and file exist"""
         os.makedirs(self.courses_dir, exist_ok=True)
@@ -43,7 +78,7 @@ class BookService:
                 "materials": [],
                 "study_sessions": 0,
                 "total_study_time": 0,
-                "chapters": book_data.get("chapters", []),
+                "chapters": self._normalize_chapters(book_data.get("chapters", [])),
                 "tags": book_data.get("tags", [])
             }
 
@@ -79,6 +114,7 @@ class BookService:
                     book["materials_count"] = len(materials)
                 else:
                     book["materials_count"] = 0
+                book["chapters"] = self._normalize_chapters(book.get("chapters", []))
 
             return books
 
@@ -109,6 +145,7 @@ class BookService:
                     book["materials"] = materials
                 else:
                     book["materials"] = []
+                book["chapters"] = self._normalize_chapters(book.get("chapters", []))
 
             return book
 
@@ -136,7 +173,10 @@ class BookService:
             allowed_fields = ["title", "author", "isbn", "description", "year", "publisher", "chapters", "tags"]
             for field in allowed_fields:
                 if field in update_data:
-                    course["books"][book_index][field] = update_data[field]
+                    if field == "chapters":
+                        course["books"][book_index][field] = self._normalize_chapters(update_data[field])
+                    else:
+                        course["books"][book_index][field] = update_data[field]
 
             course["books"][book_index]["updated_at"] = datetime.now().isoformat()
             course["updated_at"] = datetime.now().isoformat()

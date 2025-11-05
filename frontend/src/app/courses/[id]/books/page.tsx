@@ -1,10 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, BookOpen, Search, Filter } from 'lucide-react'
 import BookCard from '@/components/BookCard'
+
+interface BookChapter {
+  title: string
+  summary: string
+  estimated_minutes: number | null
+  topics: string[]
+}
 
 interface Book {
   id: string
@@ -17,8 +24,82 @@ interface Book {
   study_sessions: number
   total_study_time: number
   created_at: string
-  chapters: string[]
+  chapters: BookChapter[]
   tags: string[]
+}
+
+const toStringValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value)
+}
+
+const toFiniteNumber = (value: unknown): number => {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+const normalizeChapter = (chapter: unknown): BookChapter | null => {
+  if (typeof chapter === 'string') {
+    const title = chapter.trim()
+    if (!title) return null
+    return {
+      title,
+      summary: '',
+      estimated_minutes: null,
+      topics: []
+    }
+  }
+
+  if (chapter && typeof chapter === 'object') {
+    const data = chapter as Record<string, unknown>
+    const rawTitle = typeof data.title === 'string' ? data.title : typeof data.name === 'string' ? data.name : ''
+    const title = rawTitle.trim()
+    if (!title) return null
+
+    let estimated: number | null = null
+    if (typeof data.estimated_minutes === 'number') {
+      estimated = data.estimated_minutes
+    } else if (typeof data.estimated_minutes === 'string' && data.estimated_minutes.trim()) {
+      const parsed = Number.parseInt(data.estimated_minutes, 10)
+      estimated = Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+    }
+
+    return {
+      title,
+      summary: typeof data.summary === 'string' ? data.summary.trim() : '',
+      estimated_minutes: estimated,
+      topics: Array.isArray(data.topics) ? data.topics.map(topic => toStringValue(topic)).filter(Boolean) : []
+    }
+  }
+
+  return null
+}
+
+const normalizeBook = (book: unknown): Book => {
+  const record = (book && typeof book === 'object') ? book as Record<string, unknown> : {}
+  const chaptersArray = Array.isArray(record.chapters) ? record.chapters : []
+  const normalizedChapters = chaptersArray
+    .map(normalizeChapter)
+    .filter((chapter): chapter is BookChapter => Boolean(chapter))
+
+  return {
+    id: toStringValue(record.id),
+    title: toStringValue(record.title),
+    author: toStringValue(record.author),
+    description: toStringValue(record.description),
+    year: toStringValue(record.year),
+    publisher: toStringValue(record.publisher),
+    materials_count: toFiniteNumber(record.materials_count),
+    study_sessions: toFiniteNumber(record.study_sessions),
+    total_study_time: toFiniteNumber(record.total_study_time),
+    created_at: toStringValue(record.created_at),
+    chapters: normalizedChapters,
+    tags: Array.isArray(record.tags) ? record.tags.map(tag => toStringValue(tag)).filter(Boolean) : []
+  }
 }
 
 export default function BooksPage() {
@@ -42,11 +123,12 @@ export default function BooksPage() {
       const response = await fetch(`/api/courses/${courseId}/books`)
       if (response.ok) {
         const data = await response.json()
-        setBooks(data.books || [])
+        const normalized = Array.isArray(data.books) ? data.books.map(normalizeBook) : []
+        setBooks(normalized)
       } else {
         setError('Errore nel caricamento dei libri')
       }
-    } catch (error) {
+    } catch {
       setError('Errore nel caricamento dei libri')
     } finally {
       setLoading(false)
@@ -60,8 +142,8 @@ export default function BooksPage() {
         const data = await response.json()
         setCourseName(data.course.name)
       }
-    } catch (error) {
-      console.error('Error fetching course info:', error)
+    } catch (err) {
+      console.error('Error fetching course info:', err)
     }
   }
 
@@ -220,6 +302,18 @@ export default function BooksPage() {
 }
 
 // Create Book Modal Component
+type ChapterFormState = {
+  title: string
+  summary: string
+  estimated_minutes: string
+}
+
+const createEmptyChapter = (): ChapterFormState => ({
+  title: '',
+  summary: '',
+  estimated_minutes: ''
+})
+
 function CreateBookModal({ courseId, onClose, onBookCreated }: {
   courseId: string
   onClose: () => void
@@ -232,22 +326,45 @@ function CreateBookModal({ courseId, onClose, onBookCreated }: {
     description: '',
     year: '',
     publisher: '',
-    chapters: [''],
+    chapters: [createEmptyChapter()],
     tags: ['']
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
     setLoading(true)
     setError('')
 
     try {
+      const normalizedChapters = formData.chapters
+        .map(chapter => {
+          const title = chapter.title.trim()
+          if (!title) return null
+
+          let estimatedMinutes: number | null = null
+          if (chapter.estimated_minutes.trim()) {
+            const parsed = Number.parseInt(chapter.estimated_minutes, 10)
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              estimatedMinutes = parsed
+            }
+          }
+
+          return {
+            title,
+            summary: chapter.summary.trim(),
+            estimated_minutes: estimatedMinutes
+          }
+        })
+        .filter((chapter): chapter is { title: string; summary: string; estimated_minutes: number | null } => Boolean(chapter))
+
+      const normalizedTags = Array.from(new Set(formData.tags.map(tag => tag.trim()).filter(tag => tag.length > 0)))
+
       const bookData = {
         ...formData,
-        chapters: formData.chapters.filter(ch => ch.trim() !== ''),
-        tags: formData.tags.filter(tag => tag.trim() !== '')
+        chapters: normalizedChapters,
+        tags: normalizedTags
       }
 
       const response = await fetch(`/api/courses/${courseId}/books`, {
@@ -264,7 +381,7 @@ function CreateBookModal({ courseId, onClose, onBookCreated }: {
       } else {
         setError('Errore durante la creazione del libro')
       }
-    } catch (error) {
+    } catch {
       setError('Errore durante la creazione del libro')
     } finally {
       setLoading(false)
@@ -274,7 +391,7 @@ function CreateBookModal({ courseId, onClose, onBookCreated }: {
   const addChapter = () => {
     setFormData(prev => ({
       ...prev,
-      chapters: [...prev.chapters, '']
+      chapters: [...prev.chapters, createEmptyChapter()]
     }))
   }
 
@@ -401,30 +518,73 @@ function CreateBookModal({ courseId, onClose, onBookCreated }: {
                 + Aggiungi capitolo
               </button>
             </div>
-            {formData.chapters.map((chapter, index) => (
-              <div key={index} className="flex items-center space-x-2 mb-2">
-                <input
-                  type="text"
-                  value={chapter}
-                  onChange={(e) => {
-                    const newChapters = [...formData.chapters]
-                    newChapters[index] = e.target.value
-                    setFormData(prev => ({ ...prev, chapters: newChapters }))
-                  }}
-                  placeholder="Nome del capitolo"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {formData.chapters.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeChapter(index)}
-                    className="p-2 text-red-500 hover:text-red-700"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
+            <div className="space-y-3">
+              {formData.chapters.map((chapter, index) => (
+                <div key={index} className="rounded-lg border border-gray-200 p-4 space-y-3 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Capitolo {index + 1}</span>
+                    {formData.chapters.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeChapter(index)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Rimuovi
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Titolo *
+                    </label>
+                    <input
+                      type="text"
+                      value={chapter.title}
+                      onChange={(e) => {
+                        const newChapters = [...formData.chapters]
+                        newChapters[index] = { ...newChapters[index], title: e.target.value }
+                        setFormData(prev => ({ ...prev, chapters: newChapters }))
+                      }}
+                      placeholder="Titolo del capitolo"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Sintesi (opzionale)
+                    </label>
+                    <textarea
+                      value={chapter.summary}
+                      onChange={(e) => {
+                        const newChapters = [...formData.chapters]
+                        newChapters[index] = { ...newChapters[index], summary: e.target.value }
+                        setFormData(prev => ({ ...prev, chapters: newChapters }))
+                      }}
+                      rows={2}
+                      placeholder="Breve descrizione dei contenuti"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Minuti stimati (opzionale)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={chapter.estimated_minutes}
+                      onChange={(e) => {
+                        const newChapters = [...formData.chapters]
+                        newChapters[index] = { ...newChapters[index], estimated_minutes: e.target.value }
+                        setFormData(prev => ({ ...prev, chapters: newChapters }))
+                      }}
+                      placeholder="45"
+                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>

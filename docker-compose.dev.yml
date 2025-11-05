@@ -1,0 +1,46 @@
+# Docker Compose override for development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - ./backend/.env:/app/.env
+      - ./data:/app/data
+      - rag_data:/app/rag
+    environment:
+      - PYTHONPATH=/app
+      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+      - NEXT_PUBLIC_DEBUG=true
+    ports:
+      - "5000:3000"
+    command: ["npm", "run", "dev"]
+
+  redis:
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --notify-keyspace-events Ex
+
+  ollama:
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    volumes:
+      - ollama_models:/root/.ollama

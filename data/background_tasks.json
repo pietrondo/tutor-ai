@@ -1,0 +1,72 @@
+{
+  "tasks": [
+    {
+      "id": "b9200f6b-fc84-4225-8ea3-b74be5cf5bd3",
+      "task_type": "study_plan_generation",
+      "status": "completed",
+      "progress": 100.0,
+      "message": "Task completed successfully",
+      "result": {
+        "study_plan": {
+          "id": "e54904a7-5b04-46d9-9528-c02d183d3bf3",
+          "course_id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9",
+          "title": "Piano di Studio - Piano di Studio Test Background",
+          "description": "Piano personalizzato basato su 3 documenti",
+          "total_sessions": 1,
+          "estimated_hours": 0,
+          "difficulty_progression": "graduale",
+          "created_at": "2025-11-03 09:32:01.647646",
+          "updated_at": "2025-11-03 09:32:01.647647",
+          "sessions": [
+            {
+              "id": "bfedf359-8c9e-486b-9c2c-920230ddcd29",
+              "title": "Studio: Geografia",
+              "description": "Sessione di studio su Geografia",
+              "duration_minutes": 30,
+              "topics": [
+                "Geografia"
+              ],
+              "materials": [
+                "docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf",
+                "docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf",
+                "man-gio-nuovo.pdf"
+              ],
+              "difficulty": "intermediate",
+              "objectives": [
+                "Comprendere i concetti chiave",
+                "Applicare le conoscenze"
+              ],
+              "prerequisites": [],
+              "completion_date": null,
+              "completed": false,
+              "order_index": 0
+            }
+          ],
+          "current_session_index": 0,
+          "is_active": true
+        },
+        "sessions_count": 1,
+        "estimated_hours": 0,
+        "chapters_detected": 0,
+        "topics_extracted": 1
+      },
+      "error": null,
+      "created_at": "2025-11-03 09:30:15.874837",
+      "started_at": "2025-11-03 09:30:15.880400",
+      "completed_at": "2025-11-03 09:32:01.686957",
+      "course_id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9",
+      "user_id": null,
+      "metadata": {
+        "preferences": {
+          "course_id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9",
+          "title": "Piano di Studio Test Background",
+          "sessions_per_week": 2,
+          "session_duration": 30,
+          "difficulty_level": "intermediate",
+          "difficulty_progression": "graduale"
+        },
+        "course_id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9"
+      }
+    }
+  ]
+}

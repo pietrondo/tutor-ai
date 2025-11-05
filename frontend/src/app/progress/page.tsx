@@ -9,6 +9,13 @@ interface WeeklyProgress {
   sessions: number
 }
 
+interface WeeklyProgressApi {
+  day: string
+  minutes?: number
+  sessions?: number
+  date?: string
+}
+
 interface Achievement {
   title: string
   description: string
@@ -98,7 +105,7 @@ export default function ProgressPage() {
       }
 
       // Ensure weekly_progress is an array before mapping
-      let weeklyProgressData = Array.isArray(progressData.weekly_progress)
+      let weeklyProgressData: WeeklyProgressApi[] = Array.isArray(progressData.weekly_progress)
         ? progressData.weekly_progress
         : []
 
@@ -113,12 +120,12 @@ export default function ProgressPage() {
         }))
       }
 
-      const newData = {
+      const newData: ProgressData = {
         totalStudyTime: progressData.total_study_time || 0,
         sessionsCompleted: progressData.total_sessions || 0,
         coursesInProgress: progressData.courses_with_progress || 0,
         conceptsLearned: conceptsLearned,
-        weeklyProgress: weeklyProgressData.map((day: any) => ({
+        weeklyProgress: weeklyProgressData.map((day) => ({
           day: dayNames[day.day] || day.day,
           minutes: day.minutes || 0,
           sessions: day.sessions || 0

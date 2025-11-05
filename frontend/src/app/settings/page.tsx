@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Brain, Database, Globe, Shield, Bell, Palette, Save, RefreshCw, Key, Eye, EyeOff, CheckCircle, AlertCircle, Sun, Moon } from 'lucide-react'
-import ModelManager from '@/components/ModelManager'
-import { RAGManagementPanel } from '@/components/RAGManagementPanel'
+import { Settings, Globe, Shield, Bell, Palette, Save, RefreshCw, Key, Eye, EyeOff, CheckCircle, Sun, Moon } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 
 interface SelectFieldOption {
@@ -28,7 +27,7 @@ type FormField = SelectField | CheckboxField
 
 interface SettingsSection {
   title: string
-  icon: any
+  icon: LucideIcon
   color: string
   fields: FormField[]
 }
@@ -46,8 +45,78 @@ export default function SettingsPage() {
   const [apiKeys, setApiKeys] = useState({
     openai: '',
     openrouter: '',
-    anthropic: ''
+    zai: ''
   })
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('app-settings')
+    const savedApiKeys = localStorage.getItem('api-keys')
+
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings))
+      } catch (e) {
+        console.error('Failed to parse saved settings:', e)
+      }
+    }
+
+    if (savedApiKeys) {
+      try {
+        const keys = JSON.parse(savedApiKeys)
+        setApiKeys(keys)
+        // Configure LLM Manager with saved keys
+        configureLLMManager(keys)
+      } catch (e) {
+        console.error('Failed to parse saved API keys:', e)
+      }
+    }
+  }, [])
+
+  // Configure LLM Manager with API keys
+  const configureLLMManager = async (keys: typeof apiKeys) => {
+    const { llmManager } = await import('@/lib/llm-manager')
+
+    // Configure OpenAI
+    if (keys.openai) {
+      llmManager.configureProvider('openai', { apiKey: keys.openai, isAvailable: false })
+      await llmManager.checkProviderAvailability('openai')
+    }
+
+    // Configure OpenRouter
+    if (keys.openrouter) {
+      llmManager.configureProvider('openrouter', { apiKey: keys.openrouter, isAvailable: false })
+      await llmManager.checkProviderAvailability('openrouter')
+    }
+
+    
+    // Configure Z.AI
+    if (keys.zai) {
+      llmManager.configureProvider('zai', { apiKey: keys.zai, isAvailable: false })
+      await llmManager.checkProviderAvailability('zai')
+    }
+
+    // Set default provider based on settings
+    const selectedProvider = settings.llmProvider
+    if (selectedProvider && keys[selectedProvider as keyof typeof keys]) {
+      llmManager.setDefaultProvider(selectedProvider)
+    }
+  }
+
+  // Handle provider change
+  const handleProviderChange = async (newProvider: string) => {
+    setSettings(prev => ({ ...prev, llmProvider: newProvider }))
+
+    // Save immediately
+    const updatedSettings = { ...settings, llmProvider: newProvider }
+    localStorage.setItem('app-settings', JSON.stringify(updatedSettings))
+
+    // Configure LLM Manager if we have the API key
+    if (apiKeys[newProvider as keyof typeof apiKeys]) {
+      const { llmManager } = await import('@/lib/llm-manager')
+      llmManager.setDefaultProvider(newProvider)
+    }
+  }
 
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({})
   const [testingKey, setTestingKey] = useState<string | null>(null)
@@ -78,10 +147,9 @@ export default function SettingsPage() {
           headers['HTTP-Referer'] = window.location.origin
           headers['X-Title'] = 'AI Tutor System'
           break
-        case 'anthropic':
-          baseUrl = 'https://api.anthropic.com/v1'
-          headers['x-api-key'] = apiKey
-          headers['anthropic-version'] = '2023-06-01'
+                case 'zai':
+          baseUrl = 'https://api.z.ai/api/paas/v4/'
+          headers['Authorization'] = `Bearer ${apiKey}`
           break
         default:
           throw new Error('Provider non supportato')
@@ -97,8 +165,15 @@ export default function SettingsPage() {
           ...prev,
           [provider]: { valid: true, message: '✅ API Key valida e funzionante!' }
         }))
+
+        // Auto-save the valid API key
+        const updatedKeys = { ...apiKeys, [provider]: apiKey }
+        setApiKeys(updatedKeys)
+        localStorage.setItem('api-keys', JSON.stringify(updatedKeys))
+
+        // Configure LLM Manager
+        await configureLLMManager(updatedKeys)
       } else {
-        const errorText = await response.text()
         setKeyStatus(prev => ({
           ...prev,
           [provider]: { valid: false, message: `❌ Errore ${response.status}: ${response.statusText}` }
@@ -124,13 +199,19 @@ export default function SettingsPage() {
     setSaveStatus('')
 
     try {
-      // Simulate saving settings
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Save settings to localStorage
+      localStorage.setItem('app-settings', JSON.stringify(settings))
+      localStorage.setItem('api-keys', JSON.stringify(apiKeys))
+
+      // Configure LLM Manager with new API keys
+      await configureLLMManager(apiKeys)
+
       setSaveStatus('Impostazioni salvate con successo!')
 
       // Clear status after 3 seconds
       setTimeout(() => setSaveStatus(''), 3000)
     } catch (error) {
+      console.error('Error saving settings:', error)
       setSaveStatus('Errore nel salvataggio delle impostazioni')
     } finally {
       setLoading(false)
@@ -140,7 +221,7 @@ export default function SettingsPage() {
   const settingSections: SettingsSection[] = [
     {
       title: 'Preferenze AI',
-      icon: Brain,
+      icon: Settings,
       color: 'blue',
       fields: [
         {
@@ -149,8 +230,9 @@ export default function SettingsPage() {
           type: 'select',
           options: [
             { value: 'openai', label: 'OpenAI (GPT-4, GPT-4o, etc.)' },
-            { value: 'ollama', label: 'Ollama (Locale)' },
-            { value: 'lmstudio', label: 'LM Studio (Locale)' },
+            { value: 'openrouter', label: 'OpenRouter' },
+              { value: 'zai', label: 'Z.AI (GLM-4.6)' },
+              { value: 'lmstudio', label: 'LM Studio (Locale)' },
             { value: 'local', label: 'Locale (Legacy)' }
           ]
         }
@@ -350,10 +432,16 @@ export default function SettingsPage() {
                     {field.type === 'select' ? (
                       <select
                         value={String(settings[field.name as keyof typeof settings])}
-                        onChange={(e) => setSettings(prev => ({
-                          ...prev,
-                          [field.name]: e.target.value
-                        }))}
+                        onChange={(e) => {
+                          if (field.name === 'llmProvider') {
+                            handleProviderChange(e.target.value)
+                          } else {
+                            setSettings(prev => ({
+                              ...prev,
+                              [field.name]: e.target.value
+                            }))
+                          }
+                        }}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       >
                         {field.options?.map((option) => (
@@ -387,50 +475,6 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* Model Manager Section */}
-        <div className="glass-card rounded-2xl p-8 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 relative overflow-hidden">
-          {/* Animated gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-100"></div>
-
-          {/* Top accent line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12">
-                <Brain className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Gestione Modelli AI
-              </h3>
-            </div>
-
-            <ModelManager />
-          </div>
-        </div>
-
-        {/* RAG Management Section */}
-        <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 relative overflow-hidden">
-          {/* Animated gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-blue-500/5 opacity-50"></div>
-
-          {/* Top accent line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-blue-500"></div>
-
-          <div className="relative z-10">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-3 bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12">
-                <Database className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Gestione RAG
-              </h3>
-            </div>
-
-            <RAGManagementPanel />
-          </div>
-        </div>
-
         {/* API Keys Section (simplified) */}
         <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 relative overflow-hidden">
           {/* Animated gradient background */}
@@ -449,11 +493,11 @@ export default function SettingsPage() {
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
               {/* OpenAI API Key */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-gray-800 flex items-center">
-                  <Brain className="h-4 w-4 mr-2 text-blue-600" />
+                  <Key className="h-4 w-4 mr-2 text-blue-600" />
                   OpenAI
                 </h4>
                 <div className="relative">
@@ -550,34 +594,35 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Anthropic API Key */}
+  
+              {/* Z.AI API Key */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-gray-800 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2 text-orange-600" />
-                  Anthropic
+                  <div className="h-4 w-4 mr-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">Z</div>
+                  Z.AI
                 </h4>
                 <div className="relative">
                   <input
-                    type={showApiKeys.anthropic ? 'text' : 'password'}
-                    value={apiKeys.anthropic}
-                    onChange={(e) => setApiKeys(prev => ({ ...prev, anthropic: e.target.value }))}
-                    placeholder="sk-ant-..."
-                    className="w-full px-4 py-3 pr-20 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur"
+                    type={showApiKeys.zai ? 'text' : 'password'}
+                    value={apiKeys.zai}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, zai: e.target.value }))}
+                    placeholder="zai-..."
+                    className="w-full px-4 py-3 pr-20 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur"
                   />
                   <button
                     type="button"
-                    onClick={() => toggleApiKeyVisibility('anthropic')}
+                    onClick={() => toggleApiKeyVisibility('zai')}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                   >
-                    {showApiKeys.anthropic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showApiKeys.zai ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <button
-                  onClick={() => testApiKey('anthropic', apiKeys.anthropic)}
-                  disabled={!apiKeys.anthropic || testingKey === 'anthropic'}
-                  className="w-full px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-orange-600 hover:to-orange-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  onClick={() => testApiKey('zai', apiKeys.zai)}
+                  disabled={!apiKeys.zai || testingKey === 'zai'}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-indigo-600 hover:to-purple-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
-                  {testingKey === 'anthropic' ? (
+                  {testingKey === 'zai' ? (
                     <>
                       <RefreshCw className="h-4 w-4 animate-spin" />
                       <span>Test...</span>
@@ -589,13 +634,13 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
-                {keyStatus.anthropic && (
+                {keyStatus.zai && (
                   <div className={`p-3 rounded-lg border text-sm ${
-                    keyStatus.anthropic.valid
+                    keyStatus.zai.valid
                       ? 'bg-green-50 border-green-200 text-green-800'
                       : 'bg-red-50 border-red-200 text-red-800'
                   }`}>
-                    {keyStatus.anthropic.message}
+                    {keyStatus.zai.message}
                   </div>
                 )}
               </div>

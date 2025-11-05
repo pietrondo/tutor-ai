@@ -1,0 +1,217 @@
+{
+  "plans": {
+    "52a405ac-f622-4ce3-a702-3a55b03d911f": {
+      "id": "52a405ac-f622-4ce3-a702-3a55b03d911f",
+      "course_id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9",
+      "title": "Piano di Studio - Piano Completo Geografia Storica",
+      "description": "Piano personalizzato basato su 1 documenti",
+      "total_sessions": 2,
+      "estimated_hours": 2,
+      "difficulty_progression": "graduale",
+      "created_at": "2025-11-05 10:17:42.708825",
+      "updated_at": "2025-11-05 10:17:42.708827",
+      "sessions": [
+        {
+          "id": "4ef22ff7-90ff-4b17-b5d3-486b0d4065fd",
+          "title": "Sessione guidata",
+          "description": "Panoramica strutturata sugli argomenti selezionati.",
+          "duration_minutes": 45,
+          "topics": [
+            "Metodologie di analisi territoriale",
+            "Fonti cartografiche",
+            "Analisi territoriale storica"
+          ],
+          "materials": [
+            "Capitolo 1 - Evoluzione geopolitica - Analisi territoriale storica",
+            "manuale_geografia.pdf"
+          ],
+          "difficulty": "intermediate",
+          "objectives": [
+            "Comprendere i concetti chiave",
+            "Applicare le nozioni ai casi di studio"
+          ],
+          "prerequisites": [
+            "Ripasso dei concetti base"
+          ],
+          "order_index": 0,
+          "book_id": null,
+          "book_title": "Capitolo 1 - Evoluzione geopolitica",
+          "chapter_title": "Analisi territoriale storica",
+          "chapter_index": null,
+          "chapter_summary": "Studiare la trasformazione dei territori nel tempo con approccio multidisciplinare.",
+          "concepts": [
+            {
+              "id": "analisi-territoriale",
+              "name": "Analisi territoriale storica",
+              "summary": "Studiare la trasformazione dei territori nel tempo con approccio multidisciplinare.",
+              "chapter": {
+                "title": "Capitolo 1 - Evoluzione geopolitica",
+                "index": 0
+              },
+              "related_topics": [
+                "Metodologie di analisi territoriale",
+                "Fonti cartografiche"
+              ],
+              "learning_objectives": [
+                "Applicare metodi di analisi alle trasformazioni geopolitiche",
+                "Interpretare le fonti cartografiche in chiave storica"
+              ],
+              "suggested_reading": [
+                "Manuale di geografia storica, Capitolo 1"
+              ],
+              "recommended_minutes": 45,
+              "quiz_outline": [
+                "Definizione di geografia storica",
+                "Strumenti di analisi territoriale"
+              ],
+              "quizzes": [
+                {
+                  "id": "quiz-diagnostico-analisi",
+                  "label": "diagnostico",
+                  "difficulty": "easy",
+                  "title": "Quiz Diagnostico - Analisi territoriale",
+                  "generated_at": "2025-11-05T10:17:42.708221",
+                  "questions": [
+                    {
+                      "question": "Qual è l'obiettivo principale della geografia storica?",
+                      "options": {
+                        "A": "Studiare la distribuzione delle specie animali",
+                        "B": "Analizzare l'evoluzione dei territori nel tempo",
+                        "C": "Calcolare la densità demografica attuale",
+                        "D": "Prevedere i trend climatici futuri"
+                      },
+                      "correct": "B"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "quizzes": [
+            {
+              "concept_id": "analisi-territoriale",
+              "concept_name": "Analisi territoriale storica",
+              "quiz_id": "quiz-diagnostico-analisi",
+              "label": "diagnostico",
+              "difficulty": "easy",
+              "title": "Quiz Diagnostico - Analisi territoriale",
+              "generated_at": "2025-11-05T10:17:42.708221",
+              "questions": [
+                {
+                  "question": "Qual è l'obiettivo principale della geografia storica?",
+                  "options": {
+                    "A": "Studiare la distribuzione delle specie animali",
+                    "B": "Analizzare l'evoluzione dei territori nel tempo",
+                    "C": "Calcolare la densità demografica attuale",
+                    "D": "Prevedere i trend climatici futuri"
+                  },
+                  "correct": "B"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "6dea298a-1405-4024-a4d1-68279ab28edb",
+          "title": "Sessione guidata",
+          "description": "Panoramica strutturata sugli argomenti selezionati.",
+          "duration_minutes": 45,
+          "topics": [
+            "Rotte commerciali",
+            "Influenze socio-politiche",
+            "Rotte commerciali coloniali"
+          ],
+          "materials": [
+            "Capitolo 2 - Espansioni coloniali - Rotte commerciali coloniali",
+            "manuale_geografia.pdf"
+          ],
+          "difficulty": "intermediate",
+          "objectives": [
+            "Comprendere i concetti chiave",
+            "Applicare le nozioni ai casi di studio"
+          ],
+          "prerequisites": [
+            "Ripasso dei concetti base"
+          ],
+          "order_index": 1,
+          "book_id": null,
+          "book_title": "Capitolo 2 - Espansioni coloniali",
+          "chapter_title": "Rotte commerciali coloniali",
+          "chapter_index": null,
+          "chapter_summary": "Comprendere l'impatto delle rotte commerciali sulla geografia storica.",
+          "concepts": [
+            {
+              "id": "rotte-commerciali",
+              "name": "Rotte commerciali coloniali",
+              "summary": "Comprendere l'impatto delle rotte commerciali sulla geografia storica.",
+              "chapter": {
+                "title": "Capitolo 2 - Espansioni coloniali",
+                "index": 1
+              },
+              "related_topics": [
+                "Rotte commerciali",
+                "Influenze socio-politiche"
+              ],
+              "learning_objectives": [
+                "Analizzare le principali rotte del periodo coloniale",
+                "Valutare le conseguenze socio-politiche delle espansioni"
+              ],
+              "suggested_reading": [
+                "Manuale di geografia storica, Capitolo 2"
+              ],
+              "recommended_minutes": 40,
+              "quiz_outline": [
+                "Principali rotte",
+                "Relazioni politiche"
+              ],
+              "quizzes": [
+                {
+                  "id": "quiz-approfondimento-rotte",
+                  "label": "approfondimento",
+                  "difficulty": "hard",
+                  "title": "Quiz Approfondimento - Rotte coloniali",
+                  "generated_at": "2025-11-05T10:17:42.708221",
+                  "questions": [
+                    {
+                      "question": "Quale rotta collegava l'Europa occidentale all'Asia orientale nel XVII secolo?",
+                      "options": {
+                        "A": "Rotta del Capo",
+                        "B": "Rotta del Nord-Ovest",
+                        "C": "Via della Seta",
+                        "D": "Rotta del Pacifico"
+                      },
+                      "correct": "A"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "quizzes": [
+            {
+              "concept_id": "rotte-commerciali",
+              "concept_name": "Rotte commerciali coloniali",
+              "quiz_id": "quiz-approfondimento-rotte",
+              "label": "approfondimento",
+              "difficulty": "hard",
+              "title": "Quiz Approfondimento - Rotte coloniali",
+              "generated_at": "2025-11-05T10:17:42.708221",
+              "questions": [
+                {
+                  "question": "Quale rotta collegava l'Europa occidentale all'Asia orientale nel XVII secolo?",
+                  "options": {
+                    "A": "Rotta del Capo",
+                    "B": "Rotta del Nord-Ovest",
+                    "C": "Via della Seta",
+                    "D": "Rotta del Pacifico"
+                  },
+                  "correct": "A"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

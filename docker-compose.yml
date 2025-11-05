@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: tutor-ai-backend:latest
+    image: tutor-ai-backend:ready
     container_name: tutor-ai-backend
     ports:
       - "8000:8000"
@@ -14,12 +14,15 @@ services:
       - rag_data:/app/rag
     environment:
       - PYTHONPATH=/app
+      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
     restart: unless-stopped
+    entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   frontend:
     build:
@@ -28,17 +31,24 @@ services:
     image: tutor-ai-frontend:latest
     container_name: tutor-ai-frontend
     ports:
-      - "3000:3000"
+      - "5000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Optional: Redis for caching
   redis:
@@ -51,26 +61,29 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
 
-  # Optional: Ollama for local LLM models
-  ollama:
-    image: ollama/ollama:latest
-    container_name: tutor-ai-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-    restart: unless-stopped
-    environment:
-      - OLLAMA_HOST=0.0.0.0
+  # Ollama removed - using Z.AI instead
 
 volumes:
   redis_data:
     driver: local
   rag_data:
     driver: local
-  ollama_models:
-    driver: local
 
 networks:
   default:
     name: tutor-ai-network
+    driver: bridge
+
+# Development profile
+x-dev-volumes: &dev-volumes
+  - ./frontend:/app
+  - /app/node_modules
+  - /app/.next
+  - ./backend:/app
+
+# Development override
+x-dev-frontend: &dev-frontend
+  environment:
+    - NEXT_PUBLIC_API_URL=http://localhost:8000
+    - NODE_ENV=development
+  volumes: *dev-volumes

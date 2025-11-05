@@ -1,9 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play } from 'lucide-react'
+import SlideGenerator from '@/components/SlideGenerator'
+
+interface BookChapter {
+  title: string
+  summary: string
+  estimated_minutes: number | null
+  topics: string[]
+}
 
 interface Book {
   id: string
@@ -17,7 +25,7 @@ interface Book {
   study_sessions: number
   total_study_time: number
   created_at: string
-  chapters: string[]
+  chapters: BookChapter[]
   tags: string[]
   materials: Array<{
     filename: string
@@ -25,6 +33,82 @@ interface Book {
     uploaded_at: string
     file_path: string
   }>
+}
+
+const toStringValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value)
+}
+
+const toFiniteNumber = (value: unknown): number => {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+const normalizeChapter = (chapter: unknown): BookChapter | null => {
+  if (typeof chapter === 'string') {
+    const title = chapter.trim()
+    if (!title) return null
+    return {
+      title,
+      summary: '',
+      estimated_minutes: null,
+      topics: []
+    }
+  }
+
+  if (chapter && typeof chapter === 'object') {
+    const data = chapter as Record<string, unknown>
+    const rawTitle = typeof data.title === 'string' ? data.title : typeof data.name === 'string' ? data.name : ''
+    const title = rawTitle.trim()
+    if (!title) return null
+
+    let estimated: number | null = null
+    if (typeof data.estimated_minutes === 'number') {
+      estimated = data.estimated_minutes
+    } else if (typeof data.estimated_minutes === 'string' && data.estimated_minutes.trim()) {
+      const parsed = Number.parseInt(data.estimated_minutes, 10)
+      estimated = Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+    }
+
+    return {
+      title,
+      summary: typeof data.summary === 'string' ? data.summary.trim() : '',
+      estimated_minutes: estimated,
+      topics: Array.isArray(data.topics) ? data.topics.map(topic => toStringValue(topic)).filter(Boolean) : []
+    }
+  }
+
+  return null
+}
+
+const normalizeBook = (book: unknown): Book => {
+  const record = (book && typeof book === 'object') ? book as Record<string, unknown> : {}
+  const chaptersArray = Array.isArray(record.chapters) ? record.chapters : []
+  const normalizedChapters = chaptersArray
+    .map(normalizeChapter)
+    .filter((chapter): chapter is BookChapter => Boolean(chapter))
+
+  return {
+    id: toStringValue(record.id),
+    title: toStringValue(record.title),
+    author: toStringValue(record.author),
+    isbn: toStringValue(record.isbn),
+    description: toStringValue(record.description),
+    year: toStringValue(record.year),
+    publisher: toStringValue(record.publisher),
+    materials_count: toFiniteNumber(record.materials_count),
+    study_sessions: toFiniteNumber(record.study_sessions),
+    total_study_time: toFiniteNumber(record.total_study_time),
+    created_at: toStringValue(record.created_at),
+    chapters: normalizedChapters,
+    tags: Array.isArray(record.tags) ? record.tags.map(tag => toStringValue(tag)).filter(Boolean) : [],
+    materials: Array.isArray(record.materials) ? record.materials as Book['materials'] : []
+  }
 }
 
 export default function BookPage() {
@@ -49,11 +133,11 @@ export default function BookPage() {
       const response = await fetch(`/api/courses/${courseId}/books/${bookId}`)
       if (response.ok) {
         const data = await response.json()
-        setBook(data.book)
+        setBook(normalizeBook(data.book))
       } else {
         setError('Errore nel caricamento del libro')
       }
-    } catch (error) {
+    } catch {
       setError('Errore nel caricamento del libro')
     } finally {
       setLoading(false)
@@ -67,12 +151,12 @@ export default function BookPage() {
         const data = await response.json()
         setCourseName(data.course.name)
       }
-    } catch (error) {
-      console.error('Error fetching course info:', error)
+    } catch (err) {
+      console.error('Error fetching course info:', err)
     }
   }
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
@@ -106,7 +190,7 @@ export default function BookPage() {
           } else {
             errorCount++
           }
-        } catch (error) {
+        } catch {
           errorCount++
         }
       }
@@ -122,7 +206,7 @@ export default function BookPage() {
       } else {
         alert('Errore durante il caricamento dei materiali')
       }
-    } catch (error) {
+    } catch {
       alert('Errore durante il caricamento dei materiali')
     } finally {
       setUploading(false)
@@ -258,12 +342,34 @@ export default function BookPage() {
                   {book.chapters.map((chapter, index) => (
                     <div
                       key={index}
-                      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                      className="p-4 bg-gray-50 rounded-lg space-y-2"
                     >
-                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                        {index + 1}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">{chapter.title}</p>
+                            {chapter.summary && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                {chapter.summary}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {typeof chapter.estimated_minutes === 'number' && (
+                          <div className="flex items-center space-x-1 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>{chapter.estimated_minutes} min</span>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-gray-700">{chapter}</span>
+                      {!chapter.summary && !chapter.estimated_minutes && (
+                        <p className="text-sm text-gray-500">
+                          Nessuna descrizione aggiunta per questo capitolo.
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -358,6 +464,13 @@ export default function BookPage() {
                   <Brain className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
                   Mappa Concettuale
                 </Link>
+
+                <SlideGenerator
+                  bookId={bookId}
+                  courseId={courseId}
+                  bookTitle={book.title}
+                  bookAuthor={book.author}
+                />
 
                 <Link
                   href={`/courses/${courseId}/books/${bookId}/edit`}

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: tutor-ai-backend:cors-fixed
+    container_name: tutor-ai-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend/.env:/app/.env
+      - rag_data:/app/rag
+    environment:
+      - PYTHONPATH=/app
+      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+    restart: unless-stopped
+    entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: tutor-ai-frontend:latest
+    container_name: tutor-ai-frontend
+    ports:
+      - "5000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  rag_data:
+    driver: local
+
+networks:
+  default:
+    name: tutor-ai-network
+    driver: bridge
+
+# Development profile
+x-dev-volumes: &dev-volumes
+  - ./frontend:/app
+  - /app/node_modules
+  - /app/.next
+  - ./backend:/app
+
+# Development override
+x-dev-frontend: &dev-frontend
+  environment:
+    - NEXT_PUBLIC_API_URL=http://localhost:8000
+    - NODE_ENV=development
+  volumes: *dev-volumes

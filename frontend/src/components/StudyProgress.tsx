@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, Calendar, Clock, Target, Flame, BookOpen } from 'lucide-react'
+import { Clock, Target, Flame, BookOpen } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 
 interface StudyProgressProps {
@@ -150,7 +150,7 @@ export function StudyProgress({ courseId }: StudyProgressProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Argomenti Coperti</p>
-              <p className="text-2xl font-bold text-gray-900">{progress.topics_covered.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{(progress.topics_covered || []).length}</p>
             </div>
             <div className="p-3 bg-purple-100 rounded-lg">
               <Target className="h-6 w-6 text-purple-600" />
@@ -243,11 +243,11 @@ export function StudyProgress({ courseId }: StudyProgressProps) {
       </div>
 
       {/* All Topics */}
-      {progress.topics_covered.length > 0 && (
+      {(progress.topics_covered || []).length > 0 && (
         <div className="card">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Tutti gli Argomenti Coperti</h3>
           <div className="flex flex-wrap gap-2">
-            {progress.topics_covered.map((topic, index) => (
+            {(progress.topics_covered || []).map((topic, index) => (
               <span
                 key={index}
                 className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"

@@ -14,6 +14,20 @@ interface MaterialInfo {
   course_name: string
 }
 
+type CourseMaterial = {
+  filename: string
+  file_path: string
+  size?: number
+  uploaded_at?: string
+}
+
+type CourseResponse = {
+  course?: {
+    name: string
+    materials?: CourseMaterial[]
+  }
+}
+
 export default function PDFViewerPage() {
   const params = useParams()
   const router = useRouter()
@@ -38,35 +52,37 @@ export default function PDFViewerPage() {
         throw new Error('Corso non trovato')
       }
 
-      const courseData = await courseResponse.json()
-      const course = courseData.course
+      const coursePayload: CourseResponse = await courseResponse.json()
+      const course = coursePayload.course
 
-      // Check if the material exists in course materials
-      if (course.materials) {
-        const material = course.materials.find((m: any) =>
-          m.filename === filename || m.file_path.includes(filename)
-        )
-
-        if (!material) {
-          throw new Error('Materiale non trovato')
-        }
-
-        setMaterialInfo({
-          filename: material.filename,
-          size: material.size,
-          uploaded_at: material.uploaded_at,
-          file_path: material.file_path,
-          course_name: course.name
-        })
-
-        // Construct PDF URL
-        const baseUrl = process.env.NODE_ENV === 'development'
-          ? 'http://localhost:8000'
-          : window.location.origin
-        setPdfUrl(`${baseUrl}/uploads/${encodeURIComponent(filename)}`)
-      } else {
-        throw new Error('Nessun materiale trovato per questo corso')
+      if (!course) {
+        throw new Error('Corso non trovato')
       }
+
+      const materials: CourseMaterial[] = Array.isArray(course.materials) ? course.materials : []
+      const material = materials.find(
+        (item) =>
+          typeof item.filename === 'string' &&
+          typeof item.file_path === 'string' &&
+          (item.filename === filename || item.file_path.includes(filename))
+      )
+
+      if (!material) {
+        throw new Error('Materiale non trovato')
+      }
+
+      setMaterialInfo({
+        filename: material.filename,
+        size: material.size ?? 0,
+        uploaded_at: material.uploaded_at ?? new Date().toISOString(),
+        file_path: material.file_path,
+        course_name: course.name
+      })
+
+      const baseUrl = process.env.NODE_ENV === 'development'
+        ? 'http://localhost:8000'
+        : window.location.origin
+      setPdfUrl(`${baseUrl}/uploads/${encodeURIComponent(filename)}`)
     } catch (error) {
       console.error('Error fetching material info:', error)
       setError(error instanceof Error ? error.message : 'Errore nel caricamento del materiale')
@@ -75,28 +91,10 @@ export default function PDFViewerPage() {
     }
   }
 
-  const handleSaveAnnotations = (annotations: any[]) => {
+  const handleSaveAnnotations = (annotations: unknown[]) => {
     // Save annotations to backend or localStorage
     console.log('Saving annotations:', annotations)
     // TODO: Implement backend save
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('it-IT', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
   }
 
   if (loading) {
@@ -152,27 +150,6 @@ export default function PDFViewerPage() {
         onSave={handleSaveAnnotations}
       />
 
-      {/* Material Info Footer - Only shown when needed */}
-      {false && ( // Set to true if you want to show this info
-        <div className="bg-white border-t border-gray-200 p-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-between text-sm text-gray-600">
-            <div className="flex items-center space-x-4">
-              <span><strong>File:</strong> {materialInfo.filename}</span>
-              <span><strong>Dimensione:</strong> {formatFileSize(materialInfo.size)}</span>
-              <span><strong>Caricato:</strong> {formatDate(materialInfo.uploaded_at)}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-gray-500">Corso:</span>
-              <Link
-                href={`/courses/${courseId}`}
-                className="text-blue-600 hover:text-blue-800 font-medium"
-              >
-                {materialInfo.course_name}
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

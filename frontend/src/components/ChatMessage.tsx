@@ -2,7 +2,7 @@
 
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { User, Bot, FileText, Clock } from 'lucide-react'
+import { User, Bot, FileText } from 'lucide-react'
 
 interface Source {
   source: string

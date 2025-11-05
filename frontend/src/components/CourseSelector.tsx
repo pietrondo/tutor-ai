@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 
 interface Course {
   id: string

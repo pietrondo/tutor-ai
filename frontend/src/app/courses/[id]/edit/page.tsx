@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, X, BookOpen, User, FileText } from 'lucide-react'
@@ -54,24 +54,24 @@ export default function EditCoursePage() {
           setError('Errore nel caricamento del corso')
         }
       }
-    } catch (error) {
-      console.error('Errore nel caricamento del corso:', error)
+    } catch (err) {
+      console.error('Errore nel caricamento del corso:', err)
       setError('Errore di connessione al server')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target
     setFormData(prev => ({
       ...prev,
       [name]: value
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
 
     if (!formData.name.trim() || !formData.subject.trim()) {
       setError('Il nome e la materia sono obbligatori')
@@ -96,8 +96,8 @@ export default function EditCoursePage() {
         const data = await response.json()
         setError(data.detail || 'Errore nell\'aggiornamento del corso')
       }
-    } catch (error) {
-      console.error('Errore nell\'aggiornamento del corso:', error)
+    } catch (err) {
+      console.error('Errore nell\'aggiornamento del corso:', err)
       setError('Errore di connessione al server')
     } finally {
       setSaving(false)

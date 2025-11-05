@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Plus } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewCoursePage() {
@@ -15,14 +15,14 @@ export default function NewCoursePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
+  const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = event.target
     setFormData(prev => ({ ...prev, [name]: value }))
     if (error) setError('')
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
     setIsSubmitting(true)
     setError('')
 

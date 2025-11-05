@@ -1,11 +1,28 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  type KeyboardEventHandler,
+  type FormEvent
+} from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Send, BookOpen, FileText, Brain, Settings, Zap, Database, Globe, AlertCircle, RefreshCw } from 'lucide-react'
+import {
+  Send,
+  Brain,
+  Zap,
+  AlertCircle,
+  RefreshCw,
+  Filter,
+  Target
+} from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
 import { CourseSelector } from '@/components/CourseSelector'
+import BookSelector from '@/components/BookSelector'
 import { llmManager, LLMRequest, LLMResponse } from '@/lib/llm-manager'
+import type { CourseConcept, ConceptMetrics, CourseConceptMap } from '@/types/concept'
 
 interface Message {
   id: string
@@ -30,6 +47,13 @@ interface Course {
   materials_count: number
 }
 
+interface Book {
+  id: string
+  title: string
+  author?: string
+  materials_count: number
+}
+
 interface LLMStatus {
   available: boolean
   current: string
@@ -37,40 +61,210 @@ interface LLMStatus {
   totalProviders: number
 }
 
+interface QuizQuestion {
+  question: string
+  options: Record<string, string>
+  correct: string
+  explanation: string
+}
+
+interface ConceptQuiz {
+  title: string
+  difficulty: string
+  questions: QuizQuestion[]
+}
+
+interface ActiveQuizState {
+  concept: CourseConcept
+  quiz: ConceptQuiz
+  answers: Record<number, string>
+  startTime: number
+  submitted: boolean
+  result?: {
+    score: number
+    correct: number
+    total: number
+    timeSeconds: number
+  }
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const MAX_FOCUS_CONCEPTS = 3
+
 export function ChatWrapper() {
   const searchParams = useSearchParams()
-  const [selectedCourse, setSelectedCourse] = useState<string>('')
+  const [selectedCourse, setSelectedCourse] = useState('')
+  const [selectedBook, setSelectedBook] = useState('')
   const [courses, setCourses] = useState<Course[]>([])
+  const [books, setBooks] = useState<Book[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [sessionId, setSessionId] = useState<string>('')
   const [llmStatus, setLlmStatus] = useState<LLMStatus | null>(null)
   const [showLLMStatus, setShowLLMStatus] = useState(false)
   const [ragEnabled, setRagEnabled] = useState(true)
+
+  const [conceptMap, setConceptMap] = useState<CourseConceptMap | null>(null)
+  const [conceptMetrics, setConceptMetrics] = useState<ConceptMetrics>({})
+  const [conceptsLoading, setConceptsLoading] = useState(false)
+  const [conceptError, setConceptError] = useState<string | null>(null)
+  const [conceptsGenerating, setConceptsGenerating] = useState(false)
+  const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
+  const [activeQuiz, setActiveQuiz] = useState<ActiveQuizState | null>(null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     initializeChat()
   }, [])
 
+  useEffect(() => {
+    if (selectedCourse) {
+      loadBooks(selectedCourse)
+      loadConceptContext(selectedCourse)
+    } else {
+      setBooks([])
+      setSelectedBook('')
+      setConceptMap(null)
+      setConceptMetrics({})
+      setSelectedConceptIds([])
+    }
+  }, [selectedCourse])
+
   const initializeChat = async () => {
     await loadCourses()
+    await loadSavedSettings()
     await checkLLMProviders()
 
     const courseId = searchParams.get('course')
+    const bookId = searchParams.get('book')
+
     if (courseId) {
       setSelectedCourse(courseId)
+      await loadBooks(courseId)
+      await loadConceptContext(courseId)
+    }
+
+    if (bookId) {
+      setSelectedBook(bookId)
+    }
+  }
+
+  const loadSavedSettings = async () => {
+    try {
+      const savedApiKeys = localStorage.getItem('api-keys')
+      const savedSettings = localStorage.getItem('app-settings')
+
+      if (savedApiKeys) {
+        const apiKeys = JSON.parse(savedApiKeys)
+
+        if (apiKeys.openai) {
+          llmManager.configureProvider('openai', { apiKey: apiKeys.openai })
+        }
+
+        if (apiKeys.openrouter) {
+          llmManager.configureProvider('openrouter', { apiKey: apiKeys.openrouter })
+        }
+
+        if (apiKeys.anthropic) {
+          llmManager.configureProvider('anthropic', { apiKey: apiKeys.anthropic })
+        }
+
+        if (apiKeys.zai) {
+          llmManager.configureProvider('zai', { apiKey: apiKeys.zai })
+        }
+
+        if (savedSettings) {
+          const settings = JSON.parse(savedSettings)
+          if (settings.llmProvider && apiKeys[settings.llmProvider]) {
+            llmManager.setDefaultProvider(settings.llmProvider)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved settings:', error)
     }
   }
 
   const loadCourses = async () => {
     try {
-      const response = await fetch('http://localhost:8000/courses')
+      const response = await fetch(`${API_BASE_URL}/courses`)
       const data = await response.json()
       setCourses(data.courses || [])
     } catch (error) {
       console.error('Errore nel caricamento dei corsi:', error)
+    }
+  }
+
+  const loadBooks = async (courseId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/books`)
+      const data = await response.json()
+      setBooks(data.books || [])
+    } catch (error) {
+      console.error('Errore nel caricamento dei libri:', error)
+    }
+  }
+
+  const loadConceptContext = async (courseId: string) => {
+    setConceptsLoading(true)
+    setConceptError(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/concepts`)
+      if (response.ok) {
+        const data = await response.json()
+        setConceptMap(data.concept_map)
+        await loadConceptMetrics(courseId)
+      } else if (response.status === 404) {
+        setConceptMap(null)
+        setConceptMetrics({})
+      } else {
+        throw new Error('Impossibile caricare la mappa concettuale')
+      }
+    } catch (error) {
+      console.error('Errore concept map:', error)
+      setConceptError('Nessuna mappa concettuale disponibile. Generala per iniziare.')
+      setConceptMap(null)
+      setConceptMetrics({})
+    } finally {
+      setConceptsLoading(false)
+    }
+  }
+
+  const loadConceptMetrics = async (courseId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/concepts/metrics`)
+      if (response.ok) {
+        const data = await response.json()
+        setConceptMetrics(data.metrics || {})
+      }
+    } catch (error) {
+      console.error('Errore caricamento metriche concetti:', error)
+    }
+  }
+
+  const handleGenerateConceptMap = async () => {
+    if (!selectedCourse) return
+    setConceptsGenerating(true)
+    setConceptError(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${selectedCourse}/concepts/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: selectedBook || undefined, force: true })
+      })
+      if (!response.ok) {
+        throw new Error('Errore generazione concept map')
+      }
+      const data = await response.json()
+      setConceptMap(data.concept_map)
+      setSelectedConceptIds([])
+      await loadConceptMetrics(selectedCourse)
+    } catch (error) {
+      console.error('Errore generazione concept map:', error)
+      setConceptError('Impossibile generare la mappa concettuale. Riprova più tardi.')
+    } finally {
+      setConceptsGenerating(false)
     }
   }
 
@@ -98,42 +292,81 @@ export function ChatWrapper() {
   }
 
   useEffect(() => {
-    scrollToBottom()
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const selectedCourseData = useMemo(
+    () => courses.find(c => c.id === selectedCourse) || null,
+    [courses, selectedCourse]
+  )
+
+  const selectedBookData = useMemo(
+    () => books.find(b => b.id === selectedBook) || null,
+    [books, selectedBook]
+  )
+
+  const selectedConcepts = useMemo(
+    () => (conceptMap?.concepts || []).filter(concept => selectedConceptIds.includes(concept.id)),
+    [conceptMap, selectedConceptIds]
+  )
+
+  const toggleConcept = (conceptId: string) => {
+    setSelectedConceptIds(prev => {
+      if (prev.includes(conceptId)) {
+        return prev.filter(id => id !== conceptId)
+      }
+      if (prev.length >= MAX_FOCUS_CONCEPTS) {
+        const [, ...rest] = [...prev, conceptId]
+        return rest
+      }
+      return [...prev, conceptId]
+    })
   }
 
-  const generateSystemPrompt = (courseContext?: any) => {
-    const basePrompt = `Sei un tutor AI esperto per studenti di informatica. Fornisci risposte chiare, accurate e basate sulle migliori pratiche educative.
+  const generateSystemPrompt = (courseContext?: Course, bookContext?: Book) => {
+    const basePrompt = `Sei un tutor AI esperto per studenti universitari. Fornisci risposte chiare, accurate e pratiche.
 
-    Caratteristiche chiave:
-    - Sii paziente e incoraggiante
-    - Fornisci esempi pratici quando possibile
-    - Struttura le risposte in modo logico
-    - Adatta la complessità al livello dell'utente
-    - Usa un linguaggio chiaro e professionale ma accessibile`
+Caratteristiche chiave:
+- Sii paziente e incoraggiante
+- Fornisci esempi pratici quando possibile
+- Struttura le risposte in modo logico
+- Adatta la complessità al livello dell'utente
+- Usa un linguaggio chiaro e professionale ma accessibile`
+
+    let contextInfo = ''
 
     if (courseContext) {
-      return `${basePrompt}
-
-Contesto del corso corrente:
-      - Nome: ${courseContext.name}
-      - Materia: ${courseContext.subject}
-      - Materiali disponibili: ${courseContext.materials_count} documenti
-      ${ragEnabled ? 'I materiali del corso sono stati indicizzati e possono essere usati come riferimento per risposte più accurate.' : ''}`
+      contextInfo += `\nContesto del corso:\n- Nome: ${courseContext.name}\n- Materia: ${courseContext.subject}\n- Materiali indicizzati: ${courseContext.materials_count}`
     }
 
-    return basePrompt
+    if (bookContext) {
+      contextInfo += `\nMateriale in focus: ${bookContext.title}${bookContext.author ? ` (${bookContext.author})` : ''}`
+    }
+
+    if (selectedConcepts.length > 0) {
+      const conceptSummaries = selectedConcepts.map(concept => {
+        const metrics = conceptMetrics[concept.id]
+        const statsText = metrics
+          ? `, performance media quizzes: ${(metrics.stats.average_score * 100).toFixed(0)}%`
+          : ''
+        return `- ${concept.name} (Capitolo: ${concept.chapter?.title || 'N/A'}${statsText})\n  Obiettivi: ${concept.learning_objectives.slice(0, 2).join('; ')}`
+      }).join('\n')
+      contextInfo += `\nConcetti prioritari:\n${conceptSummaries}`
+    }
+
+    if (!contextInfo) {
+      return basePrompt
+    }
+
+    return `${basePrompt}\n\n${contextInfo}`
   }
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !selectedCourse || isLoading) return
+    if (!input.trim() || !selectedCourse) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: input,
+      content: input.trim(),
       role: 'user',
       timestamp: new Date().toISOString()
     }
@@ -142,63 +375,43 @@ Contesto del corso corrente:
     setInput('')
     setIsLoading(true)
 
+    const courseContext = selectedCourseData || undefined
+    const bookContext = selectedBookData || undefined
+    const systemPrompt = generateSystemPrompt(courseContext, bookContext)
+
+    const llmRequest: LLMRequest = {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages.map((message) => ({ role: message.role, content: message.content })),
+        { role: 'user', content: userMessage.content }
+      ],
+      rag_enabled: ragEnabled,
+      course_id: selectedCourse,
+      metadata: {
+        book_id: selectedBook || undefined,
+        focus_concepts: selectedConcepts.map(concept => ({
+          id: concept.id,
+          name: concept.name,
+          chapter: concept.chapter?.title
+        }))
+      }
+    }
+
+    const startTime = performance.now()
+
     try {
-      const courseContext = courses.find(c => c.id === selectedCourse)
-      const systemPrompt = generateSystemPrompt(courseContext)
-
-      // Perform RAG search if enabled
-      let ragContext = null
-      if (ragEnabled && courseContext) {
-        try {
-          const searchResults = await llmManager.searchDocuments(
-            input,
-            selectedCourse,
-            3
-          )
-          if (searchResults.chunks.length > 0) {
-            ragContext = searchResults
-          }
-        } catch (error) {
-          console.error('RAG search failed:', error)
-        }
-      }
-
-      const llmRequest: LLMRequest = {
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          ...messages.map(msg => ({
-            role: msg.role,
-            content: msg.content,
-            ...(ragContext && msg.role === 'assistant' && {
-              content: `${msg.content}\n\nFonti RAG: ${ragContext.chunks.length} documenti rilevanti trovati con punteggio di similarità medio di ${(ragContext.chunks.reduce((sum, chunk) => sum + chunk.similarity, 0) / ragContext.chunks.length).toFixed(2)}`
-            })
-          })),
-          {
-            role: 'user',
-            content: input
-          }
-        ],
-        temperature: 0.7,
-        maxTokens: 2000,
-        systemPrompt
-      }
-
-      const startTime = Date.now()
-      const response: LLMResponse = await llmManager.generateResponse(llmRequest)
-      const responseTime = Date.now() - startTime
+      const response: LLMResponse = await llmManager.invoke(llmRequest)
+      const responseTime = performance.now() - startTime
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.content,
+        content: response.message,
         role: 'assistant',
         timestamp: new Date().toISOString(),
-        sources: ragContext?.chunks.map((chunk, index) => ({
+        sources: response.sources?.map((chunk, index) => ({
           source: chunk.source,
           chunk_index: index,
-          relevance_score: chunk.similarity
+          relevance_score: chunk.similarity || chunk.score || 0.75
         })),
         provider: response.provider,
         model: response.model,
@@ -207,11 +420,9 @@ Contesto del corso corrente:
       }
 
       setMessages(prev => [...prev, assistantMessage])
-      setSessionId(`session_${Date.now()}`)
     } catch (error) {
       console.error('Errore nell\'invio del messaggio:', error)
 
-      // Determine error type based on error message
       let errorMessage = 'Mi dispiace, si è verificato un errore. Riprova più tardi.'
 
       if (error instanceof Error) {
@@ -237,139 +448,380 @@ Contesto del corso corrente:
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
+  const handleKeyPress: KeyboardEventHandler<HTMLInputElement> = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
       handleSendMessage()
     }
   }
 
-  const selectedCourseData = courses.find(c => c.id === selectedCourse)
+  const handleStartQuiz = async (concept: CourseConcept) => {
+    if (!selectedCourse) return
 
-  const getLLMStatusIcon = () => {
-    if (!llmStatus) return <Globe className="h-5 w-5 text-gray-400" />
+    setActiveQuiz(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: selectedCourse,
+          topic: concept.name,
+          difficulty: 'medium',
+          num_questions: 5
+        })
+      })
 
-    if (llmStatus.available) {
-      return <Database className="h-5 w-5 text-green-600" />
-    } else {
-      return <AlertCircle className="h-5 w-5 text-red-600" />
+      if (!response.ok) {
+        throw new Error('Errore generazione quiz')
+      }
+
+      const data = await response.json()
+      const quiz: ConceptQuiz = data.quiz
+      setActiveQuiz({
+        concept,
+        quiz,
+        answers: {},
+        startTime: performance.now(),
+        submitted: false
+      })
+    } catch (error) {
+      console.error('Errore quiz concetto:', error)
+      setConceptError('Impossibile generare il quiz per il concetto selezionato.')
     }
   }
 
-  const getLLMStatusText = () => {
-    if (!llmStatus) return 'Provider sconosciuto'
+  const handleSubmitQuiz = async () => {
+    if (!activeQuiz || !selectedCourse) return
 
-    if (llmStatus.available) {
-      return `${llmStatus.current} disponibile (${llmStatus.fallbacks.length} fallback)`
-    } else {
-      return `Nessun provider disponibile (${llmStatus.totalProviders} totali)`
+    const { answers, quiz, concept, startTime } = activeQuiz
+    const total = quiz.questions.length
+    let correct = 0
+
+    quiz.questions.forEach((question, index) => {
+      if (answers[index] === question.correct) {
+        correct += 1
+      }
+    })
+
+    const timeSeconds = (performance.now() - startTime) / 1000
+    const score = correct / total
+
+    try {
+      await fetch(`${API_BASE_URL}/courses/${selectedCourse}/concepts/${concept.id}/quiz-results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          concept_name: concept.name,
+          chapter_title: concept.chapter?.title,
+          score,
+          time_seconds: timeSeconds,
+          correct_answers: correct,
+          total_questions: total
+        })
+      })
+
+      await loadConceptMetrics(selectedCourse)
+    } catch (error) {
+      console.error('Errore salvataggio quiz concetto:', error)
     }
+
+    setActiveQuiz({
+      ...activeQuiz,
+      submitted: true,
+      result: { score, correct, total, timeSeconds }
+    })
   }
 
-  return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-3xl font-bold text-gray-900">Chat con il Tutor AI Avanzato</h1>
-          <div className="flex items-center space-x-2">
+  const renderConceptFocus = () => {
+    if (!selectedCourse) return null
+
+    const concepts = conceptMap?.concepts || []
+
+    return (
+      <div className="mb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Target className="h-4 w-4 text-purple-600" />
+            Concetti su cui concentrarsi
+          </h2>
+          <div className="flex items-center gap-2">
+            {conceptsLoading ? (
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <RefreshCw className="h-3 w-3 animate-spin" /> Caricamento…
+              </span>
+            ) : conceptMap ? (
+              <span className="text-xs text-gray-500">
+                {concepts.length} concetti disponibili
+              </span>
+            ) : null}
             <button
-              onClick={() => setShowLLMStatus(!showLLMStatus)}
-              className="btn btn-ghost btn-sm"
-              title="Stato Provider LLM"
+              onClick={handleGenerateConceptMap}
+              disabled={conceptsGenerating}
+              className="flex items-center gap-1 rounded-md border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-60"
             >
-              {getLLMStatusIcon()}
-            </button>
-            <button
-              onClick={() => setRagEnabled(!ragEnabled)}
-              className={`btn btn-ghost btn-sm ${ragEnabled ? 'text-green-600' : 'text-gray-600'}`}
-              title={ragEnabled ? 'RAG attivo' : 'RAG disattivo'}
-            >
-              <Database className="h-4 w-4" />
+              {conceptsGenerating ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Filter className="h-3 w-3" />}
+              Rigenera mappa
             </button>
           </div>
         </div>
-        <p className="text-gray-600">
-          Chat intelligente con multi-provider LLM e RAG per risposte accurate basate sui materiali di studio
-        </p>
-      </div>
 
-      {/* LLM Status Bar */}
-      {showLLMStatus && llmStatus && (
-        <div className="glass rounded-xl p-4 border border-gray-200/50 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {getLLMStatusIcon()}
-              <div>
-                <div className="text-sm font-medium text-gray-900">Status Provider LLM</div>
-                <div className="text-xs text-gray-600">{getLLMStatusText()}</div>
+        {conceptError && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {conceptError}
+          </div>
+        )}
+
+        {concepts.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {concepts.map(concept => {
+                const isSelected = selectedConceptIds.includes(concept.id)
+                const metrics = conceptMetrics[concept.id]
+                const difficultyBadge = metrics ? `${(metrics.stats.average_score * 100).toFixed(0)}%` : '—'
+
+                return (
+                  <button
+                    key={concept.id}
+                    onClick={() => toggleConcept(concept.id)}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span className="font-medium">{concept.name}</span>
+                    <span className="ml-2 text-[10px] text-gray-500">{difficultyBadge}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedConcepts.length > 0 && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                {selectedConcepts.map(concept => {
+                  const metrics = conceptMetrics[concept.id]
+                  return (
+                    <div key={concept.id} className="mb-3 last:mb-0">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-900">{concept.name}</h3>
+                        <button
+                          className="text-xs text-blue-600 hover:text-blue-700"
+                          onClick={() => handleStartQuiz(concept)}
+                        >
+                          Genera quiz
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Capitolo: {concept.chapter?.title || 'N/A'}</p>
+                      <p className="text-xs text-gray-600 mt-1">Obiettivi: {concept.learning_objectives.slice(0, 2).join('; ')}</p>
+                      {metrics && (
+                        <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-gray-500">
+                          <span>Media quiz: {(metrics.stats.average_score * 100).toFixed(0)}%</span>
+                          <span>Tentativi: {metrics.stats.attempts_count}</span>
+                          <span>Tempo medio: {metrics.stats.average_time_seconds.toFixed(0)}s</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-            <button
-              onClick={checkLLMProviders}
-              className="btn btn-secondary btn-sm"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Ricontrolla
-            </button>
-          </div>
-
-          {llmStatus.available && (
-            <div className="mt-3 flex items-center space-x-2 text-xs text-gray-600">
-              <span>Provider:</span>
-              <span className="font-medium text-gray-900">{llmStatus.current}</span>
-              {llmStatus.fallbacks.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span>Fallbacks: {llmStatus.fallbacks.join(', ')}</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Course Selector */}
-      <div className="mb-6">
-        <CourseSelector
-          courses={courses}
-          selectedCourse={selectedCourse}
-          onCourseChange={setSelectedCourse}
-        />
-
-        {selectedCourseData && (
-          <div className="mt-2 flex items-center text-sm text-gray-600">
-            <BookOpen className="h-4 w-4 mr-1" />
-            {selectedCourseData.materials_count} materiali disponibili
-            {ragEnabled && (
-              <>
-                <span>•</span>
-                <span className="text-green-600">RAG attivo</span>
-              </>
             )}
           </div>
         )}
+
+        {!conceptsLoading && !conceptMap && !conceptError && (
+          <button
+            onClick={handleGenerateConceptMap}
+            disabled={conceptsGenerating}
+            className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-purple-300 hover:text-purple-700"
+          >
+            <Brain className="h-4 w-4" />
+            Genera mappa concettuale del corso
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const renderQuizModal = () => {
+    if (!activeQuiz) return null
+
+    const { concept, quiz, answers, submitted, result } = activeQuiz
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Quiz: {concept.name}</h2>
+              <p className="text-xs text-gray-500">{quiz.difficulty.toUpperCase()} • {quiz.questions.length} domande</p>
+            </div>
+            <button className="text-sm text-gray-500 hover:text-gray-700" onClick={() => setActiveQuiz(null)}>
+              Chiudi
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            {quiz.questions.map((question, index) => (
+              <div key={index} className="rounded-lg border border-gray-200 p-4">
+                <div className="mb-3 text-sm font-semibold text-gray-800">
+                  {index + 1}. {question.question}
+                </div>
+                <div className="space-y-2">
+                  {Object.entries(question.options).map(([key, value]) => {
+                    const isSelected = answers[index] === key
+                    const isCorrect = submitted && question.correct === key
+                    const isWrongSelection = submitted && isSelected && question.correct !== key
+
+                    return (
+                      <label
+                        key={key}
+                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                          isCorrect
+                            ? 'border-green-400 bg-green-50 text-green-800'
+                            : isWrongSelection
+                            ? 'border-red-400 bg-red-50 text-red-800'
+                            : isSelected
+                            ? 'border-blue-400 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`question-${index}`}
+                          value={key}
+                          disabled={submitted}
+                          checked={isSelected}
+                          onChange={() =>
+                            setActiveQuiz(prev => prev ? {
+                              ...prev,
+                              answers: { ...prev.answers, [index]: key }
+                            } : prev)
+                          }
+                        />
+                        <span className="font-medium">{key}.</span>
+                        <span>{value}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {submitted && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Spiegazione: {question.explanation}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex items-center justify-between">
+            {submitted && result ? (
+              <div className="text-sm text-gray-700">
+                Punteggio: <span className="font-semibold">{(result.score * 100).toFixed(0)}%</span> •
+                Risposte corrette: {result.correct}/{result.total} • Tempo: {result.timeSeconds.toFixed(1)}s
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">
+                Seleziona una risposta per ogni domanda, poi invia il quiz.
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              {!submitted && (
+                <button
+                  onClick={handleSubmitQuiz}
+                  disabled={Object.keys(answers).length !== quiz.questions.length}
+                  className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+                >
+                  Invia risposte
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const handleClearConversation = () => {
+    setMessages([])
+    setActiveQuiz(null)
+  }
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    handleSendMessage()
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="card">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <CourseSelector
+              courses={courses}
+              selectedCourse={selectedCourse}
+              onCourseChange={setSelectedCourse}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={ragEnabled}
+                    onChange={(e) => setRagEnabled(e.target.checked)}
+                  />
+                  RAG attivo
+                </label>
+                {llmStatus && (
+                  <button
+                    onClick={() => setShowLLMStatus(prev => !prev)}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] ${
+                      llmStatus.available
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {llmStatus.available ? <Zap className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                    {llmStatus.available ? 'LLM disponibile' : 'LLM non disponibile'}
+                  </button>
+                )}
+              </div>
+              <BookSelector
+                books={books}
+                selectedBook={selectedBook}
+                onBookChange={setSelectedBook}
+                disabled={!selectedCourse}
+              />
+            </div>
+          </div>
+
+          {showLLMStatus && llmStatus && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600">
+              Provider corrente: <strong>{llmStatus.current}</strong> • Fallback: {llmStatus.fallbacks.join(', ') || 'Nessuno'} • Totale provider configurati: {llmStatus.totalProviders}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Chat Messages */}
-      <div className="card mb-6 h-96 overflow-y-auto">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <Brain className="h-12 w-12 mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium mb-2">Inizia una conversazione intelligente</h3>
-            <p className="text-center max-w-md">
-              Seleziona un corso e fai la tua domanda al tutor AI avanzato.
-              Il sistema utilizerà il provider LLM ottimale e RAG per fornire risposte accurate basate sui materiali caricati.
-            </p>
+      {renderConceptFocus()}
+
+      <div className="card min-h-[320px]">
+        {messages.length === 0 && !isLoading ? (
+          <div className="flex h-48 flex-col items-center justify-center text-center text-sm text-gray-500">
+            <Brain className="mb-3 h-8 w-8 text-purple-500" />
+            <p>Inizia selezionando un corso e, se vuoi, uno o più concetti su cui concentrarti.<br />Formula poi la tua domanda al tutor AI.</p>
           </div>
         ) : (
-          <div className="space-y-4 p-4">
-            {messages.map((message) => (
+          <div className="space-y-4">
+            {messages.map(message => (
               <ChatMessage key={message.id} message={message} />
             ))}
             {isLoading && (
-              <div className="flex items-center space-x-2 text-gray-500">
-                <div className="loading-spinner"></div>
-                <span>Il tutor sta pensando...</span>
+              <div className="flex justify-start text-sm text-gray-500">
+                <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Generazione risposta…
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -377,77 +829,43 @@ Contesto del corso corrente:
         )}
       </div>
 
-      {/* Message Status Indicators */}
-      {messages.length > 0 && (
-        <div className="mb-4 p-2 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>
-              {messages.filter(m => m.role === 'assistant').length} risposte generate
-            </span>
-            {ragEnabled && (
-              <span>• RAG: {messages.filter(m => m.sources && m.sources.length > 0).length} con fonti</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Input Form */}
       <div className="card">
-        <div className="flex space-x-4">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={selectedCourse ? "Fai la tua domanda..." : "Seleziona prima un corso..."}
-            disabled={!selectedCourse || isLoading}
-            className="form-input flex-1"
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!input.trim() || !selectedCourse || isLoading}
-            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-          >
-            {isLoading ? (
-              <div className="loading-spinner"></div>
-            ) : (
-              <Send className="h-4 w-4" />
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={selectedCourse ? 'Fai la tua domanda...' : 'Seleziona prima un corso…'}
+              disabled={!selectedCourse || isLoading}
+              className="form-input flex-1"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || !selectedCourse || isLoading}
+              className="btn btn-primary flex items-center gap-2 disabled:opacity-60"
+            >
+              {isLoading ? <div className="loading-spinner"></div> : <Send className="h-4 w-4" />}
+              Invia
+            </button>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <button
+              type="button"
+              onClick={handleClearConversation}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              Svuota conversazione
+            </button>
+            {selectedConcepts.length > 0 && (
+              <span>Focus: {selectedConcepts.map(concept => concept.name).join(', ')}</span>
             )}
-            <span>Invia</span>
-          </button>
-        </div>
+          </div>
+        </form>
       </div>
 
-      {/* Features Info */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center space-x-2 text-blue-800 mb-1">
-            <Zap className="h-4 w-4" />
-            <span className="font-medium text-sm">Multi-Provider</span>
-          </div>
-          <p className="text-xs text-blue-700">
-            Supporta OpenAI, OpenRouter, LM Studio e altri provider con fallback automatico
-          </p>
-        </div>
-        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-          <div className="flex items-center space-x-2 text-green-800 mb-1">
-            <Database className="h-4 w-4" />
-            <span className="font-medium text-sm">RAG Integrato</span>
-          </div>
-          <p className="text-xs text-green-700">
-            Ricerca semantica nei documenti per risposte basate sui materiali di studio
-          </p>
-        </div>
-        <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-          <div className="flex items-center space-x-2 text-purple-800 mb-1">
-            <Settings className="h-4 w-4" />
-            <span className="font-medium text-sm">Adattivo</span>
-          </div>
-          <p className="text-xs text-purple-700">
-            Selezione automatica del provider ottimale e gestione errori
-          </p>
-        </div>
-      </div>
+      {renderQuizModal()}
     </div>
   )
 }

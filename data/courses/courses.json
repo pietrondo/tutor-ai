@@ -1,40 +1,11 @@
 [
   {
-    "id": "a000c40a-bcc0-4968-bc06-4d52d46f1c56",
-    "name": "sd",
-    "description": "ds",
-    "subject": "Matematica",
-    "created_at": "2025-11-02T14:40:18.969894",
-    "updated_at": "2025-11-02T15:43:54.747224",
-    "materials": [],
-    "study_sessions": 0,
-    "total_study_time": 0,
-    "books": [
-      {
-        "id": "0fe07801-687d-40e0-8346-2e832552e1e9",
-        "title": "Libro di Test",
-        "author": "Autore di Test",
-        "isbn": "",
-        "description": "Test description",
-        "year": "",
-        "publisher": "",
-        "created_at": "2025-11-02T15:43:54.747209",
-        "updated_at": "2025-11-02T15:43:54.747221",
-        "materials": [],
-        "study_sessions": 0,
-        "total_study_time": 0,
-        "chapters": [],
-        "tags": []
-      }
-    ]
-  },
-  {
     "id": "e9195d61-9bd2-4e30-a183-cee2ab80f1b9",
     "name": "Geografia storica",
     "description": "Geografia storica",
     "subject": "Storia",
     "created_at": "2025-11-02T14:40:34.280721",
-    "updated_at": "2025-11-02T15:19:47.200970",
+    "updated_at": "2025-11-02T21:19:21.067153",
     "materials": [],
     "study_sessions": 0,
     "total_study_time": 0,
@@ -54,18 +25,23 @@
         "total_study_time": 0,
         "chapters": [],
         "tags": []
+      },
+      {
+        "id": "582d5f87-89bb-45da-8df5-28e33d7dc009",
+        "title": "Caboto",
+        "author": "",
+        "isbn": "",
+        "description": "",
+        "year": "",
+        "publisher": "",
+        "created_at": "2025-11-02T21:19:21.067108",
+        "updated_at": "2025-11-02T21:19:21.067141",
+        "materials": [],
+        "study_sessions": 0,
+        "total_study_time": 0,
+        "chapters": [],
+        "tags": []
       }
     ]
-  },
-  {
-    "id": "ff296c6d-6d15-4f43-bae4-caf25b92783f",
-    "name": "Corso di Test per Libri",
-    "description": "Corso per testare la funzionalit\u00e0 dei libri",
-    "subject": "Test",
-    "created_at": "2025-11-02T14:42:25.625204",
-    "updated_at": "2025-11-02T14:42:25.625219",
-    "materials": [],
-    "study_sessions": 0,
-    "total_study_time": 0
   }
 ]

@@ -40,7 +40,7 @@ export default function StudyTimer() {
   const [totalStudyTime, setTotalStudyTime] = useState(0)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Load saved data from localStorage
   useEffect(() => {

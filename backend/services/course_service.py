@@ -56,15 +56,19 @@ class CourseService:
             courses = self.get_all_courses_raw()
 
             for course in courses:
-                # Add materials count
+                # Add materials count - search recursively for PDFs
                 course_dir = os.path.join(self.courses_dir, course["id"])
+                materials = []
                 if os.path.exists(course_dir):
-                    materials = [f for f in os.listdir(course_dir) if f.endswith('.pdf')]
-                    course["materials_count"] = len(materials)
-                    course["materials"] = materials
-                else:
-                    course["materials_count"] = 0
-                    course["materials"] = []
+                    for root, dirs, files in os.walk(course_dir):
+                        for f in files:
+                            if f.endswith('.pdf'):
+                                # Get relative path from course directory
+                                rel_path = os.path.relpath(os.path.join(root, f), course_dir)
+                                materials.append(rel_path)
+
+                course["materials_count"] = len(materials)
+                course["materials"] = materials
 
             return courses
 
@@ -86,23 +90,25 @@ class CourseService:
             course = next((c for c in courses if c["id"] == course_id), None)
 
             if course:
-                # Get detailed materials info
+                # Get detailed materials info - search recursively for PDFs
                 course_dir = os.path.join(self.courses_dir, course_id)
+                materials = []
                 if os.path.exists(course_dir):
-                    materials = []
-                    for filename in os.listdir(course_dir):
-                        if filename.endswith('.pdf'):
-                            file_path = os.path.join(course_dir, filename)
-                            stat = os.stat(file_path)
-                            materials.append({
-                                "filename": filename,
-                                "size": stat.st_size,
-                                "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                                "file_path": file_path
-                            })
-                    course["materials"] = materials
-                else:
-                    course["materials"] = []
+                    for root, dirs, files in os.walk(course_dir):
+                        for filename in files:
+                            if filename.endswith('.pdf'):
+                                file_path = os.path.join(root, filename)
+                                stat = os.stat(file_path)
+                                # Get relative path from course directory
+                                rel_path = os.path.relpath(file_path, course_dir)
+                                materials.append({
+                                    "filename": filename,
+                                    "relative_path": rel_path,
+                                    "size": stat.st_size,
+                                    "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                                    "file_path": file_path
+                                })
+                course["materials"] = materials
 
             return course
 

@@ -7,6 +7,15 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
+    tesseract-ocr \
+    tesseract-ocr-ita \
+    tesseract-ocr-eng \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
@@ -22,7 +31,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Crea le directory necessarie
-RUN mkdir -p data/{courses,vector_db,uploads,tracking}
+RUN mkdir -p data/{courses,vector_db,uploads,tracking} && \
+    mkdir -p data/courses/*/books && \
+    chmod -R 755 data/
 
 # Espone la porta
 EXPOSE 8000

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Clock, BookOpen, Target, CheckCircle, Circle, Plus, Settings, Play, Edit3, Trash2, ChevronRight, BookMarked, MessageSquare } from 'lucide-react'
+import { Clock, BookOpen, Target, CheckCircle, Circle, Plus, Trash2, ChevronRight, BookMarked, MessageSquare } from 'lucide-react'
 
 interface StudySession {
   id: string
@@ -17,6 +17,79 @@ interface StudySession {
   completion_date?: string
   completed: boolean
   order_index: number
+  book_id?: string
+  book_title?: string
+  chapter_title?: string
+  chapter_index?: number | null
+  chapter_summary?: string | null
+  concepts?: Array<{
+    id?: string
+    name: string
+    chapter?: {
+      title?: string
+      index?: number | null
+    }
+    summary?: string
+    related_topics?: string[]
+    learning_objectives?: string[]
+    suggested_reading?: string[]
+    recommended_minutes?: number | null
+    quiz_outline?: string[]
+    quizzes?: Array<{
+      id?: string
+      label?: string
+      difficulty?: string | null
+      title?: string
+      generated_at?: string
+      questions?: Array<{
+        question?: string
+        options?: Record<string, string>
+        correct?: string
+      }>
+    }>
+  }>
+  quizzes?: Array<{
+    concept_id?: string
+    concept_name?: string
+    quiz_id?: string
+    label?: string
+    difficulty?: string | null
+    title?: string
+    generated_at?: string
+    questions?: Array<{
+      question?: string
+      options?: Record<string, string>
+      correct?: string
+      explanation?: string
+    }>
+  }>
+}
+
+interface MissionTask {
+  id: string
+  label: string
+  type: string
+  target_id?: string | null
+  related_session_id?: string | null
+  related_concept_id?: string | null
+  related_quiz_id?: string | null
+  completed: boolean
+  completed_at?: string | null
+  badge?: string | null
+}
+
+interface StudyMission {
+  id: string
+  title: string
+  description: string
+  week_index: number
+  start_date: string
+  end_date: string
+  progress: number
+  badge?: string | null
+  completed: boolean
+  completed_at?: string | null
+  tasks: MissionTask[]
 }
 
 interface StudyPlan {
@@ -30,6 +103,7 @@ interface StudyPlan {
   created_at: string
   updated_at: string
   sessions: StudySession[]
+  missions?: StudyMission[]
   current_session_index: number
   is_active: boolean
 }
@@ -48,6 +122,7 @@ interface NewPlanForm {
   session_duration: number
   difficulty_level: string
   difficulty_progression: string
+  refresh_concept_quizzes: boolean
 }
 
 export default function StudyPlannerPage() {
@@ -59,6 +134,63 @@ export default function StudyPlannerPage() {
   const [selectedPlan, setSelectedPlan] = useState<StudyPlan | null>(null)
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
   const [creatingPlan, setCreatingPlan] = useState(false)
+  const [activeQuiz, setActiveQuiz] = useState<{
+    sessionId: string
+    quiz: NonNullable<StudySession['quizzes']>[number]
+  } | null>(null)
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({})
+  const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [quizScore, setQuizScore] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 })
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null)
+  const [quizSubmitting, setQuizSubmitting] = useState(false)
+  const [quizSubmitError, setQuizSubmitError] = useState<string | null>(null)
+  const [quizSubmitSuccess, setQuizSubmitSuccess] = useState(false)
+  const [updatingTaskIds, setUpdatingTaskIds] = useState<Set<string>>(new Set())
+const [missions, setMissions] = useState<StudyMission[]>([])
+const [missionsLoading, setMissionsLoading] = useState(false)
+const [missionsError, setMissionsError] = useState('')
+
+  const normalizeMissionTask = (taskRaw: unknown, fallbackId: string): MissionTask => {
+    const record = taskRaw && typeof taskRaw === 'object' ? taskRaw as Record<string, unknown> : {}
+    return {
+      id: record.id ? String(record.id) : fallbackId,
+      label: record.label ? String(record.label) : 'Attività',
+      type: record.type ? String(record.type) : 'task',
+      target_id: record.target_id !== undefined && record.target_id !== null ? String(record.target_id) : undefined,
+      related_session_id: record.related_session_id !== undefined && record.related_session_id !== null ? String(record.related_session_id) : undefined,
+      related_concept_id: record.related_concept_id !== undefined && record.related_concept_id !== null ? String(record.related_concept_id) : undefined,
+      related_quiz_id: record.related_quiz_id !== undefined && record.related_quiz_id !== null ? String(record.related_quiz_id) : undefined,
+      completed: Boolean(record.completed),
+      completed_at: typeof record.completed_at === 'string' ? record.completed_at : undefined,
+      badge: record.badge !== undefined && record.badge !== null ? String(record.badge) : undefined
+    }
+  }
+
+  const normalizeMission = (missionRaw: unknown, fallbackIndex = 0): StudyMission => {
+    const record = missionRaw && typeof missionRaw === 'object' ? missionRaw as Record<string, unknown> : {}
+    const missionId = record.id ? String(record.id) : `mission-${fallbackIndex}`
+    const tasksRaw = Array.isArray(record.tasks) ? record.tasks : []
+    const startDate = typeof record.start_date === 'string' ? record.start_date : new Date().toISOString()
+    const endDate = typeof record.end_date === 'string' ? record.end_date : startDate
+
+    return {
+      id: missionId,
+      title: record.title ? String(record.title) : 'Missione settimanale',
+      description: record.description ? String(record.description) : '',
+      week_index: typeof record.week_index === 'number' ? record.week_index : Number(record.week_index) || fallbackIndex,
+      start_date: startDate,
+      end_date: endDate,
+      progress: typeof record.progress === 'number' ? record.progress : Number(record.progress) || 0,
+      badge: record.badge !== undefined && record.badge !== null ? String(record.badge) : undefined,
+      completed: Boolean(record.completed),
+      completed_at: typeof record.completed_at === 'string' ? record.completed_at : undefined,
+      tasks: tasksRaw.map((task, index) => normalizeMissionTask(task, `${missionId}-task-${index}`))
+    }
+  }
+
+  const normalizeMissions = (missionsData: unknown[] = []): StudyMission[] => (
+    (missionsData || []).map((mission, index) => normalizeMission(mission, index))
+  )
 
   const [newPlan, setNewPlan] = useState<NewPlanForm>({
     course_id: '',
@@ -66,13 +198,23 @@ export default function StudyPlannerPage() {
     sessions_per_week: 3,
     session_duration: 45,
     difficulty_level: 'intermediate',
-    difficulty_progression: 'graduale'
+    difficulty_progression: 'graduale',
+    refresh_concept_quizzes: true
   })
 
   useEffect(() => {
     fetchCourses()
     fetchPlans()
   }, [])
+
+  useEffect(() => {
+    if (selectedPlan) {
+      setMissionsError('')
+      fetchMissions(selectedPlan.id, normalizeMissions(selectedPlan.missions || []))
+    } else {
+      setMissions([])
+    }
+  }, [selectedPlan?.id])
 
   const fetchCourses = async () => {
     try {
@@ -111,6 +253,106 @@ export default function StudyPlannerPage() {
     }
   }
 
+  const fetchMissions = async (planId: string, fallback: StudyMission[] = []) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    if (fallback.length > 0) {
+      setMissions(fallback)
+    }
+
+    try {
+      setMissionsLoading(true)
+      setMissionsError('')
+      const response = await fetch(`${apiUrl}/study-plans/${planId}/missions`)
+      if (!response.ok) {
+        throw new Error('Errore nel caricamento delle missioni')
+      }
+      const data = await response.json()
+      if (data.success) {
+        const missionsRaw = Array.isArray(data.missions) ? data.missions : []
+        const normalized = normalizeMissions(missionsRaw as unknown[])
+        setMissions(normalized)
+        setSelectedPlan(prev => (prev && prev.id === planId) ? { ...prev, missions: normalized } : prev)
+      } else {
+        setMissionsError('Impossibile recuperare le missioni')
+      }
+    } catch (error) {
+      console.error('Error fetching missions:', error)
+      setMissionsError('Errore nel caricamento delle missioni settimanali')
+    } finally {
+      setMissionsLoading(false)
+    }
+  }
+
+  const toggleMissionTask = async (missionId: string, taskId: string, completed: boolean) => {
+    if (!selectedPlan) return
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const updating = new Set(updatingTaskIds)
+    updating.add(taskId)
+    setUpdatingTaskIds(updating)
+
+    const previousMissions = missions
+    setMissions(prev => prev.map(mission => {
+      if (mission.id !== missionId) {
+        return mission
+      }
+      return {
+        ...mission,
+        tasks: mission.tasks.map(task => task.id === taskId ? { ...task, completed } : task)
+      }
+    }))
+
+    try {
+      const response = await fetch(`${apiUrl}/study-plans/${selectedPlan.id}/missions/${missionId}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ completed })
+      })
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'aggiornamento della missione')
+      }
+
+      const data = await response.json()
+      if (data.success && data.mission) {
+        const normalizedMission = normalizeMissions([data.mission])[0]
+        setMissions(prev => prev.map(mission => mission.id === missionId ? normalizedMission : mission))
+      } else {
+        throw new Error('Risposta non valida dal server')
+      }
+    } catch (error) {
+      console.error('Error updating mission task:', error)
+      setMissions(previousMissions)
+    } finally {
+      setUpdatingTaskIds(prev => {
+        const updated = new Set(prev)
+        updated.delete(taskId)
+        return updated
+      })
+    }
+  }
+
+  const autoCompleteMissionTask = async (quizId: string) => {
+    const mission = missions.find(currentMission => currentMission.tasks.some(task => task.related_quiz_id === quizId))
+    if (!mission) return
+    const task = mission.tasks.find(item => item.related_quiz_id === quizId)
+    if (!task || task.completed) return
+    await toggleMissionTask(mission.id, task.id, true)
+  }
+
+  const activeMission = useMemo(() => {
+    if (!missions.length) return null
+    const nextMission = missions.find(mission => !mission.completed)
+    return nextMission ?? missions[missions.length - 1]
+  }, [missions])
+
+  const secondaryMissions = useMemo(() => {
+    if (!missions.length) return [] as StudyMission[]
+    const activeId = activeMission?.id
+    return missions.filter(mission => mission.id !== activeId)
+  }, [missions, activeMission?.id])
+
   useEffect(() => {
     if (courses.length > 0) {
       fetchPlans()
@@ -136,7 +378,8 @@ export default function StudyPlannerPage() {
 
       const data = await response.json()
       if (data.success) {
-        setPlans(prev => [data.plan, ...prev])
+        const createdPlan: StudyPlan = data.plan
+        setPlans(prev => [createdPlan, ...prev])
         setShowCreateForm(false)
         setNewPlan({
           course_id: '',
@@ -144,8 +387,13 @@ export default function StudyPlannerPage() {
           sessions_per_week: 3,
           session_duration: 45,
           difficulty_level: 'intermediate',
-          difficulty_progression: 'graduale'
+          difficulty_progression: 'graduale',
+          refresh_concept_quizzes: true
         })
+        setSelectedPlan(createdPlan)
+        setMissions(normalizeMissions(createdPlan.missions || []))
+        setMissionsError('')
+        setExpandedSessions(new Set())
       } else {
         alert('Errore nella creazione del piano di studio')
       }
@@ -179,6 +427,7 @@ export default function StudyPlannerPage() {
               }
             : plan
         ))
+        void fetchMissions(planId)
       }
     } catch (error) {
       console.error('Error updating session progress:', error)
@@ -227,6 +476,9 @@ export default function StudyPlannerPage() {
       case 'beginner': return 'bg-green-100 text-green-800'
       case 'intermediate': return 'bg-yellow-100 text-yellow-800'
       case 'advanced': return 'bg-red-100 text-red-800'
+      case 'easy': return 'bg-green-100 text-green-800'
+      case 'medium': return 'bg-yellow-100 text-yellow-800'
+      case 'hard': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -236,6 +488,9 @@ export default function StudyPlannerPage() {
       case 'beginner': return 'Principiante'
       case 'intermediate': return 'Intermedio'
       case 'advanced': return 'Avanzato'
+      case 'easy': return 'Facile'
+      case 'medium': return 'Medio'
+      case 'hard': return 'Difficile'
       default: return difficulty
     }
   }
@@ -247,6 +502,101 @@ export default function StudyPlannerPage() {
       sessionTitle
     })
     router.push(`/study-planner/${sessionId}?${params.toString()}`)
+  }
+
+  const openQuiz = (sessionId: string, quiz: NonNullable<StudySession['quizzes']>[number]) => {
+    setActiveQuiz({ sessionId, quiz })
+    setQuizAnswers({})
+    setQuizSubmitted(false)
+    setQuizScore({ correct: 0, total: quiz.questions?.length ?? 0 })
+    setQuizStartTime(Date.now())
+    setQuizSubmitting(false)
+    setQuizSubmitError(null)
+    setQuizSubmitSuccess(false)
+  }
+
+  const closeQuiz = () => {
+    setActiveQuiz(null)
+    setQuizAnswers({})
+    setQuizSubmitted(false)
+    setQuizScore({ correct: 0, total: 0 })
+    setQuizStartTime(null)
+    setQuizSubmitting(false)
+    setQuizSubmitError(null)
+    setQuizSubmitSuccess(false)
+  }
+
+  const handleQuizAnswerChange = (questionIndex: number, optionKey: string) => {
+    setQuizAnswers(prev => ({
+      ...prev,
+      [questionIndex]: optionKey
+    }))
+  }
+
+  const submitQuizAnswers = async () => {
+    if (!activeQuiz?.quiz.questions || quizSubmitting) {
+      return
+    }
+
+    const total = activeQuiz.quiz.questions.length
+    let correct = 0
+    activeQuiz.quiz.questions.forEach((question, index) => {
+      const userAnswer = quizAnswers[index]
+      if (userAnswer && question.correct && userAnswer === question.correct) {
+        correct += 1
+      }
+    })
+
+    setQuizScore({ correct, total })
+    setQuizSubmitted(true)
+    setQuizSubmitting(true)
+    setQuizSubmitError(null)
+
+    const courseId = selectedPlan?.course_id
+    const conceptId = activeQuiz.quiz.concept_id
+    if (!courseId || !conceptId) {
+      setQuizSubmitting(false)
+      setQuizSubmitError('Impossibile registrare il risultato del quiz (informazioni corso o concetto mancanti).')
+      return
+    }
+
+    const session = selectedPlan.sessions.find(s => s.id === activeQuiz.sessionId)
+    const timeSeconds = quizStartTime ? (Date.now() - quizStartTime) / 1000 : 0
+    const scoreRatio = total > 0 ? correct / total : 0
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+    try {
+      const response = await fetch(`${apiUrl}/courses/${courseId}/concepts/${conceptId}/quiz-results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          concept_name: activeQuiz.quiz.concept_name || session?.chapter_title || activeQuiz.quiz.title || 'Concetto',
+          chapter_title: session?.chapter_title ?? null,
+          score: Number(scoreRatio.toFixed(3)),
+          time_seconds: Number(timeSeconds.toFixed(2)),
+          correct_answers: correct,
+          total_questions: total
+        })
+      })
+
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}))
+        throw new Error(detail?.detail || 'Errore nella registrazione del risultato')
+      }
+
+      setQuizSubmitSuccess(true)
+      const quizId = activeQuiz.quiz.quiz_id || activeQuiz.quiz.id
+      if (quizId) {
+        void autoCompleteMissionTask(String(quizId))
+      }
+    } catch (error) {
+      console.error('Errore nel salvataggio del quiz:', error)
+      setQuizSubmitError(error instanceof Error ? error.message : 'Errore nel salvataggio del quiz')
+    } finally {
+      setQuizSubmitting(false)
+    }
   }
 
   if (loading) {
@@ -264,8 +614,9 @@ export default function StudyPlannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container-responsive py-8">
+    <Fragment>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="container-responsive py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -388,6 +739,22 @@ export default function StudyPlannerPage() {
                     </select>
                   </div>
                 </div>
+
+                <div className="flex items-start space-x-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3">
+                  <input
+                    id="refresh-concept-quizzes"
+                    type="checkbox"
+                    checked={newPlan.refresh_concept_quizzes}
+                    onChange={(e) => setNewPlan(prev => ({ ...prev, refresh_concept_quizzes: e.target.checked }))}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="refresh-concept-quizzes" className="text-sm text-gray-700">
+                    <span className="block font-medium">Rigenera i quiz per ogni concetto</span>
+                    <span className="text-xs text-gray-600">
+                      Genera quiz diagnostici e di approfondimento per monitorare la comprensione di ogni capitolo.
+                    </span>
+                  </label>
+                </div>
               </div>
 
               <div className="flex space-x-3 mt-6">
@@ -436,7 +803,10 @@ export default function StudyPlannerPage() {
                     className={`glass-card p-4 cursor-pointer transition-all duration-200 ${
                       selectedPlan?.id === plan.id ? 'ring-2 ring-blue-500 shadow-lg' : 'hover:shadow-md'
                     }`}
-                    onClick={() => setSelectedPlan(plan)}
+                    onClick={() => {
+                      setSelectedPlan(plan)
+                      setMissions(normalizeMissions(plan.missions || []))
+                    }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-gray-900 text-sm">{plan.title}</h3>
@@ -527,6 +897,96 @@ export default function StudyPlannerPage() {
                     </div>
                   </div>
 
+                  <div className="mt-6 space-y-4">
+                    {missionsLoading ? (
+                      <div className="glass-card p-4 flex items-center space-x-3 text-sm text-gray-600">
+                        <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+                        <span>Caricamento missioni settimanali...</span>
+                      </div>
+                    ) : missionsError ? (
+                      <div className="glass-card p-4 border border-red-200 text-red-600 text-sm">
+                        {missionsError}
+                      </div>
+                    ) : activeMission ? (
+                      <div className="glass-card p-5">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                              <span>{activeMission.title}</span>
+                              {activeMission.badge && (
+                                <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                                  {activeMission.badge}
+                                </span>
+                              )}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">{activeMission.description}</p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              {new Date(activeMission.start_date).toLocaleDateString()} → {new Date(activeMission.end_date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs uppercase text-gray-500">Avanzamento</p>
+                            <p className="text-lg font-semibold text-gray-900">{Math.round((activeMission.progress || 0) * 100)}%</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500"
+                            style={{ width: `${Math.round((activeMission.progress || 0) * 100)}%` }}
+                          ></div>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          {activeMission.tasks.map(task => (
+                            <label key={task.id} className="flex items-start space-x-3 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={task.completed}
+                                disabled={updatingTaskIds.has(task.id)}
+                                onChange={(e) => toggleMissionTask(activeMission.id, task.id, e.target.checked)}
+                                className="mt-1 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                              />
+                              <div className={task.completed ? 'text-gray-400 line-through' : ''}>
+                                <span className="font-medium">{task.label}</span>
+                                <div className="text-xs text-gray-500">
+                                  {task.type === 'session' && 'Sessione'}
+                                  {task.type === 'quiz' && 'Quiz'}
+                                  {task.type === 'concept_review' && 'Ripasso concetto'}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-card p-4 text-sm text-gray-600">
+                        Nessuna missione disponibile per questo piano.
+                      </div>
+                    )}
+
+                    {secondaryMissions.length > 0 && (
+                      <div className="glass-card p-4">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2">Altre missioni</h4>
+                        <div className="space-y-2 text-sm text-gray-600">
+                          {secondaryMissions.map(mission => (
+                            <div key={mission.id} className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-gray-700">{mission.title}</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(mission.start_date).toLocaleDateString()} → {new Date(mission.end_date).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200">
+                                {Math.round((mission.progress || 0) * 100)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Sessions List */}
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Sessioni di Studio</h3>
@@ -574,18 +1034,124 @@ export default function StudyPlannerPage() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-                                <span>Sessione {index + 1}</span>
-                                {session.topics.length > 0 && (
-                                  <span>{session.topics.length} argoment{session.topics.length === 1 ? 'o' : 'i'}</span>
-                                )}
-                                {session.objectives.length > 0 && (
-                                  <span>{session.objectives.length} obiettiv{session.objectives.length === 1 ? 'o' : 'i'}</span>
+                              <div className="mt-3 space-y-2">
+                                <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                                  <span>Sessione {index + 1}</span>
+                                  {session.topics.length > 0 && (
+                                    <span>{session.topics.length} argoment{session.topics.length === 1 ? 'o' : 'i'}</span>
+                                  )}
+                                  {session.objectives.length > 0 && (
+                                    <span>{session.objectives.length} obiettiv{session.objectives.length === 1 ? 'o' : 'i'}</span>
+                                  )}
+                                  {session.concepts && session.concepts.length > 0 && (
+                                    <span>{session.concepts.length} concett{session.concepts.length === 1 ? 'o' : 'i'}</span>
+                                  )}
+                                  {session.quizzes && session.quizzes.length > 0 && (
+                                    <span>{session.quizzes.length} quiz</span>
+                                  )}
+                                </div>
+                                {(typeof session.chapter_index === 'number' || session.book_title || session.chapter_title) && (
+                                  <div className="flex flex-wrap gap-2 text-xs">
+                                    {typeof session.chapter_index === 'number' && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-600 font-medium">
+                                        Capitolo {session.chapter_index + 1}
+                                      </span>
+                                    )}
+                                    {session.book_title && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
+                                        Libro: {session.book_title}
+                                      </span>
+                                    )}
+                                    {session.chapter_title && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-purple-100 text-purple-600 font-medium">
+                                        {session.chapter_title}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
                               {expandedSessions.has(session.id) && (
-                                <div className="mt-4 space-y-3 text-sm">
+                                <div className="mt-4 space-y-4 text-sm">
+                                  {session.chapter_summary && (
+                                    <div>
+                                      <strong className="text-gray-700">Sintesi del capitolo:</strong>
+                                      <p className="mt-1 text-gray-600 leading-relaxed">{session.chapter_summary}</p>
+                                    </div>
+                                  )}
+
+                                  {session.concepts && session.concepts.length > 0 && (
+                                    <div>
+                                      <strong className="text-gray-700">Concetti chiave:</strong>
+                                      <div className="mt-2 space-y-3">
+                                        {session.concepts.map((concept, conceptIndex) => {
+                                          if (!concept) return null
+                                          return (
+                                            <div
+                                              key={`${concept.id || concept.name || 'concept'}-${conceptIndex}`}
+                                              className="rounded-lg border border-gray-200 bg-white/60 p-3 shadow-sm"
+                                            >
+                                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                <div>
+                                                  <div className="font-medium text-gray-800">{concept.name}</div>
+                                                  {concept.summary && (
+                                                    <p className="mt-1 text-gray-600 text-sm leading-relaxed">{concept.summary}</p>
+                                                  )}
+                                                </div>
+                                                <div className="flex flex-col items-start gap-1 text-xs text-gray-500 sm:items-end">
+                                                  {typeof concept.recommended_minutes === 'number' && concept.recommended_minutes > 0 && (
+                                                    <span className="inline-flex items-center gap-1">
+                                                      <Clock className="h-3 w-3 text-gray-400" />
+                                                      {concept.recommended_minutes} min consigliati
+                                                    </span>
+                                                  )}
+                                                  {concept.quizzes && concept.quizzes.length > 0 && (
+                                                    <span className="inline-flex items-center gap-1 text-purple-600">
+                                                      <BookOpen className="h-3 w-3" />
+                                                      {concept.quizzes.length} quiz
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              {concept.related_topics && concept.related_topics.length > 0 && (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                  {concept.related_topics.slice(0, 6).map((topic, topicIndex) => (
+                                                    <span
+                                                      key={`${topic}-${topicIndex}`}
+                                                      className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 text-xs"
+                                                    >
+                                                      {topic}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {concept.learning_objectives && concept.learning_objectives.length > 0 && (
+                                                <div className="mt-2">
+                                                  <span className="text-xs uppercase tracking-wide text-gray-500">Obiettivi specifici</span>
+                                                  <ul className="mt-1 ml-4 list-disc space-y-1 text-gray-600 text-sm">
+                                                    {concept.learning_objectives.slice(0, 3).map((objective, objIndex) => (
+                                                      <li key={`${objective}-${objIndex}`}>{objective}</li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              )}
+                                              {concept.suggested_reading && concept.suggested_reading.length > 0 && (
+                                                <div className="mt-2 text-xs text-gray-500">
+                                                  <span className="uppercase tracking-wide">Letture consigliate:</span>
+                                                  <ul className="mt-1 ml-4 list-disc space-y-1">
+                                                    {concept.suggested_reading.slice(0, 3).map((reading, readingIndex) => (
+                                                      <li key={`${reading}-${readingIndex}`}>{reading}</li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {session.topics.length > 0 && (
                                     <div>
                                       <strong className="text-gray-700">Argomenti:</strong>
@@ -599,7 +1165,7 @@ export default function StudyPlannerPage() {
 
                                   {session.objectives.length > 0 && (
                                     <div>
-                                      <strong className="text-gray-700">Obiettivi:</strong>
+                                      <strong className="text-gray-700">Obiettivi della sessione:</strong>
                                       <ul className="mt-1 ml-4 list-disc text-gray-600">
                                         {session.objectives.map((objective, i) => (
                                           <li key={i}>{objective}</li>
@@ -627,6 +1193,55 @@ export default function StudyPlannerPage() {
                                           <li key={i}>{material}</li>
                                         ))}
                                       </ul>
+                                    </div>
+                                  )}
+
+                                  {session.quizzes && session.quizzes.length > 0 && (
+                                    <div>
+                                      <strong className="text-gray-700">Quiz disponibili:</strong>
+                                      <div className="mt-2 space-y-2">
+                                        {session.quizzes.map((quiz, quizIndex) => {
+                                          const questionCount = quiz.questions?.length ?? 0
+                                          const parsedDate = quiz.generated_at ? Date.parse(quiz.generated_at) : NaN
+                                          const readableDate = Number.isNaN(parsedDate) ? null : new Date(parsedDate).toLocaleDateString()
+                                          return (
+                                            <div
+                                              key={`${quiz.quiz_id || quiz.label || 'quiz'}-${quizIndex}`}
+                                              className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-700"
+                                            >
+                                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                <div>
+                                                  <div className="font-medium">
+                                                    {quiz.title || `${quiz.label ? quiz.label.charAt(0).toUpperCase() + quiz.label.slice(1) : 'Quiz'}${quiz.concept_name ? ` · ${quiz.concept_name}` : ''}`}
+                                                  </div>
+                                                  <div className="text-xs text-purple-600">
+                                                    {quiz.concept_name ? `Concetto: ${quiz.concept_name}` : 'Valutazione generale'}
+                                                    {quiz.label && ` · ${quiz.label.charAt(0).toUpperCase() + quiz.label.slice(1)}`}
+                                                  </div>
+                                                </div>
+                                                {quiz.difficulty && (
+                                                  <span className={`self-start rounded-full px-2 py-0.5 text-xs font-medium ${getDifficultyColor(quiz.difficulty)}`}>
+                                                    {getDifficultyLabel(quiz.difficulty)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="mt-1 flex flex-wrap gap-3 text-xs text-purple-600">
+                                                <span>{questionCount} domanda{questionCount === 1 ? '' : 'e'}</span>
+                                                {readableDate && <span>Generato il {readableDate}</span>}
+                                              </div>
+                                              <div className="mt-3">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openQuiz(session.id, quiz)}
+                                                  className="inline-flex items-center space-x-2 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-700"
+                                                >
+                                                  <span>Apri quiz</span>
+                                                </button>
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -661,6 +1276,159 @@ export default function StudyPlannerPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      {activeQuiz && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {activeQuiz.quiz.title || 'Quiz'}
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {activeQuiz.quiz.concept_name
+                    ? `Concetto: ${activeQuiz.quiz.concept_name}`
+                    : 'Valutazione concettuale'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeQuiz}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Chiudi quiz"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
+              {(activeQuiz.quiz.questions || []).map((question, index) => {
+                const options = question.options || {}
+                const optionKeys = Object.keys(options)
+                const userAnswer = quizAnswers[index]
+                const isCorrect = quizSubmitted && userAnswer === question.correct
+                const showCorrect = quizSubmitted && question.correct
+                return (
+                  <div key={`${activeQuiz.quiz.quiz_id || 'quiz'}-q-${index}`} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-800">
+                          Domanda {index + 1}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-700">{question.question || 'Domanda non disponibile'}</p>
+                      </div>
+                      {quizSubmitted && (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {isCorrect ? 'Corretto' : 'Risposta errata'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {optionKeys.length === 0 && (
+                        <p className="text-xs text-gray-500">Opzioni non disponibili.</p>
+                      )}
+                      {optionKeys.map(optionKey => {
+                        const optionLabel = options[optionKey]
+                        const isSelected = userAnswer === optionKey
+                        const isCorrectOption = quizSubmitted && question.correct === optionKey
+                        const optionStateClass = quizSubmitted
+                          ? isCorrectOption
+                            ? 'border-green-500 bg-green-50'
+                            : isSelected
+                              ? 'border-red-400 bg-red-50'
+                              : 'border-gray-200'
+                          : 'border-gray-200 hover:border-purple-400'
+                        return (
+                          <label
+                            key={optionKey}
+                            className={`flex cursor-pointer items-start space-x-3 rounded-lg border px-3 py-2 text-sm transition-colors ${optionStateClass}`}
+                          >
+                            <input
+                              type="radio"
+                              name={`quiz-${activeQuiz.quiz.quiz_id}-${index}`}
+                              value={optionKey}
+                              checked={isSelected}
+                              onChange={() => handleQuizAnswerChange(index, optionKey)}
+                              disabled={quizSubmitted}
+                              className="mt-1 h-4 w-4 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-gray-700">
+                              <span className="font-semibold">{optionKey})</span> {optionLabel}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {showCorrect && question.correct && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Risposta corretta: {question.correct}
+                      </div>
+                    )}
+                    {quizSubmitted && question.explanation && (
+                      <div className="mt-2 rounded-md bg-purple-50 p-2 text-xs text-purple-700">
+                        {question.explanation}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                {quizSubmitted ? (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">
+                      Punteggio: {quizScore.correct} / {quizScore.total} ({quizScore.total > 0 ? Math.round((quizScore.correct / quizScore.total) * 100) : 0}%)
+                    </p>
+                    {quizSubmitSuccess && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Risultato salvato nella cronologia dei concetti.
+                      </p>
+                    )}
+                    {quizSubmitError && (
+                      <p className="text-xs text-red-600 mt-1">
+                        {quizSubmitError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Seleziona una risposta per ogni domanda e premi “Invia risposte” per verificare il punteggio.
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {!quizSubmitted && (
+                  <button
+                    type="button"
+                    onClick={submitQuizAnswers}
+                    className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+                    disabled={
+                      quizSubmitting ||
+                      !activeQuiz.quiz.questions ||
+                      activeQuiz.quiz.questions.length === 0 ||
+                      Object.keys(quizAnswers).length !== activeQuiz.quiz.questions.length
+                    }
+                  >
+                    {quizSubmitting ? 'Salvataggio...' : 'Invia risposte'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={closeQuiz}
+                  className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                  disabled={quizSubmitting}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Fragment>
   )
 }

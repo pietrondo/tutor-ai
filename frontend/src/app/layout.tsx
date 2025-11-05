@@ -1,4 +1,5 @@
 import './globals.css'
+import type { ReactNode } from 'react'
 import { Inter } from 'next/font/google'
 import { Navigation } from '@/components/Navigation'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -22,8 +23,7 @@ export const metadata = {
     'materiale didattico',
     'assistente virtuale',
     'OpenAI tutor',
-    'Ollama education',
-    'LM Studio learning'
+      'LM Studio learning'
   ],
   authors: [{ name: 'Tutor-AI Team' }],
   creator: 'Tutor-AI',
@@ -81,7 +81,7 @@ export const metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="it" className="scroll-smooth">
@@ -129,7 +129,7 @@ export default function RootLayout({
             </footer>
           </div>
         </div>
-        </ThemeProvider>
+      </ThemeProvider>
       </body>
     </html>
   )

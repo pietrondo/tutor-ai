@@ -1,7 +1,14 @@
 'use client'
 
+import type { MouseEvent } from 'react'
 import Link from 'next/link'
-import { BookOpen, FileText, Clock, Edit, Trash2 } from 'lucide-react'
+import { BookOpen, FileText, Clock, Trash2 } from 'lucide-react'
+
+interface BookChapter {
+  title: string
+  summary: string
+  estimated_minutes: number | null
+}
 
 interface Book {
   id: string
@@ -14,7 +21,7 @@ interface Book {
   study_sessions: number
   total_study_time: number
   created_at: string
-  chapters: string[]
+  chapters: BookChapter[]
   tags: string[]
 }
 
@@ -25,9 +32,9 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleDelete = async (event: MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
 
     if (!confirm('Sei sicuro di voler eliminare questo libro?')) {
       return
@@ -43,10 +50,14 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
       } else {
         alert('Errore durante l\'eliminazione del libro')
       }
-    } catch (error) {
+    } catch {
       alert('Errore durante l\'eliminazione del libro')
     }
   }
+
+  const totalEstimatedMinutes = book.chapters
+    ? book.chapters.reduce((acc, chapter) => acc + (chapter.estimated_minutes || 0), 0)
+    : 0
 
   return (
     <Link
@@ -79,6 +90,15 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
           <p className="text-sm text-gray-600 mb-4 line-clamp-2">
             {book.description}
           </p>
+        )}
+
+        {book.chapters && book.chapters.length > 0 && (
+          <div className="text-xs text-gray-500 mb-4">
+            {book.chapters.length} capitol{book.chapters.length === 1 ? 'o' : 'i'}
+            {totalEstimatedMinutes > 0 && (
+              <span> • {totalEstimatedMinutes} minuti consigliati</span>
+            )}
+          </div>
         )}
 
         <div className="flex items-center justify-between text-sm text-gray-500 mb-4">

@@ -38,7 +38,11 @@
       "Bash(docker-compose exec:*)",
       "Bash(python:*)",
       "Bash(docker logs:*)",
-      "Bash(docker rmi:*)"
+      "Bash(docker rmi:*)",
+      "Bash(python3:*)",
+      "Bash(lsof:*)",
+      "WebFetch(domain:docs.z.ai)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

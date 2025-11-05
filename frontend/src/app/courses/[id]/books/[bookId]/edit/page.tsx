@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, X, Plus } from 'lucide-react'
+
+interface BookChapter {
+  title: string
+  summary: string
+  estimated_minutes: number | null
+  topics: string[]
+}
 
 interface Book {
   id: string
@@ -13,9 +20,88 @@ interface Book {
   description: string
   year: string
   publisher: string
-  chapters: string[]
+  chapters: BookChapter[]
   tags: string[]
 }
+
+type ChapterFormState = {
+  title: string
+  summary: string
+  estimated_minutes: string
+}
+
+const toStringValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value)
+}
+
+const normalizeChapter = (chapter: unknown): BookChapter | null => {
+  if (typeof chapter === 'string') {
+    const title = chapter.trim()
+    if (!title) return null
+    return {
+      title,
+      summary: '',
+      estimated_minutes: null,
+      topics: []
+    }
+  }
+
+  if (chapter && typeof chapter === 'object') {
+    const data = chapter as Record<string, unknown>
+    const rawTitle = typeof data.title === 'string' ? data.title : typeof data.name === 'string' ? data.name : ''
+    const title = rawTitle.trim()
+    if (!title) return null
+
+    let estimated: number | null = null
+    if (typeof data.estimated_minutes === 'number') {
+      estimated = data.estimated_minutes
+    } else if (typeof data.estimated_minutes === 'string' && data.estimated_minutes.trim()) {
+      const parsed = Number.parseInt(data.estimated_minutes, 10)
+      estimated = Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+    }
+
+    return {
+      title,
+      summary: typeof data.summary === 'string' ? data.summary.trim() : '',
+      estimated_minutes: estimated,
+      topics: Array.isArray(data.topics) ? data.topics.map(topic => toStringValue(topic)).filter(Boolean) : []
+    }
+  }
+
+  return null
+}
+
+const normalizeBook = (book: unknown): Book => {
+  const record = (book && typeof book === 'object') ? book as Record<string, unknown> : {}
+  const chaptersArray = Array.isArray(record.chapters) ? record.chapters : []
+  const normalizedChapters = chaptersArray
+    .map(normalizeChapter)
+    .filter((chapter): chapter is BookChapter => Boolean(chapter))
+
+  return {
+    id: toStringValue(record.id),
+    title: toStringValue(record.title),
+    author: toStringValue(record.author),
+    isbn: toStringValue(record.isbn),
+    description: toStringValue(record.description),
+    year: toStringValue(record.year),
+    publisher: toStringValue(record.publisher),
+    chapters: normalizedChapters,
+    tags: Array.isArray(record.tags) ? record.tags.map(tag => toStringValue(tag)).filter(Boolean) : []
+  }
+}
+
+const createEmptyChapter = (): ChapterFormState => ({
+  title: '',
+  summary: '',
+  estimated_minutes: ''
+})
 
 export default function EditBookPage() {
   const params = useParams()
@@ -35,15 +121,14 @@ export default function EditBookPage() {
     title: '',
     author: '',
     isbn: '',
-    description: '',
-    year: '',
-    publisher: '',
-    chapters: [] as string[],
-    tags: [] as string[]
-  })
+  description: '',
+  year: '',
+  publisher: '',
+  chapters: [createEmptyChapter()],
+  tags: [] as string[]
+})
 
-  const [newChapter, setNewChapter] = useState('')
-  const [newTag, setNewTag] = useState('')
+const [newTag, setNewTag] = useState('')
 
   useEffect(() => {
     fetchBook()
@@ -55,21 +140,28 @@ export default function EditBookPage() {
       const response = await fetch(`/api/courses/${courseId}/books/${bookId}`)
       if (response.ok) {
         const data = await response.json()
-        setBook(data.book)
+        const normalized = normalizeBook(data.book)
+        setBook(normalized)
         setFormData({
-          title: data.book.title || '',
-          author: data.book.author || '',
-          isbn: data.book.isbn || '',
-          description: data.book.description || '',
-          year: data.book.year || '',
-          publisher: data.book.publisher || '',
-          chapters: data.book.chapters || [],
-          tags: data.book.tags || []
+          title: normalized.title,
+          author: normalized.author,
+          isbn: normalized.isbn,
+          description: normalized.description,
+          year: normalized.year,
+          publisher: normalized.publisher,
+          chapters: normalized.chapters.length > 0
+            ? normalized.chapters.map(chapter => ({
+                title: chapter.title,
+                summary: chapter.summary,
+                estimated_minutes: chapter.estimated_minutes !== null ? String(chapter.estimated_minutes) : ''
+              }))
+            : [createEmptyChapter()],
+          tags: normalized.tags
         })
       } else {
         setError('Errore nel caricamento del libro')
       }
-    } catch (error) {
+    } catch {
       setError('Errore nel caricamento del libro')
     } finally {
       setLoading(false)
@@ -83,13 +175,13 @@ export default function EditBookPage() {
         const data = await response.json()
         setCourseName(data.course.name)
       }
-    } catch (error) {
-      console.error('Error fetching course info:', error)
+    } catch (err) {
+      console.error('Error fetching course info:', err)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -97,13 +189,10 @@ export default function EditBookPage() {
   }
 
   const addChapter = () => {
-    if (newChapter.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        chapters: [...prev.chapters, newChapter.trim()]
-      }))
-      setNewChapter('')
-    }
+    setFormData(prev => ({
+      ...prev,
+      chapters: [...prev.chapters, createEmptyChapter()]
+    }))
   }
 
   const removeChapter = (index: number) => {
@@ -130,19 +219,53 @@ export default function EditBookPage() {
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
     setSaving(true)
     setError('')
     setSuccess('')
 
     try {
+      const normalizedChapters = formData.chapters
+        .map(chapter => {
+          const title = chapter.title.trim()
+          if (!title) return null
+
+          let estimatedMinutes: number | null = null
+          if (chapter.estimated_minutes.trim()) {
+            const parsed = Number.parseInt(chapter.estimated_minutes, 10)
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              estimatedMinutes = parsed
+            }
+          }
+
+          return {
+            title,
+            summary: chapter.summary.trim(),
+            estimated_minutes: estimatedMinutes
+          }
+        })
+        .filter((chapter): chapter is { title: string; summary: string; estimated_minutes: number | null } => Boolean(chapter))
+
+      const normalizedTags = Array.from(new Set(formData.tags.map(tag => tag.trim()).filter(tag => tag.length > 0)))
+
+      const payload = {
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        description: formData.description,
+        year: formData.year,
+        publisher: formData.publisher,
+        chapters: normalizedChapters,
+        tags: normalizedTags
+      }
+
       const response = await fetch(`/api/courses/${courseId}/books/${bookId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -153,7 +276,7 @@ export default function EditBookPage() {
       } else {
         setError('Errore durante l\'aggiornamento del libro')
       }
-    } catch (error) {
+    } catch {
       setError('Errore durante l\'aggiornamento del libro')
     } finally {
       setSaving(false)
@@ -328,43 +451,85 @@ export default function EditBookPage() {
 
           {/* Capitoli */}
           <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Capitoli</h2>
-
-            <div className="space-y-3">
-              {formData.chapters.map((chapter, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium">
-                    {index + 1}
-                  </div>
-                  <span className="flex-1 text-gray-700">{chapter}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeChapter(index)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center space-x-3">
-              <input
-                type="text"
-                value={newChapter}
-                onChange={(e) => setNewChapter(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addChapter())}
-                placeholder="Aggiungi un nuovo capitolo"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Capitoli</h2>
               <button
                 type="button"
                 onClick={addChapter}
                 className="btn btn-secondary flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
-                <span>Aggiungi</span>
+                <span>Aggiungi capitolo</span>
               </button>
+            </div>
+
+            <div className="space-y-3">
+              {formData.chapters.map((chapter, index) => (
+                <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Capitolo {index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeChapter(index)}
+                      className="text-xs text-red-500 hover:text-red-600 inline-flex items-center space-x-1"
+                    >
+                      <X className="h-3 w-3" />
+                      <span>Rimuovi</span>
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Titolo *
+                    </label>
+                    <input
+                      type="text"
+                      value={chapter.title}
+                      onChange={(e) => {
+                        const newChapters = [...formData.chapters]
+                        newChapters[index] = { ...newChapters[index], title: e.target.value }
+                        setFormData(prev => ({ ...prev, chapters: newChapters }))
+                      }}
+                      placeholder="Titolo del capitolo"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Sintesi (opzionale)
+                    </label>
+                    <textarea
+                      value={chapter.summary}
+                      onChange={(e) => {
+                        const newChapters = [...formData.chapters]
+                        newChapters[index] = { ...newChapters[index], summary: e.target.value }
+                        setFormData(prev => ({ ...prev, chapters: newChapters }))
+                      }}
+                      rows={2}
+                      placeholder="Descrizione sintetica del capitolo"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Minuti stimati (opzionale)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={chapter.estimated_minutes}
+                        onChange={(e) => {
+                          const newChapters = [...formData.chapters]
+                          newChapters[index] = { ...newChapters[index], estimated_minutes: e.target.value }
+                          setFormData(prev => ({ ...prev, chapters: newChapters }))
+                        }}
+                        placeholder="45"
+                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
