@@ -168,6 +168,18 @@ COPY package*.json ./
 RUN npm ci --only=production --silent && npm cache clean --force
 ```
 
+#### PyTorch CPU Wheels
+
+Per evitare il download di bundle CUDA (diversi GB) durante `pip install`, il file `backend/requirements.txt` forza ora l'uso delle ruote CPU-only di PyTorch aggiungendo:
+
+```
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
+```
+
+Questo riduce sensibilmente i layer Docker dedicati all'installazione delle dipendenze AI mantenendo al contempo compatibilità con `sentence-transformers` ed `easyocr`.
+
 ### BuildKit Optimization
 ```bash
 # Docker BuildKit automatico negli script

@@ -1,3 +1,6 @@
+# Extra indexes (use CUDA-enabled PyTorch wheels for GPU acceleration)
+--extra-index-url https://download.pytorch.org/whl/cu121
+
 # Core dependencies
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
@@ -12,7 +15,8 @@ langchain-openai>=0.2.0
 chromadb==0.5.20
 sentence-transformers==3.3.1
 transformers>=4.45.0
-torch>=2.5.0
+torch==2.5.1
+torchvision==0.20.1
 rank-bm25==0.2.2
 
 # PDF processing

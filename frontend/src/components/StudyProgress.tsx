@@ -199,9 +199,9 @@ export function StudyProgress({ courseId }: StudyProgressProps) {
         {/* Most Studied Topics */}
         <div className="card">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Argomenti più Studiati</h3>
-          {insights.most_common_topics.length > 0 ? (
+          {(insights?.most_common_topics ?? []).length > 0 ? (
             <div className="space-y-3">
-              {insights.most_common_topics.map((topic, index) => (
+              {(insights?.most_common_topics ?? []).map((topic, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-900 capitalize">{topic.topic}</span>
                   <span className="text-sm text-gray-500">{topic.count} volte</span>
@@ -243,11 +243,11 @@ export function StudyProgress({ courseId }: StudyProgressProps) {
       </div>
 
       {/* All Topics */}
-      {(progress.topics_covered || []).length > 0 && (
+      {((progress.topics_covered ?? [])).length > 0 && (
         <div className="card">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Tutti gli Argomenti Coperti</h3>
           <div className="flex flex-wrap gap-2">
-            {(progress.topics_covered || []).map((topic, index) => (
+            {(progress.topics_covered ?? []).map((topic, index) => (
               <span
                 key={index}
                 className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"

@@ -10,10 +10,72 @@ from collections import Counter, defaultdict
 import structlog
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
-from rank_bm25 import BM25Okapi
 from services.rag_service import RAGService
 
 logger = structlog.get_logger()
+
+class SimpleBM25:
+    """
+    Implementazione semplificata di BM25 senza dipendenze esterne
+    """
+
+    def __init__(self, corpus: List[List[str]], k1: float = 1.2, b: float = 0.75, epsilon: float = 0.25):
+        """
+        Inizializza BM25
+        k1: parametro di saturation del termine frequency
+        b: parametro di normalizzazione della lunghezza del documento
+        epsilon: parametro per smoothing IDF
+        """
+        self.k1 = k1
+        self.b = b
+        self.epsilon = epsilon
+        self.corpus = corpus
+        self.corpus_size = len(corpus)
+        self.avgdl = sum(len(doc) for doc in corpus) / self.corpus_size if self.corpus_size > 0 else 0
+
+        # Calcola IDF scores
+        self.idf = {}
+        self._build_idf()
+
+    def _build_idf(self):
+        """Calcola Inverse Document Frequency scores"""
+        # Conta document frequency per ogni termine
+        df = Counter()
+        for doc in self.corpus:
+            unique_terms = set(doc)
+            df.update(unique_terms)
+
+        # Calcola IDF scores
+        for term in df:
+            idf = math.log((self.corpus_size - df[term] + 0.5) / (df[term] + 0.5))
+            self.idf[term] = idf
+
+        # Applica epsilon smoothing per termini non visti
+        max_idf = max(self.idf.values()) if self.idf else 0.0
+        self.idf["<UNK>"] = math.log(self.corpus_size + 1) - max_idf - self.epsilon
+
+    def get_scores(self, query: List[str]) -> List[float]:
+        """
+        Calcola BM25 scores per la query contro tutti i documenti
+        """
+        scores = []
+
+        for i, doc in enumerate(self.corpus):
+            score = 0.0
+            doc_len = len(doc)
+
+            for term in query:
+                if term in doc:
+                    # Term frequency in document
+                    tf = doc.count(term)
+                    # IDF del termine
+                    idf = self.idf.get(term, self.idf["<UNK>"])
+                    # BM25 formula
+                    score += idf * (tf * (self.k1 + 1)) / (tf + self.k1 * (1 - self.b + self.b * doc_len / self.avgdl))
+
+            scores.append(score)
+
+        return scores
 
 class HybridSearchService:
     """
@@ -37,6 +99,9 @@ class HybridSearchService:
         self.min_query_length = 2
         self.max_results = 20
         self.fusion_method = "weighted_sum"  # weighted_sum, rrf, rank_fusion
+
+        # Cache service (lazy loading)
+        self.cache_service = None
 
         logger.info("HybridSearchService initialized",
                    semantic_weight=self.semantic_weight,
@@ -170,7 +235,7 @@ class HybridSearchService:
                 return False
 
             # Crea indice BM25 con parametri ottimizzati per italiano
-            self.bm25_index = BM25Okapi(
+            self.bm25_index = SimpleBM25(
                 self.documents_corpus,
                 k1=1.2,  # Parametri ottimizzati per testo italiano
                 b=0.75,
@@ -425,14 +490,280 @@ class HybridSearchService:
         else:
             logger.warning(f"Invalid fusion method: {method}")
 
+    def _init_cache_service(self):
+        """Inizializza il servizio di cache"""
+        if self.cache_service is None:
+            try:
+                from services.cache_service import RedisCacheService
+                self.cache_service = RedisCacheService()
+                logger.info("HybridSearch cache service initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize HybridSearch cache service: {e}")
+                self.cache_service = None
+
+    def _generate_hybrid_cache_key(self, query: str, course_id: str, book_id: Optional[str] = None,
+                                 k: int = 10, semantic_weight: float = 0.6, keyword_weight: float = 0.4,
+                                 fusion_method: str = "weighted_sum") -> str:
+        """
+        Genera cache key per risultati hybrid search
+        """
+        import hashlib
+        key_components = [
+            f"hybrid:{hashlib.md5(query.encode()).hexdigest()[:16]}",
+            f"course:{course_id}",
+            f"k:{k}",
+            f"weights:{semantic_weight}:{keyword_weight}",
+            f"fusion:{fusion_method}"
+        ]
+
+        if book_id:
+            key_components.append(f"book:{book_id}")
+
+        return ":".join(key_components)
+
+    async def keyword_search_cached(self, query: str, k: int = 10) -> List[Tuple[Dict, float]]:
+        """
+        Esegue ricerca keyword BM25 con cache
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                cache_key = f"bm25:{hashlib.md5(query.encode()).hexdigest()[:16]}:k:{k}"
+
+                # Tenta cache
+                from services.cache_service import CacheType
+                cached_result = await self.cache_service.get(CacheType.HYBRAR_SEARCH, cache_key)
+
+                if cached_result is not None:
+                    logger.debug("BM25 cache hit", query=query[:30])
+                    return cached_result
+
+            # Cache miss - esegui ricerca
+            result = self.keyword_search(query, k)
+
+            # Salva in cache
+            if self.cache_service and result:
+                await self.cache_service.set(CacheType.HYBRAR_SEARCH, cache_key, result, ttl=1800)  # 30 min
+                logger.debug("BM25 result cached", query=query[:30])
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in cached keyword search: {e}")
+            # Fallback a ricerca diretta
+            return self.keyword_search(query, k)
+
+    async def semantic_search_cached(self, query: str, course_id: str, book_id: Optional[str] = None,
+                                  k: int = 10) -> List[Tuple[Dict, float]]:
+        """
+        Esegue ricerca semantica con cache
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                cache_key = self._generate_hybrid_cache_key(
+                    query, course_id, book_id, k, self.semantic_weight, self.keyword_weight, self.fusion_method
+                )
+
+                # Tenta cache
+                from services.cache_service import CacheType
+                cached_result = await self.cache_service.get(CacheType.HYBRAR_SEARCH, cache_key)
+
+                if cached_result is not None:
+                    logger.debug("Semantic search cache hit", query=query[:30])
+                    return cached_result
+
+            # Cache miss - esegui ricerca
+            result = self.semantic_search(query, course_id, book_id, k)
+
+            # Salva in cache
+            if self.cache_service and result:
+                await self.cache_service.set(CacheType.HYBRAR_SEARCH, cache_key, result, ttl=1800)  # 30 min
+                logger.debug("Semantic search result cached", query=query[:30])
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in cached semantic search: {e}")
+            # Fallback a ricerca diretta
+            return self.semantic_search(query, course_id, book_id, k)
+
+    async def hybrid_search_cached(self, query: str, course_id: str, book_id: Optional[str] = None,
+                                 k: int = 10, semantic_weight: Optional[float] = None,
+                                 keyword_weight: Optional[float] = None,
+                                 fusion_method: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Esegue ricerca hybrid con cache layer completo
+        """
+        try:
+            # Use provided weights or defaults
+            sem_weight = semantic_weight or self.semantic_weight
+            key_weight = keyword_weight or self.keyword_weight
+            fusion_meth = fusion_method or self.fusion_method
+
+            # Genera cache key completo
+            if self.cache_service:
+                cache_key = self._generate_hybrid_cache_key(
+                    query, course_id, book_id, k, sem_weight, key_weight, fusion_meth
+                )
+
+                # Tenta cache completo
+                from services.cache_service import CacheType
+                cached_result = await self.cache_service.get(CacheType.HYBRAR_SEARCH, cache_key)
+
+                if cached_result is not None:
+                    logger.info("Hybrid search cache hit", query=query[:30], cache_key=cache_key[:32])
+                    cached_result["cached"] = True
+                    return cached_result
+
+            # Cache miss - esegui ricerca completa con caching intermedio
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                # Esegue ricerche con caching
+                semantic_future = executor.submit(
+                    lambda: asyncio.run(self.semantic_search_cached(query, course_id, book_id, k * 2))
+                )
+                keyword_future = executor.submit(
+                    lambda: asyncio.run(self.keyword_search_cached(query, k * 2))
+                )
+
+                semantic_results = semantic_future.result()
+                keyword_results = keyword_future.result()
+
+            # Fusion dei risultati
+            if fusion_meth == "rrf":
+                hybrid_results = self.reciprocal_rank_fusion(semantic_results, keyword_results)
+            else:  # weighted_sum
+                hybrid_results = self.weighted_sum_fusion(semantic_results, keyword_results)
+
+            # Prepara risultato finale
+            final_result = await self._prepare_hybrid_search_result(
+                query, course_id, book_id, hybrid_results[:k], semantic_results, keyword_results
+            )
+
+            # Salva in cache
+            if self.cache_service and final_result.get("text"):
+                await self.cache_service.set(CacheType.HYBRAR_SEARCH, cache_key, final_result, ttl=1800)  # 30 min
+                logger.info("Hybrid search result cached", query=query[:30], cache_key=cache_key[:32])
+
+            final_result["cached"] = False
+            return final_result
+
+        except Exception as e:
+            logger.error(f"Error in cached hybrid search: {e}")
+            # Fallback a metodo tradizionale
+            return await self.hybrid_search(query, course_id, book_id, k)
+
+    async def _prepare_hybrid_search_result(self, query: str, course_id: str, book_id: Optional[str],
+                                          hybrid_results: List[Tuple[Dict, float]],
+                                          semantic_results: List[Tuple[Dict, float]],
+                                          keyword_results: List[Tuple[Dict, float]]) -> Dict[str, Any]:
+        """
+        Prepara il risultato finale della ricerca hybrid
+        """
+        context_texts = []
+        sources = []
+
+        # Recupera i documenti originali
+        if hybrid_results:
+            doc_ids = []
+            for metadata, score in hybrid_results:
+                doc_id = metadata.get('source', '') + str(metadata.get('chunk_index', ''))
+                doc_ids.append(doc_id)
+
+            if doc_ids:
+                try:
+                    original_results = self.rag_service.collection.get(
+                        where={"course_id": course_id, **({"book_id": book_id} if book_id else {})},
+                        limit=1000
+                    )
+
+                    for metadata, score in hybrid_results:
+                        for i, (orig_doc, orig_metadata) in enumerate(zip(original_results['documents'], original_results['metadatas'])):
+                            if (orig_metadata.get('source') == metadata.get('source') and
+                                orig_metadata.get('chunk_index') == metadata.get('chunk_index')):
+                                context_texts.append(orig_doc)
+                                sources.append({
+                                    "source": metadata.get('source', 'Unknown'),
+                                    "chunk_index": metadata.get('chunk_index', 0),
+                                    "relevance_score": score,
+                                    "search_type": "hybrid",
+                                    "hybrid_components": {
+                                        "semantic_available": any(orig_metadata.get('source') == metadata.get('source') and
+                                                             orig_metadata.get('chunk_index') == metadata.get('chunk_index')
+                                                             for metadata, _ in semantic_results),
+                                        "keyword_available": any(orig_metadata.get('source') == metadata.get('source') and
+                                                             orig_metadata.get('chunk_index') == metadata.get('chunk_index')
+                                                             for metadata, _ in keyword_results)
+                                    }
+                                })
+                                break
+                except Exception as e:
+                    logger.error(f"Error retrieving original documents: {e}")
+
+        if not context_texts:
+            return {
+                "text": "",
+                "sources": [],
+                "message": "Nessun documento rilevante trovato per questa ricerca hybrid."
+            }
+
+        context_text = "\n\n".join(context_texts)
+
+        return {
+            "text": context_text,
+            "sources": sources,
+            "query": query,
+            "course_id": course_id,
+            "search_method": "hybrid",
+            "semantic_count": len(semantic_results),
+            "keyword_count": len(keyword_results),
+            "fusion_method": self.fusion_method,
+            "cache_enabled": self.cache_service is not None
+        }
+
     def get_search_stats(self) -> Dict[str, Any]:
         """
         Restituisce statistiche sul sistema di ricerca
         """
-        return {
+        base_stats = {
             "bm25_index_built": self.bm25_index is not None,
             "indexed_documents": len(self.documents_corpus),
             "semantic_weight": self.semantic_weight,
             "keyword_weight": self.keyword_weight,
-            "fusion_method": self.fusion_method
+            "fusion_method": self.fusion_method,
+            "cache_enabled": self.cache_service is not None
         }
+
+        # Add cache stats if available
+        if self.cache_service:
+            cache_stats = self.cache_service.get_metrics()
+            base_stats["cache_metrics"] = cache_stats
+
+        return base_stats
+
+    async def invalidate_hybrid_cache(self, course_id: str, book_id: Optional[str] = None):
+        """
+        Invalida cache hybrid per corso specifico
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                # Pattern per invalidazione cache hybrid
+                pattern = f"tutor_ai:hybrid_search:*:course:{course_id}:*"
+                if book_id:
+                    pattern = f"tutor_ai:hybrid_search:*:course:{course_id}:*:book:{book_id}:*"
+
+                # Includi anche BM25 cache
+                bm25_pattern = "tutor_ai:hybrid_search:bm25:*"
+
+                # Esegui invalidazione
+                await self.cache_service.invalidate_by_pattern(pattern)
+                await self.cache_service.invalidate_by_pattern(bm25_pattern)
+
+                logger.info("Invalidated hybrid search cache", course_id=course_id, book_id=book_id)
+
+        except Exception as e:
+            logger.error(f"Error invalidating hybrid search cache: {e}")

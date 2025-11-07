@@ -7,8 +7,34 @@ import { ArrowLeft, Brain, RefreshCw, Loader2, Save, BookOpen, Sparkles, FileTex
 import toast from 'react-hot-toast'
 import { MindmapExplorer } from '@/components/MindmapExplorer'
 import { StudyMindmap, StudyMindmapNode, ExpandedStudyNode } from '@/types/mindmap'
+import VisualMindmap, { type MindmapData } from '@/components/VisualMindmap'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const normalizeApiBaseUrl = (value: string) => {
+  if (value === '/') return '/'
+  return value.endsWith('/') ? value.slice(0, -1) : value
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL ?? '/api')
+const buildApiUrl = (path: string) => `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+
+interface ParsedResponse<T> {
+  payload: T | null
+  rawText: string
+}
+
+const parseJsonSafely = async <T,>(response: Response): Promise<ParsedResponse<T>> => {
+  const rawText = await response.text()
+  if (!rawText) {
+    return { payload: null, rawText: '' }
+  }
+
+  try {
+    return { payload: JSON.parse(rawText) as T, rawText: '' }
+  } catch (error) {
+    console.error('Failed to parse response as JSON:', error, rawText)
+    return { payload: null, rawText }
+  }
+}
 
 interface Book {
   id: string
@@ -43,6 +69,35 @@ interface MindmapExpandApiResponse {
   sources_used?: string[]
 }
 
+interface MindmapEditApiResponse {
+  success: boolean
+  edited_node?: ExpandedStudyNode
+  sources_used?: string[]
+}
+
+interface MindmapStoragePayload {
+  title?: string
+  structured_map?: StudyMindmap
+  content_markdown?: string
+  [key: string]: unknown
+}
+
+interface SavedMindmapEntry {
+  id: string
+  title: string
+  data: MindmapStoragePayload
+  createdAt: string
+  courseId: string
+  bookId: string
+}
+
+type MindmapSaveInput = MindmapStoragePayload | MindmapData
+
+const isStoragePayload = (value: MindmapSaveInput): value is MindmapStoragePayload =>
+  typeof value === 'object' &&
+  value !== null &&
+  ('structured_map' in value || 'content_markdown' in value)
+
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
@@ -52,6 +107,12 @@ const toStringArray = (value: unknown): string[] =>
 const toMindmapSources = (value: unknown): MindmapSource[] => {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is MindmapSource => typeof item === 'string' || isObject(item))
+}
+
+const hasMindmapNodes = (value: unknown): value is StudyMindmap => {
+  if (!isObject(value)) return false
+  const candidate = value as Partial<StudyMindmap>
+  return Array.isArray(candidate.nodes)
 }
 
 const isMindmapGenerationResponse = (value: unknown): value is MindmapGenerationResponse => {
@@ -96,6 +157,111 @@ export default function MindmapPage() {
   const [saving, setSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [viewMode, setViewMode] = useState<'explorer' | 'visual'>('visual')
+  const [savedMindmaps, setSavedMindmaps] = useState<SavedMindmapEntry[]>([])
+
+  // Load saved mindmaps from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(`mindmaps_${courseIdFromParams}_${bookIdFromParams}`)
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as SavedMindmapEntry[]
+        if (Array.isArray(parsed)) {
+          setSavedMindmaps(parsed)
+        }
+      } catch (e) {
+        console.error('Error loading saved mindmaps:', e)
+      }
+    }
+  }, [courseIdFromParams, bookIdFromParams])
+
+  const normalizeMindmapForStorage = (input: MindmapSaveInput): MindmapStoragePayload => {
+    if (isStoragePayload(input)) {
+      return {
+        ...input,
+        title: input.title ?? mindmap?.title ?? 'Mappa Concettuale'
+      }
+    }
+
+    const fallbackPayload: MindmapStoragePayload = {
+      title: mindmap?.title || 'Mappa Concettuale',
+      content_markdown: markdown
+    }
+
+    if (mindmap) {
+      fallbackPayload.structured_map = mindmap
+    }
+
+    fallbackPayload.visual_state = input
+    return fallbackPayload
+  }
+
+  const handleSaveMindmap = (mindmapData: MindmapSaveInput) => {
+    const normalized = normalizeMindmapForStorage(mindmapData)
+    setSaving(true)
+    try {
+      const mindmapToSave: SavedMindmapEntry = {
+        id: Date.now().toString(),
+        title: normalized.title || 'Mappa Concettuale',
+        data: normalized,
+        createdAt: new Date().toISOString(),
+        courseId: courseIdFromParams,
+        bookId: bookIdFromParams
+      }
+
+      const updated = [...savedMindmaps, mindmapToSave]
+      setSavedMindmaps(updated)
+      localStorage.setItem(`mindmaps_${courseIdFromParams}_${bookIdFromParams}`, JSON.stringify(updated))
+      setLastSavedAt(mindmapToSave.createdAt)
+      toast.success('Mappa salvata localmente!')
+    } catch (error) {
+      console.error('Errore durante il salvataggio della mappa:', error)
+      toast.error('Impossibile salvare la mappa')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleLoadMindmap = (mindmapId: string) => {
+    const savedEntry = savedMindmaps.find(m => m.id === mindmapId)
+    if (!savedEntry) return
+
+    if (viewMode === 'visual') {
+      toast.success('Mappa caricata in modalità visuale')
+      return
+    }
+
+    const structured = savedEntry.data.structured_map
+    if (structured && hasMindmapNodes(structured)) {
+      setMindmap(structured)
+    } else if (hasMindmapNodes(savedEntry.data)) {
+      setMindmap(savedEntry.data)
+    }
+    setMarkdown(savedEntry.data.content_markdown || '')
+    toast.success('Mappa caricata in modalità esploratore')
+  }
+
+  const handleDeleteMindmap = (mindmapId: string) => {
+    const updated = savedMindmaps.filter(m => m.id !== mindmapId)
+    setSavedMindmaps(updated)
+    localStorage.setItem(`mindmaps_${courseIdFromParams}_${bookIdFromParams}`, JSON.stringify(updated))
+    toast.success('Mappa eliminata')
+  }
+
+  const handleExportMindmap = (mindmapData: MindmapSaveInput) => {
+    const normalized = normalizeMindmapForStorage(mindmapData)
+    const filename = `mindmap_${new Date().toISOString().split('T')[0]}.json`
+    const blob = new Blob([JSON.stringify(normalized, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success('Mappa esportata!')
+  }
 
   useEffect(() => {
     fetchBook()
@@ -104,7 +270,7 @@ export default function MindmapPage() {
 
   const fetchBook = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseIdFromParams}/books/${bookIdFromParams}`)
+      const response = await fetch(buildApiUrl(`/courses/${courseIdFromParams}/books/${bookIdFromParams}`))
       if (response.ok) {
         const data = await response.json()
         setBook(data.book)
@@ -120,7 +286,7 @@ export default function MindmapPage() {
 
   const fetchCourseInfo = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseIdFromParams}`)
+      const response = await fetch(buildApiUrl(`/courses/${courseIdFromParams}`))
       if (response.ok) {
         const data = await response.json()
         setCourseName(data.course.name)
@@ -142,7 +308,7 @@ export default function MindmapPage() {
     setError('')
 
     try {
-      const response = await fetch(`${API_BASE_URL}/mindmap`, {
+      const response = await fetch(buildApiUrl('/mindmap'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +321,7 @@ export default function MindmapPage() {
         }),
       })
 
-      const payload: unknown = await response.json()
+      const { payload, rawText } = await parseJsonSafely<MindmapGenerationResponse>(response)
 
       if (response.ok && isMindmapGenerationResponse(payload) && payload.success && payload.mindmap) {
         setMindmap(payload.mindmap)
@@ -169,7 +335,7 @@ export default function MindmapPage() {
         const message =
           (isObject(payload) && typeof payload.detail === 'string'
             ? payload.detail
-            : 'Errore durante la generazione della mappa concettuale')
+            : rawText || 'Errore durante la generazione della mappa concettuale')
         setError(message)
         toast.error(message)
       }
@@ -227,30 +393,61 @@ export default function MindmapPage() {
     }
   }
 
-  const handleExpandNode = async (path: StudyMindmapNode[]) => {
-    if (!mindmap) return
+  const handleExpandNode = async (path: StudyMindmapNode[], customPrompt?: string) => {
+    console.log('🎯 handleExpandNode called with path:', path.map(n => n.title), 'customPrompt:', customPrompt)
+    console.log('🔍 Current mindmap state:', mindmap ? 'exists' : 'null')
+    console.log('🔄 Initializing mindmap data...', { mindmap, viewMode })
+
+    // Capture the current mindmap to avoid race conditions
+    const currentMindmap = mindmap
+    if (!currentMindmap) {
+      console.warn('⚠️ No mindmap available for expansion')
+      throw new Error('Nessuna mappa concettuale disponibile per l\'espansione')
+    }
+
     const targetNode = path[path.length - 1]
-    if (!targetNode) return
+    if (!targetNode) {
+      console.warn('⚠️ No target node found in path')
+      throw new Error('Nodo target non trovato per l\'espansione')
+    }
+
+    // Validate and sanitize custom prompt
+    const sanitizedPrompt = customPrompt?.trim()
+    if (sanitizedPrompt && sanitizedPrompt.length > 1000) {
+      console.warn('⚠️ Custom prompt too long:', sanitizedPrompt.length)
+      throw new Error('Il prompt personalizzato è troppo lungo (massimo 1000 caratteri)')
+    }
+
+    console.log('🎪 Expanding node:', targetNode.title, 'ID:', targetNode.id)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/mindmap/expand`, {
+      const requestBody = {
+        course_id: courseIdFromParams,
+        book_id: bookIdFromParams,
+        node_text: targetNode.title,
+        node_context: path
+          .slice(0, -1)
+          .map((node) => node.title)
+          .join(' > '),
+        max_children: 4,
+        expansion_prompt: sanitizedPrompt || undefined
+      }
+
+      console.log('📤 Sending expansion request:', requestBody)
+
+      const response = await fetch(buildApiUrl('/mindmap/expand'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          course_id: courseIdFromParams,
-          book_id: bookIdFromParams,
-          node_text: targetNode.title,
-          node_context: path
-            .slice(0, -1)
-            .map((node) => node.title)
-            .join(' > '),
-          max_children: 4
-        })
+        body: JSON.stringify(requestBody)
       })
 
-      const payload: unknown = await response.json()
+      console.log('📥 Expansion response status:', response.status)
+
+      const { payload, rawText } = await parseJsonSafely<MindmapExpandApiResponse>(response)
+
+      console.log('📊 Parsed response:', { payload, rawText })
 
       if (response.ok && isMindmapExpandResponse(payload) && payload.success) {
         const expandedNodes: StudyMindmapNode[] = (payload.expanded_nodes ?? []).map((child) => ({
@@ -264,12 +461,20 @@ export default function MindmapPage() {
           children: []
         }))
 
+        console.log('🌱 Expanded nodes created:', expandedNodes.length, expandedNodes.map(n => n.title))
+
         if (expandedNodes.length === 0) {
+          console.log('📭 No new concepts generated')
           toast('Nessun nuovo sotto-concetto generato')
           return
         }
 
-        setMindmap((prev) => (prev ? updateMindmapWithChildren(prev, targetNode.id, expandedNodes) : prev))
+        console.log('🔄 Updating mindmap with children...')
+        setMindmap((prev) => {
+          const updated = prev ? updateMindmapWithChildren(prev, targetNode.id, expandedNodes) : prev
+          console.log('✅ Mindmap updated with', expandedNodes.length, 'new nodes')
+          return updated
+        })
 
         const newReferences = toStringArray(payload.sources_used)
         if (newReferences.length) {
@@ -281,7 +486,7 @@ export default function MindmapPage() {
         const message =
           (isObject(payload) && typeof payload.detail === 'string'
             ? payload.detail
-            : 'Impossibile espandere il nodo con l\'AI')
+            : rawText || 'Impossibile espandere il nodo con l\'AI')
         toast.error(message)
       }
     } catch (error) {
@@ -290,43 +495,77 @@ export default function MindmapPage() {
     }
   }
 
-  const handleSaveMindmap = async () => {
+  const updateMindmapNode = (map: StudyMindmap, targetId: string, updatedNode: StudyMindmapNode): StudyMindmap => {
+    const updateNode = (nodes: StudyMindmapNode[]): StudyMindmapNode[] =>
+      nodes.map((node) => {
+        if (node.id === targetId) {
+          return { ...node, ...updatedNode }
+        }
+        if (node.children.length > 0) {
+          return { ...node, children: updateNode(node.children) }
+        }
+        return node
+      })
+
+    return {
+      ...map,
+      nodes: updateNode(map.nodes)
+    }
+  }
+
+  const handleEditNode = async (node: StudyMindmapNode, instruction: string) => {
     if (!mindmap) return
-    setSaving(true)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/courses/${courseIdFromParams}/books/${bookIdFromParams}/mindmaps`, {
+      const requestBody = {
+        course_id: courseIdFromParams,
+        book_id: bookIdFromParams,
+        node_id: node.id,
+        current_title: node.title,
+        current_summary: node.summary || '',
+        edit_instruction: instruction
+      }
+
+      const response = await fetch(buildApiUrl('/mindmap/edit'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          title: mindmap.title,
-          content_markdown: markdown,
-          structured_map: mindmap,
-          metadata: {
-            course_id: courseIdFromParams,
-            book_id: bookIdFromParams,
-            references,
-            sources
-          }
-        })
+        body: JSON.stringify(requestBody)
       })
 
-      const data = await response.json()
+      const { payload, rawText } = await parseJsonSafely<MindmapEditApiResponse>(response)
 
-      if (response.ok && data.id) {
-        setLastSavedAt(new Date().toISOString())
-        toast.success('Mappa salvata nella libreria del corso')
+      if (response.ok && payload && payload.success && payload.edited_node) {
+        const updatedNode: StudyMindmapNode = {
+          id: payload.edited_node.id,
+          title: payload.edited_node.title,
+          summary: payload.edited_node.summary || '',
+          ai_hint: payload.edited_node.ai_hint || '',
+          study_actions: payload.edited_node.study_actions || [],
+          priority: payload.edited_node.priority || null,
+          references: payload.edited_node.references || [],
+          children: node.children // Preserve existing children
+        }
+
+        setMindmap((prev) => prev ? updateMindmapNode(prev, node.id, updatedNode) : prev)
+
+        const newReferences = toStringArray(payload.sources_used)
+        if (newReferences.length) {
+          setReferences((prev) => Array.from(new Set([...prev, ...newReferences])))
+        }
+
+        toast.success('Nodo modificato con successo')
       } else {
-        const message = data.detail || 'Impossibile salvare la mappa'
+        const message =
+          (payload && typeof payload === 'object' && 'detail' in payload && typeof payload.detail === 'string'
+            ? payload.detail
+            : rawText || 'Impossibile modificare il nodo con l\'AI')
         toast.error(message)
       }
     } catch (error) {
-      console.error('Errore durante il salvataggio della mappa', error)
-      toast.error('Errore durante il salvataggio della mappa')
-    } finally {
-      setSaving(false)
+      console.error('Errore durante la modifica del nodo', error)
+      toast.error('Errore durante la modifica del nodo')
     }
   }
 
@@ -408,6 +647,30 @@ export default function MindmapPage() {
                 <p className="text-gray-600">{book?.title}</p>
               </div>
             </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('visual')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'visual'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🧠 Visuale
+              </button>
+              <button
+                onClick={() => setViewMode('explorer')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'explorer'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📋 Esploratore
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -420,7 +683,87 @@ export default function MindmapPage() {
           </div>
         )}
 
-        {!mindmap ? (
+        {/* Saved Mindmaps Sidebar */}
+        {savedMindmaps.length > 0 && (
+          <div className="mb-6 bg-white rounded-xl border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">📚 Mappe Salvate</h3>
+              <span className="text-sm text-gray-500">{savedMindmaps.length} mappe</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {savedMindmaps.map((saved) => (
+                <div key={saved.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-gray-900 truncate">{saved.title}</h4>
+                    <p className="text-xs text-gray-500">
+                      {new Date(saved.createdAt).toLocaleDateString('it-IT')}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => handleLoadMindmap(saved.id)}
+                      className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                      title="Carica mappa"
+                    >
+                      📂
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMindmap(saved.id)}
+                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                      title="Elimina mappa"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'visual' ? (
+          !mindmap ? (
+            <div className="text-center py-20 bg-white rounded-xl border" style={{ height: '800px' }}>
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Brain className="h-10 w-10 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                Genera Mappa Concettuale
+              </h3>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                Crea una mappa concettuale interattiva basata sui contenuti del libro utilizzando l'intelligenza artificiale.
+              </p>
+              <button
+                onClick={generateMindmap}
+                disabled={generating}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2 mx-auto"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Generazione in corso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-5 w-5" />
+                    <span>Genera Mappa Concettuale</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border overflow-hidden" style={{ height: '800px' }}>
+              <VisualMindmap
+                data={mindmap}
+                onSave={handleSaveMindmap}
+                onExport={handleExportMindmap}
+                editable={true}
+                onExpandNode={handleExpandNode}
+                className="w-full h-full"
+              />
+            </div>
+          )
+        ) : !mindmap ? (
           <div className="text-center py-20 bg-white rounded-xl border">
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Brain className="h-10 w-10 text-blue-600" />
@@ -470,12 +813,12 @@ export default function MindmapPage() {
                   <span>Rigenera</span>
                 </button>
                 <button
-                  onClick={handleSaveMindmap}
+                  onClick={() => handleSaveMindmap({ structured_map: mindmap, content_markdown: markdown, title: mindmap.title })}
                   disabled={saving}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  <span>Salva nel corso</span>
+                  <span>Salva localmente</span>
                 </button>
                 <button
                   onClick={handleDownloadMarkdown}
@@ -489,7 +832,7 @@ export default function MindmapPage() {
             </div>
 
             <div className="bg-white rounded-xl border p-6">
-              <MindmapExplorer mindmap={mindmap} onExpandNode={handleExpandNode} />
+              <MindmapExplorer mindmap={mindmap} onExpandNode={handleExpandNode} onEditNode={handleEditNode} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,11 +1,16 @@
-version: '3.8'
+# Docker Compose ottimizzato per performance in WSL2
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: tutor-ai-backend:cors-fixed
+      target: production
+      cache_from:
+        - tutor-ai-backend:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: tutor-ai-backend:latest
     container_name: tutor-ai-backend
     ports:
       - "8000:8000"
@@ -13,33 +18,44 @@ services:
       - ./data:/app/data
       - ./backend/.env:/app/.env
       - rag_data:/app/rag
+      - apt_cache:/var/cache/apt
+      - apt_lib_cache:/var/lib/apt
     environment:
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
       - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
     restart: unless-stopped
-    entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - tutor-ai-network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: runner
+      cache_from:
+        - tutor-ai-frontend:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+        NODE_ENV: production
+        NEXT_TELEMETRY_DISABLED: 1
     image: tutor-ai-frontend:latest
     container_name: tutor-ai-frontend
     ports:
       - "5000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3000
     restart: unless-stopped
     depends_on:
       backend:
@@ -50,15 +66,41 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - tutor-ai-network
+
+  # Redis per cache opzionale
+  redis:
+    image: redis:7-alpine
+    container_name: tutor-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - tutor-ai-network
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   rag_data:
     driver: local
+  redis_data:
+    driver: local
+  apt_cache:
+    driver: local
+  apt_lib_cache:
+    driver: local
 
 networks:
-  default:
-    name: tutor-ai-network
+  tutor-ai-network:
     driver: bridge
+    name: tutor-ai-network
 
 # Development profile
 x-dev-volumes: &dev-volumes

@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Concettuale Visuale - Sebastiano Caboto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #1a1a1a;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #374151;
+            color: white;
+        }
+
+        .canvas-container {
+            position: absolute;
+            top: 70px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        #mindmapCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+
+        #mindmapCanvas.grabbing {
+            cursor: grabbing;
+        }
+
+        .node {
+            position: absolute;
+            background: white;
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            cursor: move;
+            transition: all 0.3s ease;
+            min-width: 180px;
+            max-width: 250px;
+            z-index: 10;
+        }
+
+        .node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+        }
+
+        .node.dragging {
+            opacity: 0.8;
+            transform: scale(1.05);
+            z-index: 100;
+        }
+
+        .node.main {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            min-width: 220px;
+            z-index: 50;
+        }
+
+        .node.level-1 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            font-weight: 500;
+            z-index: 40;
+        }
+
+        .node.level-2 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            font-weight: 500;
+            z-index: 30;
+        }
+
+        .node.level-3 {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            font-weight: 500;
+            z-index: 20;
+        }
+
+        .node.expandable::after {
+            content: '+';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .node.expanded::after {
+            content: '−';
+        }
+
+        .node-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        .node-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+            line-height: 1.3;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: rgba(255,255,255,0.4);
+            transform-origin: left center;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            background: #f3f4f6;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 2px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: #e5e7eb;
+            transform: scale(1.1);
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .info-content {
+            font-size: 12px;
+            color: #4b5563;
+            line-height: 1.4;
+        }
+
+        .zoom-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 16px;
+            }
+
+            .header-actions {
+                flex-wrap: wrap;
+            }
+
+            .node {
+                min-width: 140px;
+                max-width: 180px;
+                padding: 8px 12px;
+            }
+
+            .node-title {
+                font-size: 12px;
+            }
+
+            .node-subtitle {
+                font-size: 10px;
+            }
+
+            .info-panel {
+                display: none;
+            }
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧠 Mappa Concettuale Visuale - Sebastiano Caboto</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="resetView()">
+                    🔄 Reset Vista
+                </button>
+                <button class="btn btn-success" onclick="expandAll()">
+                    📖 Espandi Tutto
+                </button>
+                <button class="btn btn-secondary" onclick="collapseAll()">
+                    📕 Comprimi Tutto
+                </button>
+            </div>
+        </header>
+
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="mindmapCanvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="zoom-controls">
+                <button class="control-btn" onclick="zoomIn()" title="Zoom In">
+                    ➕
+                </button>
+                <button class="control-btn" onclick="zoomOut()" title="Zoom Out">
+                    ➖
+                </button>
+                <button class="control-btn" onclick="centerView()" title="Centra">
+                    🎯
+                </button>
+                <button class="control-btn" onclick="toggleFullscreen()" title="Fullscreen">
+                    🔳
+                </button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-title">📊 Statistiche Mappa</div>
+            <div class="info-content">
+                <div>📍 Nodi Totali: <span id="nodeCount">0</span></div>
+                <div>🔗 Collegamenti: <span id="connectionCount">0</span></div>
+                <div>📏 Zoom: <span id="zoomLevel">100%</span></div>
+                <div>🎯 Nodi Espansi: <span id="expandedCount">0</span></div>
+            </div>
+        </div>
+
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        class VisualMindmap {
+            constructor() {
+                this.canvas = document.getElementById('mindmapCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.getElementById('canvasContainer');
+                this.nodes = new Map();
+                this.connections = [];
+                this.draggedNode = null;
+                this.offset = { x: 0, y: 0 };
+                this.scale = 1;
+                this.isDragging = false;
+                this.lastMousePos = { x: 0, y: 0 };
+                this.animationFrame = null;
+
+                this.init();
+            }
+
+            init() {
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                this.setupEventListeners();
+                this.createMindmapData();
+                this.render();
+                this.updateStats();
+            }
+
+            resizeCanvas() {
+                this.canvas.width = this.container.clientWidth;
+                this.canvas.height = this.container.clientHeight;
+            }
+
+            setupEventListeners() {
+                // Mouse events
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+
+                // Touch events
+                this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e));
+                this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
+                this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+            }
+
+            createMindmapData() {
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+
+                // Main node
+                this.addNode('main', {
+                    x: centerX,
+                    y: centerY,
+                    title: 'Sebastiano Caboto',
+                    subtitle: 'Geografia Storica',
+                    level: 'main',
+                    expanded: true
+                });
+
+                // Level 1 nodes
+                const level1Nodes = [
+                    { id: 'spedizioni', title: 'Spedizioni Principali', angle: 0 },
+                    { id: 'contratacion', title: 'Casa de la Contratacion', angle: 72 },
+                    { id: 'analogie', title: 'Analogie con Conrad', angle: 144 },
+                    { id: 'controversie', title: 'Controversie', angle: 216 },
+                    { id: 'eredita', title: 'Eredità Storica', angle: 288 }
+                ];
+
+                const radius1 = 200;
+                level1Nodes.forEach((node, index) => {
+                    const angle = (node.angle * Math.PI) / 180;
+                    const x = centerX + Math.cos(angle) * radius1;
+                    const y = centerY + Math.sin(angle) * radius1;
+
+                    this.addNode(node.id, {
+                        x, y,
+                        title: node.title,
+                        level: 'level-1',
+                        expanded: false
+                    });
+
+                    this.addConnection('main', node.id);
+                });
+
+                // Level 2 nodes
+                const level2Nodes = {
+                    spedizioni: [
+                        { id: 'gomez', title: 'Spedizione Gomez', angle: -30 },
+                        { id: 'ricchezze', title: 'Miraggio Ricchezze', angle: 30 }
+                    ],
+                    contratacion: [
+                        { id: 'funzioni', title: 'Funzioni', angle: 42 },
+                        { id: 'padron', title: 'Padron Real', angle: 102 }
+                    ],
+                    analogie: [
+                        { id: 'temi', title: 'Temi Coloniali', angle: 114 },
+                        { id: 'confronti', title: 'Confronti Letterari', angle: 174 }
+                    ],
+                    controversie: [
+                        { id: 'abusi', title: 'Abusi di Potere', angle: 186 },
+                        { id: 'congiura', title: 'La Congiura', angle: 246 }
+                    ],
+                    eredita: [
+                        { id: 'mappatura', title: 'Mappatura', angle: 258 },
+                        { id: 'influenza', title: 'Influenza', angle: 318 }
+                    ]
+                };
+
+                const radius2 = 350;
+                Object.entries(level2Nodes).forEach(([parentId, nodes]) => {
+                    const parent = this.nodes.get(parentId);
+                    if (parent) {
+                        nodes.forEach((node, index) => {
+                            const angle = ((node.angle + 90) * Math.PI) / 180;
+                            const x = parent.x + Math.cos(angle) * 150;
+                            const y = parent.y + Math.sin(angle) * 150;
+
+                            this.addNode(node.id, {
+                                x, y,
+                                title: node.title,
+                                level: 'level-2',
+                                expanded: false,
+                                hidden: true
+                            });
+
+                            this.addConnection(parentId, node.id, true);
+                        });
+                    }
+                });
+
+                // Level 3 nodes (sample)
+                const level3Nodes = {
+                    temi: [
+                        { id: 'ricchezze-tema', title: 'Brama Ricchezze' },
+                        { id: 'nativi', title: 'Sfruttamento Nativi' },
+                        { id: 'delitti', title: 'Delitti e Violenza' },
+                        { id: 'cannibalismo', title: 'Cannibalismo' },
+                        { id: 'superiorita', title: 'Superiorità Europea' }
+                    ],
+                    abusi: [
+                        { id: 'junco', title: 'Juan de Junco' },
+                        { id: 'nuremberg', title: 'Casimiro Nuremberg' },
+                        { id: 'santa-cruz', title: 'Alonso Santa Cruz' }
+                    ]
+                };
+
+                Object.entries(level3Nodes).forEach(([parentId, nodes]) => {
+                    const parent = this.nodes.get(parentId);
+                    if (parent && !parent.hidden) {
+                        nodes.forEach((node, index) => {
+                            const angle = ((index * 72 - 180) * Math.PI) / 180;
+                            const x = parent.x + Math.cos(angle) * 120;
+                            const y = parent.y + Math.sin(angle) * 120;
+
+                            this.addNode(node.id, {
+                                x, y,
+                                title: node.title,
+                                level: 'level-3',
+                                expanded: false,
+                                hidden: true
+                            });
+
+                            this.addConnection(parentId, node.id, true);
+                        });
+                    }
+                });
+            }
+
+            addNode(id, config) {
+                const node = {
+                    id,
+                    x: config.x,
+                    y: config.y,
+                    title: config.title,
+                    subtitle: config.subtitle || '',
+                    level: config.level,
+                    expanded: config.expanded || false,
+                    hidden: config.hidden || false,
+                    vx: 0,
+                    vy: 0
+                };
+                this.nodes.set(id, node);
+
+                if (!config.hidden) {
+                    this.createNodeElement(node);
+                }
+            }
+
+            addConnection(fromId, toId, hidden = false) {
+                this.connections.push({
+                    from: fromId,
+                    to: toId,
+                    hidden
+                });
+            }
+
+            createNodeElement(node) {
+                const element = document.createElement('div');
+                element.className = `node ${node.level}`;
+                element.id = `node-${node.id}`;
+                element.style.left = `${node.x}px`;
+                element.style.top = `${node.y}px`;
+
+                if (this.hasChildren(node.id)) {
+                    element.classList.add('expandable');
+                    if (node.expanded) {
+                        element.classList.add('expanded');
+                    }
+                }
+
+                element.innerHTML = `
+                    <div class="node-title">${node.title}</div>
+                    ${node.subtitle ? `<div class="node-subtitle">${node.subtitle}</div>` : ''}
+                `;
+
+                element.addEventListener('mousedown', (e) => this.startDragNode(e, node));
+                element.addEventListener('click', (e) => {
+                    if (e.target === element || e.target.parentElement === element) {
+                        this.toggleNode(node.id);
+                    }
+                });
+
+                this.container.appendChild(element);
+            }
+
+            hasChildren(nodeId) {
+                return this.connections.some(conn => conn.from === nodeId && !conn.hidden);
+            }
+
+            toggleNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (!node || !this.hasChildren(nodeId)) return;
+
+                node.expanded = !node.expanded;
+
+                const element = document.getElementById(`node-${nodeId}`);
+                if (element) {
+                    element.classList.toggle('expanded');
+                }
+
+                // Toggle children visibility
+                this.connections.forEach(conn => {
+                    if (conn.from === nodeId) {
+                        const childNode = this.nodes.get(conn.to);
+                        if (childNode) {
+                            childNode.hidden = !node.expanded;
+                            const childElement = document.getElementById(`node-${conn.to}`);
+                            if (childElement) {
+                                if (node.expanded) {
+                                    childElement.style.display = 'block';
+                                    setTimeout(() => {
+                                        childElement.style.opacity = '1';
+                                        childElement.style.transform = 'scale(1)';
+                                    }, 10);
+                                    this.toggleNodeChildren(conn.to, true);
+                                } else {
+                                    childElement.style.opacity = '0';
+                                    childElement.style.transform = 'scale(0.8)';
+                                    setTimeout(() => {
+                                        childElement.style.display = 'none';
+                                    }, 300);
+                                    this.toggleNodeChildren(conn.to, false);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                this.updateStats();
+            }
+
+            toggleNodeChildren(nodeId, expand) {
+                const node = this.nodes.get(nodeId);
+                if (!node) return;
+
+                node.expanded = expand;
+
+                this.connections.forEach(conn => {
+                    if (conn.from === nodeId) {
+                        this.toggleNodeChildren(conn.to, expand);
+                    }
+                });
+            }
+
+            startDragNode(e, node) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                this.draggedNode = node;
+                const rect = e.target.getBoundingClientRect();
+                this.offset = {
+                    x: e.clientX - rect.left - rect.width / 2,
+                    y: e.clientY - rect.top - rect.height / 2
+                };
+
+                this.canvas.classList.add('grabbing');
+            }
+
+            handleMouseDown(e) {
+                if (!this.draggedNode) {
+                    this.isDragging = true;
+                    this.lastMousePos = { x: e.clientX, y: e.clientY };
+                    this.canvas.style.cursor = 'grabbing';
+                }
+            }
+
+            handleMouseMove(e) {
+                if (this.draggedNode) {
+                    const rect = this.container.getBoundingClientRect();
+                    const x = (e.clientX - rect.left - this.offset.x) / this.scale;
+                    const y = (e.clientY - rect.top - this.offset.y) / this.scale;
+
+                    this.draggedNode.x = x;
+                    this.draggedNode.y = y;
+
+                    const element = document.getElementById(`node-${this.draggedNode.id}`);
+                    if (element) {
+                        element.style.left = `${x}px`;
+                        element.style.top = `${y}px`;
+                    }
+
+                    this.render();
+                } else if (this.isDragging) {
+                    const dx = e.clientX - this.lastMousePos.x;
+                    const dy = e.clientY - this.lastMousePos.y;
+
+                    this.offset.x += dx;
+                    this.offset.y += dy;
+
+                    this.lastMousePos = { x: e.clientX, y: e.clientY };
+                    this.render();
+                }
+            }
+
+            handleMouseUp(e) {
+                this.draggedNode = null;
+                this.isDragging = false;
+                this.canvas.style.cursor = 'grab';
+            }
+
+            handleWheel(e) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                this.scale = Math.max(0.5, Math.min(3, this.scale * delta));
+                this.render();
+                this.updateStats();
+            }
+
+            handleTouchStart(e) {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    this.handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+                }
+            }
+
+            handleTouchMove(e) {
+                if (e.touches.length === 1) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    this.handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+                }
+            }
+
+            handleTouchEnd(e) {
+                this.handleMouseUp({});
+            }
+
+            render() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.save();
+                this.ctx.translate(this.offset.x, this.offset.y);
+                this.ctx.scale(this.scale, this.scale);
+
+                // Draw connections
+                this.connections.forEach(conn => {
+                    const fromNode = this.nodes.get(conn.from);
+                    const toNode = this.nodes.get(conn.to);
+
+                    if (fromNode && toNode && !toNode.hidden) {
+                        this.drawConnection(fromNode, toNode);
+                    }
+                });
+
+                this.ctx.restore();
+            }
+
+            drawConnection(from, to) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(from.x, from.y);
+
+                // Curved connection
+                const cx = (from.x + to.x) / 2;
+                const cy = (from.y + to.y) / 2 - 30;
+
+                this.ctx.quadraticCurveTo(cx, cy, to.x, to.y);
+
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                this.ctx.lineWidth = 3;
+                this.ctx.lineCap = 'round';
+                this.ctx.stroke();
+
+                // Add arrow
+                const angle = Math.atan2(to.y - cy, to.x - cx);
+                this.ctx.save();
+                this.ctx.translate(to.x, to.y);
+                this.ctx.rotate(angle);
+                this.ctx.beginPath();
+                this.ctx.moveTo(-10, -5);
+                this.ctx.lineTo(0, 0);
+                this.ctx.lineTo(-10, 5);
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                this.ctx.restore();
+            }
+
+            updateStats() {
+                document.getElementById('nodeCount').textContent = this.nodes.size;
+                document.getElementById('connectionCount').textContent = this.connections.filter(c => !c.hidden).length;
+                document.getElementById('zoomLevel').textContent = `${Math.round(this.scale * 100)}%`;
+                document.getElementById('expandedCount').textContent = Array.from(this.nodes.values()).filter(n => n.expanded).length;
+            }
+
+            expandAll() {
+                this.nodes.forEach(node => {
+                    if (this.hasChildren(node.id)) {
+                        node.expanded = true;
+                        node.hidden = false;
+                        const element = document.getElementById(`node-${node.id}`);
+                        if (element) {
+                            element.classList.add('expanded');
+                            element.style.display = 'block';
+                            element.style.opacity = '1';
+                            element.style.transform = 'scale(1)';
+                        }
+                    }
+                });
+                this.updateStats();
+            }
+
+            collapseAll() {
+                this.nodes.forEach(node => {
+                    if (node.id !== 'main') {
+                        node.expanded = false;
+                        const element = document.getElementById(`node-${node.id}`);
+                        if (element) {
+                            element.classList.remove('expanded');
+                            if (node.level !== 'main') {
+                                element.style.display = 'none';
+                            }
+                        }
+                    }
+                });
+                this.updateStats();
+            }
+
+            resetView() {
+                this.scale = 1;
+                this.offset = { x: 0, y: 0 };
+                this.render();
+                this.updateStats();
+            }
+
+            zoomIn() {
+                this.scale = Math.min(3, this.scale * 1.2);
+                this.render();
+                this.updateStats();
+            }
+
+            zoomOut() {
+                this.scale = Math.max(0.5, this.scale / 1.2);
+                this.render();
+                this.updateStats();
+            }
+
+            centerView() {
+                const mainNode = this.nodes.get('main');
+                if (mainNode) {
+                    this.offset.x = this.canvas.width / 2 - mainNode.x * this.scale;
+                    this.offset.y = this.canvas.height / 2 - mainNode.y * this.scale;
+                    this.render();
+                }
+            }
+
+            toggleFullscreen() {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Initialize mindmap
+        let mindmap;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            mindmap = new VisualMindmap();
+
+            // Auto-center after initialization
+            setTimeout(() => {
+                mindmap.centerView();
+            }, 100);
+        });
+
+        // Global functions
+        function resetView() {
+            if (mindmap) mindmap.resetView();
+        }
+
+        function expandAll() {
+            if (mindmap) mindmap.expandAll();
+        }
+
+        function collapseAll() {
+            if (mindmap) mindmap.collapseAll();
+        }
+
+        function zoomIn() {
+            if (mindmap) mindmap.zoomIn();
+        }
+
+        function zoomOut() {
+            if (mindmap) mindmap.zoomOut();
+        }
+
+        function centerView() {
+            if (mindmap) mindmap.centerView();
+        }
+
+        function toggleFullscreen() {
+            if (mindmap) mindmap.toggleFullscreen();
+        }
+    </script>
+</body>
+</html>

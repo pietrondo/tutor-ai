@@ -32,10 +32,26 @@ interface SettingsSection {
   fields: FormField[]
 }
 
+interface ZaiModelInfo {
+  name?: string
+  description?: string
+  use_cases?: string[]
+  context_window?: number
+  max_tokens?: number
+  supports_thinking?: boolean
+  supports_vision?: boolean
+}
+
+interface AvailableModelsResponse {
+  model_type?: string
+  models?: Record<string, ZaiModelInfo>
+}
+
 export default function SettingsPage() {
   const { theme, setTheme, effectiveTheme } = useTheme()
   const [settings, setSettings] = useState({
     llmProvider: 'openai',
+    zaiModel: 'glm-4.6',
     notifications: true,
     autoSave: true,
     language: 'it',
@@ -55,7 +71,11 @@ export default function SettingsPage() {
 
     if (savedSettings) {
       try {
-        setSettings(JSON.parse(savedSettings))
+        const parsed = JSON.parse(savedSettings)
+        setSettings(parsed)
+        if (parsed.zaiModel) {
+          setSelectedZaiModel(parsed.zaiModel)
+        }
       } catch (e) {
         console.error('Failed to parse saved settings:', e)
       }
@@ -71,6 +91,9 @@ export default function SettingsPage() {
         console.error('Failed to parse saved API keys:', e)
       }
     }
+
+    // Load available models
+    loadAvailableModels()
   }, [])
 
   // Configure LLM Manager with API keys
@@ -103,6 +126,53 @@ export default function SettingsPage() {
     }
   }
 
+  // Load available models from backend
+  const loadAvailableModels = async () => {
+    setModelsLoading(true)
+    try {
+      const response = await fetch('/api/models')
+      if (response.ok) {
+        const data: AvailableModelsResponse = await response.json()
+        if (data.model_type === 'zai' && data.models) {
+          setZaiModels(data.models)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load available models:', error)
+    } finally {
+      setModelsLoading(false)
+    }
+  }
+
+  // Handle ZAI model change
+  const handleZaiModelChange = async (newModel: string) => {
+    setSelectedZaiModel(newModel)
+    setSettings(prev => ({ ...prev, zaiModel: newModel }))
+
+    // Save immediately
+    const updatedSettings = { ...settings, zaiModel: newModel }
+    localStorage.setItem('app-settings', JSON.stringify(updatedSettings))
+
+    // Set the model in backend if ZAI is the current provider
+    if (settings.llmProvider === 'zai') {
+      try {
+        const response = await fetch('/api/models', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ model_name: newModel })
+        })
+
+        if (response.ok) {
+          console.log('ZAI model updated successfully:', newModel)
+        }
+      } catch (error) {
+        console.error('Failed to update ZAI model:', error)
+      }
+    }
+  }
+
   // Handle provider change
   const handleProviderChange = async (newProvider: string) => {
     setSettings(prev => ({ ...prev, llmProvider: newProvider }))
@@ -116,6 +186,25 @@ export default function SettingsPage() {
       const { llmManager } = await import('@/lib/llm-manager')
       llmManager.setDefaultProvider(newProvider)
     }
+
+    // If switching to ZAI, also set the selected model
+    if (newProvider === 'zai' && selectedZaiModel) {
+      try {
+        const response = await fetch('/api/models', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ model_name: selectedZaiModel })
+        })
+
+        if (response.ok) {
+          console.log('ZAI model set on provider switch:', selectedZaiModel)
+        }
+      } catch (error) {
+        console.error('Failed to set ZAI model on provider switch:', error)
+      }
+    }
   }
 
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({})
@@ -124,6 +213,11 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
+
+  // Model management state
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [zaiModels, setZaiModels] = useState<Record<string, ZaiModelInfo>>({})
+  const [selectedZaiModel, setSelectedZaiModel] = useState('glm-4.6')
 
   // Test API key function
   const testApiKey = async (provider: string, apiKey: string) => {
@@ -647,6 +741,151 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* ZAI Model Selection */}
+        {settings.llmProvider === 'zai' && (
+          <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 group relative overflow-hidden">
+            {/* Animated gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 opacity-50"></div>
+
+            {/* Top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12">
+                    <Settings className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                      Modello Z.AI
+                    </h3>
+                    <p className="text-sm text-gray-600">Seleziona il modello GLM preferito</p>
+                  </div>
+                </div>
+                <button
+                  onClick={loadAvailableModels}
+                  disabled={modelsLoading}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-indigo-600 hover:to-purple-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {modelsLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Caricamento...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Ricarica</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(zaiModels).map(([modelId, modelInfo]) => (
+                  <div
+                    key={modelId}
+                    onClick={() => handleZaiModelChange(modelId)}
+                    className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                      selectedZaiModel === modelId
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400'
+                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    {selectedZaiModel === modelId && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+                    )}
+
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                        {modelInfo.name || modelId}
+                      </h4>
+
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {modelInfo.description || 'Modello GLM'}
+                      </p>
+
+                      <div className="flex flex-wrap gap-1">
+                        {modelInfo.use_cases?.slice(0, 2).map((useCase: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full dark:bg-indigo-900/30 dark:text-indigo-300"
+                          >
+                            {useCase}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
+                        <div>Context: {modelInfo.context_window?.toLocaleString() || 'N/A'} tokens</div>
+                        <div>Max: {modelInfo.max_tokens?.toLocaleString() || 'N/A'} tokens</div>
+                        {modelInfo.supports_thinking && (
+                          <div className="text-indigo-600 dark:text-indigo-400">✨ Thinking capabilities</div>
+                        )}
+                        {modelInfo.supports_vision && (
+                          <div className="text-purple-600 dark:text-purple-400">👁️ Vision capabilities</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Fallback models if API not available */}
+              {Object.keys(zaiModels).length === 0 && !modelsLoading && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">Impossibile caricare i modelli Z.AI</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { id: 'glm-4.6', name: 'GLM-4.6', desc: 'Flagship con thinking', context: 200000 },
+                      { id: 'glm-4.5', name: 'GLM-4.5', desc: 'Modello avanzato', context: 128000 },
+                      { id: 'glm-4.5v', name: 'GLM-4.5V', desc: 'Con vision', context: 128000 },
+                      { id: 'glm-4.5-air', name: 'GLM-4.5 Air', desc: 'Ottimizzato', context: 128000 },
+                      { id: 'glm-4', name: 'GLM-4', desc: 'Standard', context: 128000 },
+                      { id: 'glm-4.1v', name: 'GLM-4.1V', desc: 'Vision base', context: 128000 }
+                    ].map((model) => (
+                      <div
+                        key={model.id}
+                        onClick={() => handleZaiModelChange(model.id)}
+                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                          selectedZaiModel === model.id
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400'
+                            : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                        }`}
+                      >
+                        {selectedZaiModel === model.id && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+                        )}
+
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-gray-900 dark:text-gray-100">{model.name}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{model.desc}</p>
+                          <div className="text-xs text-gray-500">
+                            Context: {model.context.toLocaleString()} tokens
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected model info */}
+              {selectedZaiModel && (
+                <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-700">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-5 w-5 text-indigo-600" />
+                    <span className="font-medium text-indigo-900 dark:text-indigo-100">
+                      Modello selezionato: {zaiModels[selectedZaiModel]?.name || selectedZaiModel}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Advanced Settings */}
         <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 group relative overflow-hidden">

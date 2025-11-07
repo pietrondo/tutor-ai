@@ -13,9 +13,10 @@ interface BookSelectorProps {
   books: Book[]
   selectedBook: string
   onBookChange: (bookId: string) => void
+  disabled?: boolean
 }
 
-export default function BookSelector({ books, selectedBook, onBookChange }: BookSelectorProps) {
+export default function BookSelector({ books, selectedBook, onBookChange, disabled = false }: BookSelectorProps) {
   if (books.length === 0) {
     return null
   }
@@ -30,7 +31,12 @@ export default function BookSelector({ books, selectedBook, onBookChange }: Book
         <select
           value={selectedBook}
           onChange={(e) => onBookChange(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer"
+          disabled={disabled}
+          className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
+            disabled
+              ? 'bg-gray-100 cursor-not-allowed'
+              : 'bg-white cursor-pointer'
+          }`}
         >
           <option value="">Nessun libro selezionato</option>
           {books.map((book) => (

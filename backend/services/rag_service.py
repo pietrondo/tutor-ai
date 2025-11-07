@@ -1,5 +1,6 @@
 import chromadb
 import os
+import torch
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
 import PyPDF2
@@ -10,6 +11,7 @@ import uuid
 import json
 import structlog
 from pathlib import Path
+import hashlib
 
 logger = structlog.get_logger()
 
@@ -31,18 +33,40 @@ class RAGService:
         # Inizializza HybridSearchService
         self.hybrid_search = None
 
+        # Inizializza Cache Service (lazy loading)
+        self.cache_service = None
+
         logger.info("RAG Service initialized with Italian-optimized settings",
                    model=self.model_name,
                    chunk_size=self.chunk_size,
                    overlap=self.chunk_overlap)
+
+    def _build_where_filter(self, course_id: str, book_id: Optional[str] = None) -> Dict[str, Any]:
+        """Build a ChromaDB where filter that is compatible with newer query semantics."""
+        conditions: List[Dict[str, Any]] = [{"course_id": course_id}]
+        if book_id:
+            conditions.append({"book_id": book_id})
+
+        if len(conditions) == 1:
+            return conditions[0]
+
+        return {"$and": conditions}
 
     def _load_embedding_model(self):
         """Carica il modello di embedding solo quando necessario"""
         if self.embedding_model is None:
             logger.info("Loading embedding model...")
             try:
-                self.embedding_model = SentenceTransformer(self.model_name)
-                logger.info("Embedding model loaded successfully")
+                # Detecta automaticamente GPU/CUDA
+                device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                logger.info(f"Using device: {device}")
+
+                if torch.cuda.is_available():
+                    logger.info(f"CUDA device: {torch.cuda.get_device_name()}")
+                    logger.info(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
+
+                self.embedding_model = SentenceTransformer(self.model_name, device=device)
+                logger.info("Embedding model loaded successfully", device=device)
             except Exception as e:
                 logger.error(f"Failed to load embedding model: {e}")
                 raise
@@ -361,9 +385,7 @@ class RAGService:
             query_embedding = self.embedding_model.encode([query]).tolist()
 
             # Build filter based on course_id and optional book_id
-            where_filter = {"course_id": course_id}
-            if book_id:
-                where_filter["book_id"] = book_id
+            where_filter = self._build_where_filter(course_id, book_id)
 
             # Search in ChromaDB with course and book filter
             results = self.collection.query(
@@ -466,7 +488,7 @@ class RAGService:
         """Delete all documents for a specific book"""
         try:
             self.collection.delete(
-                where={"course_id": course_id, "book_id": book_id}
+                where=self._build_where_filter(course_id, book_id)
             )
             print(f"Deleted all documents for book {book_id} in course {course_id}")
         except Exception as e:
@@ -504,10 +526,11 @@ class RAGService:
             self._init_hybrid_search()
 
             if self.hybrid_search:
-                # Usa hybrid search
-                result = await self.hybrid_search.hybrid_search(query, course_id, book_id, k)
+                # Usa hybrid search con caching
+                result = await self.hybrid_search.hybrid_search_cached(query, course_id, book_id, k)
                 logger.info("Hybrid search executed successfully",
-                          query=query, course_id=course_id, results=len(result.get('sources', [])))
+                          query=query, course_id=course_id, results=len(result.get('sources', [])),
+                          cached=result.get('cached', False))
                 return result
             else:
                 # Fallback a semantic search tradizionale
@@ -536,3 +559,198 @@ class RAGService:
                 "hybrid_search_available": False,
                 "error": str(e)
             }
+
+    def _init_cache_service(self):
+        """Inizializza il servizio di cache Redis"""
+        if self.cache_service is None:
+            try:
+                from services.cache_service import RedisCacheService, CacheType
+                self.cache_service = RedisCacheService()
+                logger.info("Redis cache service initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize Redis cache service: {e}")
+                self.cache_service = None
+
+    def _generate_cache_key(self, query: str, course_id: str, book_id: Optional[str] = None,
+                           k: int = 5, use_hybrid: bool = False) -> str:
+        """
+        Genera cache key univoco per query RAG
+        """
+        key_components = [
+            f"query:{hashlib.md5(query.encode()).hexdigest()[:16]}",
+            f"course:{course_id}",
+            f"k:{k}",
+            f"hybrid:{use_hybrid}"
+        ]
+
+        if book_id:
+            key_components.append(f"book:{book_id}")
+
+        return ":".join(key_components)
+
+    async def retrieve_context_cached(self, query: str, course_id: str,
+                                    book_id: Optional[str] = None, k: int = 5,
+                                    use_hybrid: bool = False) -> Dict[str, Any]:
+        """
+        Retrieve context con cache layer per performance ottimizzate
+        """
+        try:
+            # Inizializza cache service se necessario
+            self._init_cache_service()
+
+            if self.cache_service:
+                # Genera cache key
+                cache_key = self._generate_cache_key(query, course_id, book_id, k, use_hybrid)
+
+                # Tenta di recuperare dalla cache
+                from services.cache_service import CacheType
+                cached_result = await self.cache_service.get(CacheType.QUERY_RESULT, cache_key)
+
+                if cached_result is not None:
+                    logger.info("Cache hit for RAG query", query=query[:50], cache_key=cache_key)
+                    return cached_result
+
+            # Cache miss - esegui query normale
+            if use_hybrid:
+                result = await self.retrieve_context_hybrid(query, course_id, book_id, k)
+            else:
+                result = await self.retrieve_context(query, course_id, book_id, k)
+
+            # Salva nella cache
+            if self.cache_service and result.get("text"):  # Solo cache risultati validi
+                await self.cache_service.set(CacheType.QUERY_RESULT, cache_key, result)
+                logger.info("Cached RAG query result", query=query[:50], cache_key=cache_key)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in cached context retrieval: {e}")
+            # Fallback a metodo tradizionale senza cache
+            if use_hybrid:
+                return await self.retrieve_context_hybrid(query, course_id, book_id, k)
+            else:
+                return await self.retrieve_context(query, course_id, book_id, k)
+
+    async def get_embedding_cached(self, text: str) -> List[float]:
+        """
+        Calcola embedding con cache per ottimizzare calcoli ripetuti
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                # Genera cache key basato su hash del testo
+                cache_key = f"embedding:{hashlib.md5(text.encode()).hexdigest()}"
+
+                # Tenta cache
+                from services.cache_service import CacheType
+                cached_embedding = await self.cache_service.get(CacheType.EMBEDDING, cache_key)
+
+                if cached_embedding is not None:
+                    logger.debug("Cache hit for embedding", text_hash=cache_key[:16])
+                    return cached_embedding
+
+            # Cache miss - calcola embedding
+            self._load_embedding_model()
+            embedding = self.embedding_model.encode([text])[0].tolist()
+
+            # Salva in cache
+            if self.cache_service:
+                await self.cache_service.set(CacheType.EMBEDDING, cache_key, embedding)
+                logger.debug("Cached embedding", text_hash=cache_key[:16])
+
+            return embedding
+
+        except Exception as e:
+            logger.error(f"Error in cached embedding: {e}")
+            # Fallback a calcolo diretto
+            self._load_embedding_model()
+            return self.embedding_model.encode([text])[0].tolist()
+
+    def invalidate_course_cache(self, course_id: str, book_id: Optional[str] = None):
+        """
+        Invalida tutte le cache entries per un corso specifico
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                # Pattern per invalidazione
+                pattern = f"tutor_ai:query_result:*:course:{course_id}:*"
+                if book_id:
+                    pattern = f"tutor_ai:query_result:*:course:{course_id}:*:book:{book_id}:*"
+
+                # Esegui invalidazione asincrona
+                import asyncio
+                asyncio.create_task(self.cache_service.invalidate_by_pattern(pattern))
+
+                logger.info("Invalidated cache for course", course_id=course_id, book_id=book_id)
+
+        except Exception as e:
+            logger.error(f"Error invalidating course cache: {e}")
+
+    async def get_cache_metrics(self) -> Dict[str, Any]:
+        """
+        Restituisce metriche del sistema di cache
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                cache_metrics = self.cache_service.get_metrics()
+                redis_info = self.cache_service.get_redis_info()
+                health_status = await self.cache_service.health_check()
+
+                return {
+                    "cache_enabled": True,
+                    "metrics": cache_metrics,
+                    "redis_info": redis_info,
+                    "health": health_status
+                }
+            else:
+                return {
+                    "cache_enabled": False,
+                    "message": "Redis cache service not available"
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting cache metrics: {e}")
+            return {
+                "cache_enabled": False,
+                "error": str(e)
+            }
+
+    async def clear_cache(self, cache_type: Optional[str] = None):
+        """
+        Pulisce la cache (tutti i tipi o tipo specifico)
+        """
+        try:
+            self._init_cache_service()
+
+            if self.cache_service:
+                if cache_type:
+                    from services.cache_service import CacheType
+                    try:
+                        cache_enum = CacheType(cache_type)
+                        deleted_count = await self.cache_service.clear_by_type(cache_enum)
+                        logger.info(f"Cleared {deleted_count} entries for cache type: {cache_type}")
+                        return {"success": True, "deleted_count": deleted_count, "type": cache_type}
+                    except ValueError:
+                        logger.error(f"Invalid cache type: {cache_type}")
+                        return {"success": False, "error": f"Invalid cache type: {cache_type}"}
+                else:
+                    # Clear all cache
+                    from services.cache_service import CacheType
+                    total_deleted = 0
+                    for cache_type_enum in CacheType:
+                        deleted = await self.cache_service.clear_by_type(cache_type_enum)
+                        total_deleted += deleted
+
+                    logger.info(f"Cleared all cache: {total_deleted} entries deleted")
+                    return {"success": True, "deleted_count": total_deleted, "type": "all"}
+            else:
+                return {"success": False, "message": "Cache service not available"}
+
+        except Exception as e:
+            logger.error(f"Error clearing cache: {e}")
+            return {"success": False, "error": str(e)}

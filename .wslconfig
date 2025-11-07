@@ -1,0 +1,23 @@
+# Configurazione WSL2 ottimizzata per Docker
+
+[wsl2]
+# Memoria dedicata a WSL2 (8GB)
+memory=8GB
+
+# Processori dedicati a WSL2 (4 core)
+processors=4
+
+# Dimensione file di swap (4GB)
+swap=4GB
+
+# Abilita systemd
+systemd=true
+
+# Networking ottimizzato
+localhostForwarding=true
+
+# Performance I/O ottimizzata
+kernelCommandLine = sysctl.vm.max_map_count=262144
+
+# Abilita nested virtualization per performance migliori
+nestedVirtualization=true

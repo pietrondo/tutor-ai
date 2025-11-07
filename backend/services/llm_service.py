@@ -96,7 +96,7 @@ ZAI_CONFIG = {
     "base_url": "https://api.z.ai/api/paas/v4",
     "chat_endpoint": "/chat/completions",
     "models_endpoint": "/models",
-    "timeout": 60.0,
+    "timeout": float(os.getenv("ZAI_TIMEOUT", "60.0")),
     "max_retries": 3,
     "supports_streaming": True,
     "supports_agents": True
@@ -345,40 +345,89 @@ class ZAIModelManager:
             return False
 
     async def chat_completion(self, model_name: str, messages: List[Dict], **kwargs) -> Dict[str, Any]:
-        """Esegue una chat completion con i modelli ZAI"""
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
+        """Esegue una chat completion con i modelli ZAI con retry logic"""
+        import time
 
-            payload = {
-                "model": model_name,
-                "messages": messages,
-                "max_tokens": kwargs.get("max_tokens", 1500),
-                "temperature": kwargs.get("temperature", 0.7),
-                "stream": kwargs.get("stream", False)
-            }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
 
-            # Aggiungi parametri specifici per ZAI
-            # Note: thinking parameter not supported in current API version
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "max_tokens": kwargs.get("max_tokens", 1500),
+            "temperature": kwargs.get("temperature", 0.7),
+            "stream": kwargs.get("stream", False)
+        }
 
-            response = requests.post(
-                f"{self.base_url}{self.config['chat_endpoint']}",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout
-            )
+        # Aggiungi parametri specifici per ZAI
+        # Note: thinking parameter not supported in current API version
 
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logger.error(f"ZAI API error: {response.status_code} - {response.text}")
-                raise Exception(f"ZAI API request failed: {response.status_code}")
+        max_retries = self.config.get("max_retries", 3)
+        base_delay = 1.0  # Base delay in seconds
 
-        except Exception as e:
-            logger.error(f"ZAI chat completion failed: {e}")
-            raise
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    f"{self.base_url}{self.config['chat_endpoint']}",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.error(f"ZAI API error: {response.status_code} - {response.text}")
+                    # Don't retry on client errors (4xx)
+                    if 400 <= response.status_code < 500:
+                        raise Exception(f"ZAI API client error: {response.status_code} - {response.text}")
+
+                    # For server errors, retry with backoff
+                    if attempt < max_retries:
+                        delay = base_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(f"ZAI API request failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {delay}s...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        raise Exception(f"ZAI API request failed after {max_retries + 1} attempts: {response.status_code}")
+
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"ZAI API timeout (attempt {attempt + 1}/{max_retries + 1}): {e}")
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"ZAI API timed out after {max_retries + 1} attempts")
+                    raise Exception(f"ZAI API timeout after {max_retries + 1} attempts: {e}")
+
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"ZAI API connection error (attempt {attempt + 1}/{max_retries + 1}): {e}")
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"ZAI API connection failed after {max_retries + 1} attempts")
+                    raise Exception(f"ZAI API connection failed after {max_retries + 1} attempts: {e}")
+
+            except Exception as e:
+                logger.error(f"ZAI chat completion failed: {e}")
+                if attempt < max_retries and not isinstance(e, requests.exceptions.RequestException):
+                    # Retry for non-request exceptions
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Unexpected error (attempt {attempt + 1}/{max_retries + 1}), retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    raise
+
+        # This should never be reached, but just in case
+        raise Exception("ZAI chat completion failed: Maximum retries exceeded")
 
 class LocalModelManager:
     """Gestisce l'interazione con modelli locali (Ollama/LM Studio)"""
@@ -507,7 +556,7 @@ class LLMService:
     def __init__(self):
         self.client = None
         self.model_type = os.getenv("LLM_TYPE", "zai")  # "openai", "zai", "ollama", "lmstudio"
-        self.default_model = os.getenv("ZAI_MODEL", "glm-4")
+        self.default_model = os.getenv("ZAI_MODEL", "glm-4.6")
         self.budget_mode = os.getenv("BUDGET_MODE", "false").lower() == "true"
         self.local_manager = None
         self.zai_manager = None
@@ -515,7 +564,7 @@ class LLMService:
 
         # Setup model info based on type
         if self.model_type == "zai":
-            self.model_info = ZAI_MODELS.get(self.default_model, ZAI_MODELS["glm-4"])
+            self.model_info = ZAI_MODELS.get(self.default_model, ZAI_MODELS["glm-4.6"])
         elif self.model_type == "openai":
             self.model_info = OPENAI_MODELS.get(self.default_model, OPENAI_MODELS["gpt-4o"])
         else:
@@ -555,7 +604,7 @@ class LLMService:
             try:
                 self.zai_manager = ZAIModelManager(api_key, base_url)
                 # Imposta il modello di default per ZAI
-                self.default_model = os.getenv("ZAI_MODEL", "glm-4")
+                self.default_model = os.getenv("ZAI_MODEL", "glm-4.6")
                 logger.info(f"Manager ZAI inizializzato con modello: {self.default_model}")
             except Exception as e:
                 logger.error(f"Errore nell'inizializzazione del manager ZAI: {e}")

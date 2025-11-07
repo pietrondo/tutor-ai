@@ -12,6 +12,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 import structlog
+import asyncio
 
 from services.rag_service import RAGService
 from services.llm_service import LLMService
@@ -42,14 +43,145 @@ from utils.exceptions import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def _clean_node_title(title: str) -> str:
+    """
+    Clean node title by removing URLs, references, and technical identifiers
+    """
+    logger.info(f"🧹 DEBUG: Cleaning title: {title}")
+
+    if not title or not isinstance(title, str):
+        logger.error("❌ DEBUG: Invalid title, returning 'Concetto'")
+        return "Concetto"
+
+    original_title = title.lower()  # Keep for fallback detection
+    cleaned = title.strip()
+
+    logger.info(f"📝 DEBUG: Original title: {original_title}")
+    logger.info(f"🔍 DEBUG: Initial cleaned: {cleaned}")
+
+    # Step 1: Remove URLs completely
+    cleaned = re.sub(r'https?://[^\s\)\]]+', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'www\.[^\s\)\]]+', '', cleaned, flags=re.IGNORECASE)
+
+    logger.info(f"🌐 DEBUG: After URL removal: {cleaned}")
+
+    # Step 2: Remove domain patterns aggressively (com, it, org sequences)
+    # This handles patterns like "com it docs sebastiano-caboto-libro"
+    cleaned = re.sub(r'\b[a-z-]+\s+(com|it|org|net|gov|edu)\s+[a-z-]+\b', '', cleaned, flags=re.IGNORECASE)
+    # Also handle patterns where words with dashes follow domain names
+    cleaned = re.sub(r'(com|it|org|net|gov|edu)\s+[\w-]*docs?[\w-]*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'[\w-]*docs?[\w-]*\s+(com|it|org|net|gov|edu)', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 3: Remove common technical words and document references
+    tech_words = ['docs', 'document', 'file', 'pdf', 'doc', 'down', 'upload', 'download', 'shared', 'docsity']
+    for word in tech_words:
+        cleaned = re.sub(rf'\b{re.escape(word)}\b', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 3.1: Remove specific document sharing patterns
+    cleaned = re.sub(r'document\s+shared\s+on.*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'shared\s+on\s+https?.*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'downloaded\s+by.*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'università\s+degli\s+studi\s+di.*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\(.*?unimi.*?\)', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 4: Remove page/position references
+    cleaned = re.sub(r'page:\s*\d+', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'pos:\s*\d+', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\(?\s*page:\s*\d+\s*,\s*pos:\s*\d+\s*\)?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\([^)]*page[^)]*\)', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\([^)]*pos[^)]*\)', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 5: Remove bracketed references
+    cleaned = re.sub(r'\[([^\]]+)\]', '', cleaned)
+
+    # Step 6: Remove document references
+    cleaned = re.sub(r'\(.*?documento.*?\)', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\(.*?posizione.*?\)', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 7: Remove "tratto da" and "estratto da"
+    cleaned = re.sub(r'(tratto|estratto)\s+da\s*:.*', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 8: Remove file/document references with separators
+    cleaned = re.sub(r'\b(file|documento|pdf|doc)\s*[:\-]?\s*[^\s]*', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 9: Remove hexadecimal IDs and long numbers
+    cleaned = re.sub(r'\b[a-f0-9]{6,}\b', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\b\d{6,}\b', '', cleaned)
+
+    # Step 10: Remove technical reference markers
+    cleaned = re.sub(r'\b(doc|ref|source|id)\s*[:\-]?\s*[^\s]*', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 11: Remove libro + number patterns
+    cleaned = re.sub(r'libro\s+\d+', '', cleaned, flags=re.IGNORECASE)
+
+    # Step 12: Clean up empty parentheses and brackets
+    cleaned = re.sub(r'\(\s*\)', '', cleaned)
+    cleaned = re.sub(r'\[\s*\]', '', cleaned)
+
+    # Step 13: Remove trailing punctuation and separators
+    cleaned = re.sub(r'[\.\,\;]+$', '', cleaned)
+
+    # Step 14: Clean up whitespace and punctuation (more comprehensive)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    cleaned = re.sub(r'^[,\s:;\-_\.\)\]\[]+|[,\s:;\-_\.\(\[\]]+$', '', cleaned)
+
+    cleaned = cleaned.strip()
+
+    # Step 15: If still contains domain-like patterns, extract meaningful content
+    if 'com' in cleaned.lower() or 'it' in cleaned.lower() or 'org' in cleaned.lower():
+        # Extract meaningful words (longer than 2 characters, not domain names)
+        words = cleaned.split()
+        meaningful_words = []
+        for word in words:
+            word_lower = word.lower().strip('.,;:_-')
+            if (len(word_lower) > 2 and
+                word_lower not in ['com', 'it', 'org', 'net', 'gov', 'edu', 'http', 'https', 'www'] and
+                not re.match(r'^[a-f0-9]{6,}$', word_lower)):
+                meaningful_words.append(word)
+
+        if meaningful_words:
+            cleaned = ' '.join(meaningful_words)
+
+    cleaned = cleaned.strip()
+
+    # Step 16: Convert hyphens to spaces and normalize
+    cleaned = re.sub(r'[-_]+', ' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    # Step 17: Final fallback - if still too short or contains technical patterns, provide meaningful fallback
+    if (len(cleaned) < 3 or
+        'libro' in cleaned.lower() or
+        re.search(r'\b[a-z]+-[a-z]+(?:-[a-z]+)*\b', cleaned)):  # Pattern like word-word or word-word-word
+
+        if 'caboto' in original_title:
+            cleaned = 'Viaggi di Esplorazione'
+        elif 'sebastiano' in original_title:
+            cleaned = 'Figure Storiche'
+        elif 'scoperta' in original_title:
+            cleaned = 'Scoperte Geografiche'
+        elif 'viaggio' in original_title:
+            cleaned = 'Esplorazioni'
+        elif 'docs' in original_title or 'document' in original_title:
+            cleaned = 'Documentazione Storica'
+        elif 'storia' in original_title:
+            cleaned = 'Contesto Storico'
+        elif 'geografia' in original_title:
+            cleaned = 'Geografia'
+        else:
+            cleaned = 'Concetto Principale'
+
+    logger.info(f"✅ DEBUG: Final cleaned title: '{cleaned}'")
+    logger.info(f"🔍 DEBUG: Length check - original: {len(title)}, cleaned: {len(cleaned)}")
+    return cleaned
+
 app = FastAPI(title="AI Tutor Backend", version="1.0.0")
 
 # CORS configuration - restricted to specific origins and methods
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000"],  # Frontend ports
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3001", "http://127.0.0.1:3001"],  # Frontend ports
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Specific methods only
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # Include OPTIONS for CORS preflight
     allow_headers=[
         "accept",
         "accept-language",
@@ -123,11 +255,31 @@ async def security_middleware(request: Request, call_next):
             }
         )
 
+# Global exception handler for HTTPException
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Ensure HTTPException always returns JSONResponse."""
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.detail
+    )
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for consistent error responses."""
-    return ErrorHandler.handle_error(exc, f"{request.method} {request.url.path}")
+    from fastapi.responses import JSONResponse
+
+    # Handle through ErrorHandler first
+    http_exc = ErrorHandler.handle_error(exc, f"{request.method} {request.url.path}")
+
+    # Ensure we always return JSONResponse
+    return JSONResponse(
+        status_code=http_exc.status_code,
+        content=http_exc.detail
+    )
 
 # Initialize services
 rag_service = RAGService()
@@ -174,6 +326,8 @@ class ChatMessage(BaseModel):
     course_id: str
     book_id: Optional[str] = None
     session_id: Optional[str] = None
+    use_hybrid_search: Optional[bool] = False  # Enable hybrid search
+    search_k: Optional[int] = 5  # Number of documents to retrieve
 
 class QuizRequest(BaseModel):
     course_id: str
@@ -291,7 +445,19 @@ def _normalize_mindmap_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         payload = {}
 
     title = str(payload.get("title") or "Mappa di studio").strip()
-    overview = str(payload.get("overview") or payload.get("summary") or "").strip()
+
+    # Clean overview - it might contain JSON as string
+    overview_raw = str(payload.get("overview") or payload.get("summary") or "").strip()
+    overview = _clean_overview_text(overview_raw)
+
+    # Force clean overview if it still contains JSON or is too long
+    if overview.startswith("{") or len(overview) > 200:
+        logger.warning(f"Overview invalid (contains JSON or too long), forcing clean. Length: {len(overview)}")
+        # Generate a clean overview based on title
+        clean_title = title.replace("Mappa di studio", "").strip()
+        if not clean_title:
+            clean_title = "argomenti di studio"
+        overview = f"Mappa concettuale per {clean_title}. Questa mappa contiene i concetti principali e le relazioni tra i diversi argomenti studiati."
 
     nodes_raw = payload.get("nodes")
     if not isinstance(nodes_raw, list):
@@ -314,12 +480,20 @@ def _normalize_mindmap_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "references": references
     }
 
+    # Final safety check - ensure data is clean
+    if normalized["overview"].startswith("{") or len(normalized["overview"]) > 300:
+        logger.error(f"CRITICAL: Overview still contains JSON or is too long after all cleaning. Forcing minimal clean overview.")
+        clean_title = title.replace("Mappa di studio", "").strip()
+        if not clean_title:
+            clean_title = "studio"
+        normalized["overview"] = f"Mappa concettuale per {clean_title}. Struttura organizzata dei concetti principali e delle loro relazioni."
+
     # Provide minimal default if no nodes were generated
     if not normalized["nodes"]:
         normalized["nodes"] = [{
             "id": _ensure_unique_id(_slugify_text(title), used_ids),
             "title": title,
-            "summary": overview or "Concetto principale della mappa di studio.",
+            "summary": normalized["overview"] or "Concetto principale della mappa di studio.",
             "ai_hint": "",
             "study_actions": [],
             "priority": None,
@@ -328,6 +502,772 @@ def _normalize_mindmap_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         }]
 
     return normalized
+
+
+def _create_simple_mindmap(text_content: str, topic: str) -> Dict[str, Any]:
+    """Create a simple mindmap from text content when JSON parsing fails"""
+    # Extract key concepts from text
+    lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+    title = topic or "Mappa di studio"
+
+    # Simple structure with basic nodes
+    nodes = []
+    used_ids = {}
+
+    # Add main topic
+    main_node = {
+        "id": _ensure_unique_id(_slugify_text(title), used_ids),
+        "title": title,
+        "summary": f"Mappa concettuale per {topic}",
+        "ai_hint": f"Chiedi all'AI di approfondire i concetti principali di {topic}",
+        "study_actions": [
+            "Analizzare i concetti principali",
+            "Creare riassunti per ogni argomento",
+            "Praticare con esercizi specifici"
+        ],
+        "priority": 1,
+        "references": [],
+        "children": []
+    }
+
+    # Add some basic concepts if we can extract them
+    concepts = []
+    for line in lines[:5]:  # Take first 5 meaningful lines
+        if len(line) > 10 and len(line) < 100:
+            concepts.append(line)
+
+    for i, concept in enumerate(concepts):
+        child_node = {
+            "id": _ensure_unique_id(_slugify_text(concept), used_ids),
+            "title": concept[:50] + "..." if len(concept) > 50 else concept,
+            "summary": concept,
+            "ai_hint": "Chiedi all'AI di spiegare questo concetto con esempi",
+            "study_actions": ["Approfondire il concetto", "Trovare esempi pratici"],
+            "priority": i + 1,
+            "references": [],
+            "children": []
+        }
+        main_node["children"].append(child_node)
+
+    nodes.append(main_node)
+
+    return {
+        "title": title,
+        "overview": f"Mappa concettuale generata da {topic}. Questa mappa contiene i concetti principali estratti dai materiali di studio.",
+        "nodes": nodes,
+        "study_plan": [
+            {
+                "phase": "Fase 1 - Analisi",
+                "objective": "Comprendere i concetti principali",
+                "activities": ["Leggere i materiali", "Creare riassunti"],
+                "ai_support": "Usa l'AI per spiegare concetti difficili",
+                "duration_minutes": 45
+            },
+            {
+                "phase": "Fase 2 - Approfondimento",
+                "objective": "Dettagliare ogni argomento",
+                "activities": ["Esercizi pratici", "Studio mirato"],
+                "ai_support": "Chiedi esempi e chiarimenti all'AI",
+                "duration_minutes": 30
+            }
+        ],
+        "references": [topic]
+    }
+
+
+def _create_minimal_mindmap(topic: str) -> Dict[str, Any]:
+    """Create a minimal mindmap when all else fails"""
+    title = topic or "Mappa di studio"
+
+    return {
+        "title": title,
+        "overview": f"Mappa concettuale per {topic}. Questa è una struttura base che puoi espandere.",
+        "nodes": [
+            {
+                "id": "main-concept",
+                "title": title,
+                "summary": f"Concetto principale per {topic}",
+                "ai_hint": "Chiedi all'AI di spiegare questo argomento in dettaglio",
+                "study_actions": [
+                    "Studiare i materiali di riferimento",
+                    "Creare riassunti personali",
+                    "Praticare con esercizi"
+                ],
+                "priority": 1,
+                "references": [],
+                "children": [
+                    {
+                        "id": "sub-concept-1",
+                        "title": "Concetti Fondamentali",
+                        "summary": "Principali concetti di base",
+                        "ai_hint": "Chiedi all'AI di definire i concetti chiave",
+                        "study_actions": ["Definire i termini", "Creare glossario"],
+                        "priority": 1,
+                        "references": [],
+                        "children": []
+                    },
+                    {
+                        "id": "sub-concept-2",
+                        "title": "Applicazioni Pratiche",
+                        "summary": "Come applicare questi concetti",
+                        "ai_hint": "Chiedi all'AI esempi pratici",
+                        "study_actions": ["Trovare esempi", "Creare esercizi"],
+                        "priority": 2,
+                        "references": [],
+                        "children": []
+                    }
+                ]
+            }
+        ],
+        "study_plan": [
+            {
+                "phase": "Fase 1 - Introduzione",
+                "objective": "Comprendere i concetti base",
+                "activities": ["Lettura materiale", "Note personali"],
+                "ai_support": "Usa l'AI per chiarimenti",
+                "duration_minutes": 30
+            }
+        ],
+        "references": [topic]
+    }
+
+
+def _fix_common_json_issues(json_text: str) -> Optional[str]:
+    """Try to fix common JSON formatting issues"""
+    if not json_text:
+        return None
+
+    try:
+        # Remove common prefixes/suffixes
+        text = json_text.strip()
+
+        # Remove markdown code blocks
+        if text.startswith('```json'):
+            text = text[7:].strip()
+        if text.startswith('```'):
+            text = text[3:].strip()
+        if text.endswith('```'):
+            text = text[:-3].strip()
+
+        # Remove trailing commas
+        text = re.sub(r',\s*}', '}', text)
+        text = re.sub(r',\s*]', ']', text)
+
+        # Fix quotes
+        text = re.sub(r"'([^']*)'", r'"\1"', text)
+
+        # Remove comments (basic)
+        text = re.sub(r'//.*?\n', '\n', text)
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+
+        # Find balanced braces
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        brace_count = 0
+        end = start
+        for i, char in enumerate(text[start:], start=start):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end = i + 1
+                    break
+
+        if brace_count != 0:
+            return None
+
+        return text[start:end]
+    except Exception:
+        return None
+
+
+def _extract_json_from_malformed_text(text: str) -> Optional[str]:
+    """Extract JSON from malformed text response"""
+    try:
+        # Try to find JSON object in text
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        # Find matching brace
+        brace_count = 0
+        end = start
+        for i, char in enumerate(text[start:], start=start):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end = i + 1
+                    break
+
+        if brace_count != 0:
+            return None
+
+        json_candidate = text[start:end]
+
+        # Try to fix and validate
+        fixed = _fix_common_json_issues(json_candidate)
+        if fixed:
+            return fixed
+
+        return json_candidate
+    except Exception:
+        return None
+
+
+def _is_low_quality_content(text: str) -> bool:
+    """
+    Detect if the content is low quality (apologies, document references, etc.)
+    """
+    if not text or not isinstance(text, str):
+        return True
+
+    text_lower = text.lower().strip()
+
+    # Check for apology messages
+    apology_phrases = [
+        "mi dispiace", "scusami", "non posso", "impossibile",
+        "riprova più tardi", "problema", "errore", "sorry",
+        "apologize", "issue", "problem", "try again"
+    ]
+
+    if any(phrase in text_lower for phrase in apology_phrases):
+        return True
+
+    # Check for document reference patterns
+    doc_patterns = [
+        "document shared on", "downloaded by", "www.", "http",
+        "università degli studi", "docsity", "studocu",
+        "scan to open", "sponsored or endorsed", "page:",
+        "chunk_index", "relevance_score"
+    ]
+
+    if any(pattern in text_lower for pattern in doc_patterns):
+        return True
+
+    # Check if text is too short or mostly punctuation/numbers
+    if len(text.strip()) < 20:
+        return True
+
+    # Check if text contains mostly technical identifiers
+    words = text.split()
+    meaningful_words = [w for w in words if len(w) > 3 and not w.replace('-', '').replace('_', '').isalnum()]
+    if len(meaningful_words) < len(words) * 0.3:  # Less than 30% meaningful words
+        return True
+
+    return False
+
+def _generate_intelligent_conceptual_nodes(topic: str) -> List[Dict[str, Any]]:
+    """
+    Generate intelligent conceptual nodes based on topic analysis
+    """
+    logger.info(f"🧠 Generating intelligent conceptual nodes for topic: {topic}")
+
+    topic_lower = topic.lower() if topic else ""
+
+    # Enhanced topic analysis with multiple patterns
+    if any(keyword in topic_lower for keyword in ['caboto', 'sebastiano', 'esplor', 'navigazione', 'viaggio']):
+        return [
+            {
+                "id": "biografia",
+                "title": "Biografia e Contesto",
+                "summary": "Vita, formazione e contesto storico di Sebastiano Caboto",
+                "ai_hint": "Chiedi all'AI dettagli sulla biografia e il periodo storico",
+                "study_actions": ["Ricercare fonti biografiche", "Analizzare il contesto XV-XVI secolo"],
+                "priority": 1,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "viaggi",
+                "title": "Viaggi e Scoperte",
+                "summary": "Le principali esplorazioni e le rotte navigate da Caboto",
+                "ai_hint": "Chiedi all'AI di dettagliare i singoli viaggi e le rotte",
+                "study_actions": ["Mappare le rotte", "Confrontare con altri esploratori"],
+                "priority": 2,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "impatto",
+                "title": "Impatto Storico",
+                "summary": "Conseguenze delle esplorazioni e influenza sulla geografia",
+                "ai_hint": "Chiedi all'AI di analizzare l'impatto a lungo termine",
+                "study_actions": ["Valutare l'impatto geopolitico", "Analizzare le conseguenze economiche"],
+                "priority": 3,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "relazioni",
+                "title": "Relazioni con Popoli Nativi",
+                "summary": "Interazioni tra gli esploratori e le popolazioni indigene",
+                "ai_hint": "Chiedi all'AI di approfondire gli aspetti etnografici",
+                "study_actions": ["Analizzare le fonti etnografiche", "Studiare gli scambi culturali"],
+                "priority": 4,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "fonti",
+                "title": "Fonti Storiche",
+                "summary": "Documenti, mappe e testimonianze dell'epoca",
+                "ai_hint": "Chiedi all'AI di identificare le fonti primarie e secondarie",
+                "study_actions": ["Analizzare le fonti primarie", "Criticare le testimonianze"],
+                "priority": 5,
+                "references": [],
+                "children": []
+            }
+        ]
+
+    elif any(keyword in topic_lower for keyword in ['geografia', 'storia', 'geografico', 'storico']):
+        return [
+            {
+                "id": "concetti",
+                "title": "Concetti Fondamentali",
+                "summary": "Principi teorici e definizioni di base",
+                "ai_hint": "Chiedi all'AI di chiarire i concetti principali",
+                "study_actions": ["Definire i termini chiave", "Creare schemi concettuali"],
+                "priority": 1,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "contesto",
+                "title": "Contesto Geografico",
+                "summary": "Caratteristiche fisiche e umane del territorio",
+                "ai_hint": "Chiedi all'AI di descrivere l'ambiente geografico",
+                "study_actions": ["Analizzare le carte geografiche", "Studiare l'ambiente fisico"],
+                "priority": 2,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "sviluppo",
+                "title": "Evoluzione Storica",
+                "summary": "Sviluppo temporale degli eventi e dei fenomeni",
+                "ai_hint": "Chiedi all'AI di creare una timeline degli eventi",
+                "study_actions": ["Creare linee del tempo", "Identificare i momenti chiave"],
+                "priority": 3,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "metodologia",
+                "title": "Metodologia di Studio",
+                "summary": "Metodi e approcci per l'analisi geografico-storica",
+                "ai_hint": "Chiedi all'AI di suggerire metodi di analisi",
+                "study_actions": ["Applicare metodi di analisi", "Confrontare diverse prospettive"],
+                "priority": 4,
+                "references": [],
+                "children": []
+            },
+            {
+                "id": "applicazioni",
+                "title": "Applicazioni Moderne",
+                "summary": "Rilevanza contemporanea e applicazioni pratiche",
+                "ai_hint": "Chiedi all'AI di collegare al presente",
+                "study_actions": ["Identificare collegamenti attuali", "Analizzare la rilevanza odierna"],
+                "priority": 5,
+                "references": [],
+                "children": []
+            }
+        ]
+
+    # Generic academic structure for other topics
+    return [
+        {
+            "id": "fondamenti",
+            "title": "Fondamenti Teorici",
+            "summary": "Concetti di base e principi fondamentali dell'argomento",
+            "ai_hint": f"Chiedi all'AI di spiegare i fondamenti di {topic}",
+            "study_actions": ["Definire i concetti base", "Comprendere i principi teorici"],
+            "priority": 1,
+            "references": [],
+            "children": []
+        },
+        {
+            "id": "contesto",
+            "title": "Contesto e Background",
+            "summary": "Informazioni contestuali essenziali per la comprensione",
+            "ai_hint": f"Chiedi all'AI di fornire il contesto di {topic}",
+            "study_actions": ["Ricercare il contesto", "Analizzare lo sfondo storico/culturale"],
+            "priority": 2,
+            "references": [],
+            "children": []
+        },
+        {
+            "id": "sviluppi",
+            "title": "Sviluppi Principali",
+            "summary": "Evoluzione e progressione dei concetti principali",
+            "ai_hint": f"Chiedi all'AI di descrivere gli sviluppi chiave di {topic}",
+            "study_actions": ["Tracciare gli sviluppi", "Identificare i punti di svolta"],
+            "priority": 3,
+            "references": [],
+            "children": []
+        },
+        {
+            "id": "applicazioni",
+            "title": "Applicazioni Pratiche",
+            "summary": "Esempi concreti e applicazioni reali dei concetti",
+            "ai_hint": f"Chiedi all'AI di fornire esempi pratici di {topic}",
+            "study_actions": ["Trovare esempi concreti", "Analizzare le applicazioni"],
+            "priority": 4,
+            "references": [],
+            "children": []
+        },
+        {
+            "id": "approfondimenti",
+            "title": "Approfondimenti e Ricerche",
+            "summary": "Temi avanzati e possibili direzioni di studio",
+            "ai_hint": f"Chiedi all'AI di suggerire approfondimenti su {topic}",
+            "study_actions": ["Identificare aree di approfondimento", "Proporre nuove ricerche"],
+            "priority": 5,
+            "references": [],
+            "children": []
+        }
+    ]
+
+def _create_structured_mindmap_from_text(text: str, topic: str) -> Dict[str, Any]:
+    """Create a structured mindmap from unstructured text with intelligent fallback"""
+    logger.info(f"🔍 DEBUG: _create_structured_mindmap_from_text called")
+    logger.info(f"📝 DEBUG: Input text length: {len(text)}")
+    logger.info(f"📝 DEBUG: Topic: {topic}")
+    logger.info(f"📝 DEBUG: First 200 chars of text: {text[:200]}")
+
+    # Check for low quality content
+    is_low_quality = _is_low_quality_content(text)
+    logger.info(f"🚫 DEBUG: Content quality check - Low quality: {is_low_quality}")
+
+    title = topic or "Mappa di studio"
+
+    # If content is low quality, generate intelligent conceptual nodes
+    if is_low_quality:
+        logger.info(f"🧠 DEBUG: Using intelligent conceptual node generation due to low quality content")
+        conceptual_nodes = _generate_intelligent_conceptual_nodes(topic)
+
+        main_node = {
+            "id": "main-concept",
+            "title": title,
+            "summary": f"Mappa concettuale interattiva per {topic} con approfondimenti guidati dall'AI",
+            "ai_hint": f"Chiedi all'AI di esplorare approfonditamente i concetti di {topic}",
+            "study_actions": [
+                f"Esplora i concetti principali di {topic}",
+                f"Usa l'AI per approfondire ogni nodo",
+                f"Pratica con esempi specifici"
+            ],
+            "priority": 1,
+            "references": [],
+            "children": conceptual_nodes
+        }
+
+        # Create enhanced study plan
+        study_plan_data = [
+            {
+                "phase": "Fase 1 - Esplorazione Guidata",
+                "objective": f"Comprendere i concetti fondamentali di {topic}",
+                "activities": [
+                    "Esplora i nodi concettuali principali",
+                    "Usa l'AI per chiarimenti personalizzati",
+                    "Fai domande specifiche su ogni concetto"
+                ],
+                "ai_support": f"Utilizza l'assistente AI per approfondire {topic} con esempi e spiegazioni",
+                "duration_minutes": 45
+            },
+            {
+                "phase": "Fase 2 - Approfondimento",
+                "objective": "Analizzare in dettaglio gli aspetti chiave",
+                "activities": [
+                    "Focalizzati sui nodi di priorità alta",
+                    "Chiedi all'AI esempi pratici e applicazioni",
+                    "Crea connessioni tra i concetti"
+                ],
+                "ai_support": "L'AI fornisce spiegazioni dettagliate e esempi personalizzati",
+                "duration_minutes": 60
+            }
+        ]
+
+        logger.info(f"✅ DEBUG: Created intelligent mindmap with {len(conceptual_nodes)} conceptual nodes")
+
+        return {
+            "title": title,
+            "overview": f"Mappa concettuale interattiva per {topic}. Generata automaticamente con nodi concettuali intelligenti quando il contenuto disponibile non è ottimale.",
+            "nodes": [main_node],
+            "study_plan": study_plan_data,
+            "references": [topic]
+        }
+
+    # Original logic for high-quality content
+    # Try to extract structured content from JSON string in text
+    extracted_content = None
+    clean_overview = ""
+
+    # First, try to extract JSON content from the text
+    if text and text.strip():
+        clean_text = _clean_overview_text(text.strip())
+
+        # Look for JSON content in the text
+        if clean_text and clean_text.startswith('{'):
+            try:
+                # Try to parse the cleaned text as JSON
+                parsed = json.loads(clean_text)
+                if isinstance(parsed, dict):
+                    extracted_content = parsed
+            except:
+                # If direct parsing fails, try to extract JSON from larger text
+                try:
+                    json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+                    if json_match:
+                        json_content = json_match.group(0)
+                        parsed = json.loads(json_content)
+                        if isinstance(parsed, dict):
+                            extracted_content = parsed
+                except:
+                    pass
+
+        # If we couldn't extract JSON, use the cleaned text as overview
+        if not extracted_content and clean_text:
+            clean_overview = clean_text
+
+    # Create title and overview
+    if extracted_content:
+        # Use extracted content
+        final_title = extracted_content.get("title", title)
+        final_overview = extracted_content.get("overview", clean_overview)
+        nodes_data = extracted_content.get("nodes", [])
+        study_plan_data = extracted_content.get("study_plan", [])
+        references_data = extracted_content.get("references", [])
+    else:
+        # Fallback to basic structure
+        final_title = title
+        final_overview = clean_overview or f"Mappa concettuale per {topic} basata sui materiali di studio."
+        nodes_data = []
+        study_plan_data = []
+        references_data = []
+
+    # If we have extracted nodes, use them; otherwise create from sentences
+    if nodes_data:
+        # Use extracted nodes but ensure they have proper structure
+        structured_nodes = []
+        for i, node in enumerate(nodes_data[:5]):  # Limit to 5 nodes
+            if isinstance(node, dict) and node.get("title"):
+                structured_node = {
+                    "id": node.get("id", f"concept-{i+1}"),
+                    "title": node.get("title", f"Concetto {i+1}"),
+                    "summary": node.get("summary", "Concetto estratto dai materiali di studio"),
+                    "ai_hint": node.get("ai_hint", "Chiedi all'AI di approfondire questo concetto"),
+                    "study_actions": node.get("study_actions", ["Approfondire", "Trovare esempi"]),
+                    "priority": node.get("priority", i+1),
+                    "references": node.get("references", []),
+                    "children": node.get("children", [])
+                }
+                structured_nodes.append(structured_node)
+
+        main_nodes = structured_nodes
+    else:
+        # Create nodes from sentences
+        sentences = [s.strip() for s in text.split('.') if s.strip() and len(s.strip()) > 10]
+
+        main_node = {
+            "id": "main-concept",
+            "title": final_title,
+            "summary": clean_overview or f"Analisi dei concetti principali di {topic}",
+            "ai_hint": f"Chiedi all'AI di approfondire i concetti di {topic}",
+            "study_actions": ["Analizzare i materiali", "Creare riassunti", "Praticare esercizi"],
+            "priority": 1,
+            "references": [],
+            "children": []
+        }
+
+        # Add conceptual children based on topic analysis
+        children = []
+        topic_lower = topic.lower() if topic else ""
+
+        logger.info(f"🧠 DEBUG: Starting conceptual children generation")
+        logger.info(f"🔍 DEBUG: Checking for 'caboto' in topic: {'caboto' in topic_lower}")
+        logger.info(f"🔍 DEBUG: Checking for 'sebastiano' in topic: {'sebastiano' in topic_lower}")
+        logger.info(f"🔍 DEBUG: Checking for 'esplorazione' in topic: {'esplorazione' in topic_lower}")
+
+        # Generate conceptual nodes based on topic content
+        if 'caboto' in topic_lower or 'sebastiano' in topic_lower or 'esplorazione' in topic_lower:
+            logger.info(f"✅ DEBUG: Matched Caboto/exploration topic - creating specific conceptual nodes")
+            conceptual_children = [
+                {"title": "Viaggi e Scoperte", "summary": "Le esplorazioni geografiche e la scoperta di nuove terre"},
+                {"title": "Contesto Storico", "summary": "Il periodo storico delle grandi esplorazioni"},
+                {"title": "Figure Chiave", "summary": "I protagonisti delle esplorazioni e i loro ruoli"},
+                {"title": "Impatto Culturale", "summary": "Le conseguenze delle scoperte sulle culture native"},
+                {"title": "Rotte Marittime", "summary": "Le vie di navigazione e le rotte commerciali"}
+            ]
+        elif 'geografia' in topic_lower or 'storia' in topic_lower:
+            conceptual_children = [
+                {"title": "Concetti Fondamentali", "summary": "I principi base della geografia storica"},
+                {"title": "Contesto Geografico", "summary": "L'ambiente fisico e le caratteristiche territoriali"},
+                {"title": "Evoluzione Storica", "summary": "Lo sviluppo degli eventi nel tempo"},
+                {"title": "Fonti e Documenti", "summary": "I materiali di studio e le fonti primarie"},
+                {"title": "Analisi Critica", "summary": "L'interpretazione critica delle fonti storiche"}
+            ]
+        else:
+            logger.info(f"⚠️ DEBUG: No specific topic match - using generic fallback concepts")
+            # Generic fallback concepts
+            conceptual_children = [
+                {"title": "Concetti Principali", "summary": "Le idee fondamentali del argomento"},
+                {"title": "Contesto e Background", "summary": "Le informazioni contestuali essenziali"},
+                {"title": "Sviluppi Chiave", "summary": "I punti principali dello sviluppo"},
+                {"title": "Applicazioni Pratiche", "summary": "Le applicazioni e gli esempi concreti"},
+                {"title": "Approfondimenti", "summary": "Temi correlati e possibili estensioni"}
+            ]
+
+        for i, concept in enumerate(conceptual_children[:5]):  # Max 5 children
+            # Apply cleaning to ensure consistency
+            clean_title = _clean_node_title(concept["title"])
+            clean_summary = _clean_overview_text(concept["summary"])
+
+            logger.info(f"🔍 DEBUG: Creating conceptual child node {i+1}")
+            logger.info(f"   Concept title: {clean_title}")
+            logger.info(f"   Concept summary: {clean_summary}")
+
+            child = {
+                "id": f"concept-{i+1}",
+                "title": clean_title,
+                "summary": clean_summary,
+                "ai_hint": f"Chiedi all'AI di approfondire {clean_title}",
+                "study_actions": [f"Analizza {clean_title}", f"Trova esempi di {clean_title}"],
+                "priority": i + 1,
+                "references": [],
+                "children": []
+            }
+            children.append(child)
+
+        main_node["children"] = children
+        main_nodes = [main_node]
+
+    # Create study plan if not extracted
+    if not study_plan_data:
+        study_plan_data = [
+            {
+                "phase": "Fase 1 - Analisi",
+                "objective": "Comprendere i concetti base",
+                "activities": ["Studio dei materiali", "Creazione di riassunti"],
+                "ai_support": "Utilizzo dell'AI per chiarimenti",
+                "duration_minutes": 30
+            }
+        ]
+
+    # Create references if not extracted
+    if not references_data:
+        references_data = [topic]
+
+    return {
+        "title": final_title,
+        "overview": final_overview[:200] + "..." if len(final_overview) > 200 else final_overview,
+        "nodes": main_nodes,
+        "study_plan": study_plan_data,
+        "references": references_data
+    }
+
+
+def _has_json_strings_in_payload(payload: Any) -> bool:
+    """Check if payload contains JSON strings as values"""
+    try:
+        if isinstance(payload, dict):
+            for key, value in payload.items():
+                if isinstance(value, str) and value.startswith("{"):
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def _is_valid_mindmap_payload(payload: Any) -> bool:
+    """Validate that the payload is a proper mindmap structure"""
+    try:
+        if not isinstance(payload, dict):
+            return False
+
+        # Check required fields
+        if not isinstance(payload.get("title"), str):
+            return False
+
+        # Check overview is not JSON string
+        overview = payload.get("overview", "")
+        if isinstance(overview, str) and overview.startswith("{"):
+            logger.warning(f"Invalid overview detected (starts with JSON): {overview[:100]}...")
+            return False  # Overview contains JSON instead of text
+
+        # Check nodes is a list and not empty
+        nodes = payload.get("nodes", [])
+        if not isinstance(nodes, list) or len(nodes) == 0:
+            return False
+
+        # Check at least one node has valid structure
+        for node in nodes:
+            if isinstance(node, dict) and isinstance(node.get("title"), str):
+                return True
+
+        return False
+    except Exception:
+        return False
+
+
+def _clean_overview_text(overview: str) -> str:
+    """Clean overview text that might contain JSON strings"""
+    if not overview:
+        return ""
+
+    # If overview starts with JSON, try to extract the entire JSON content
+    if overview.startswith('{'):
+        try:
+            # Try to parse as JSON and return the full JSON if it's a complete object
+            parsed = json.loads(overview)
+            if isinstance(parsed, dict):
+                # Return the original JSON string to be processed later
+                return json.dumps(parsed, ensure_ascii=False)
+        except:
+            # If parsing fails, try to extract complete JSON from text
+            try:
+                # Look for complete JSON object in the text
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', overview, re.DOTALL)
+                if json_match:
+                    json_content = json_match.group(0)
+                    # Try to validate it's parseable
+                    test_parsed = json.loads(json_content)
+                    if isinstance(test_parsed, dict):
+                        return json_content
+            except:
+                pass
+
+    # If we get here, try to extract clean text from malformed JSON
+    if overview.startswith('{') and '"' in overview:
+        # Try to extract the overview text from malformed JSON
+        if '"overview":' in overview:
+            parts = overview.split('"overview":')
+            if len(parts) > 1:
+                # Find the quoted text after "overview":
+                overview_part = parts[1].strip()
+                if overview_part.startswith('"'):
+                    # Find the closing quote, handling escaped quotes
+                    quote_end = -1
+                    for i in range(1, len(overview_part)):
+                        if overview_part[i] == '"' and overview_part[i-1] != '\\':
+                            quote_end = i
+                            break
+                    if quote_end != -1:
+                        return overview_part[1:quote_end+1]
+
+    # Remove JSON artifacts for non-JSON content
+    overview = re.sub(r'^\s*\{\s*".*?"\s*:\s*"', '', overview)  # Remove {"field": "
+    overview = re.sub(r'"\s*}\s*$', '', overview)  # Remove trailing "}
+
+    # Clean up common formatting issues
+    overview = overview.strip()
+    if overview.startswith('"') and overview.endswith('"'):
+        overview = overview[1:-1]  # Remove surrounding quotes
+
+    return overview
 
 
 def _mindmap_to_markdown(mindmap: Dict[str, Any]) -> str:
@@ -827,14 +1767,27 @@ async def upload_book_material(course_id: str, book_id: str, file: UploadFile = 
 @app.post("/chat")
 async def chat(chat_message: ChatMessage):
     try:
-        # Retrieve relevant context (with optional book filter)
-        context = await rag_service.retrieve_context(
-            chat_message.message,
-            chat_message.course_id,
-            chat_message.book_id
-        )
+        # Choose search method based on user preference with caching
+        if chat_message.use_hybrid_search:
+            # Use hybrid search (semantic + keyword) with caching
+            context = await rag_service.retrieve_context_cached(
+                chat_message.message,
+                chat_message.course_id,
+                chat_message.book_id,
+                chat_message.search_k,
+                use_hybrid=True
+            )
+        else:
+            # Use traditional semantic search with caching
+            context = await rag_service.retrieve_context_cached(
+                chat_message.message,
+                chat_message.course_id,
+                chat_message.book_id,
+                chat_message.search_k,
+                use_hybrid=False
+            )
 
-        # Generate response
+        # Generate response (potentially cached)
         response = await llm_service.generate_response(
             chat_message.message,
             context,
@@ -852,7 +1805,16 @@ async def chat(chat_message: ChatMessage):
         return {
             "response": response,
             "session_id": session_id,
-            "sources": context.get("sources", [])
+            "sources": context.get("sources", []),
+            "search_method": context.get("search_method", "semantic"),
+            "cache_info": {
+                "cache_enabled": True,
+                "cached": context.get("cached", False)
+            },
+            "search_stats": {
+                "hybrid_used": chat_message.use_hybrid_search,
+                "results_count": len(context.get("sources", []))
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -867,6 +1829,134 @@ async def generate_quiz(quiz_request: QuizRequest):
             quiz_request.num_questions
         )
         return {"quiz": quiz}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Hybrid Search endpoints
+class HybridSearchConfig(BaseModel):
+    semantic_weight: Optional[float] = 0.6
+    keyword_weight: Optional[float] = 0.4
+    fusion_method: Optional[str] = "weighted_sum"
+
+class HybridSearchRequest(BaseModel):
+    query: str
+    course_id: str
+    book_id: Optional[str] = None
+    k: Optional[int] = 10
+    semantic_weight: Optional[float] = 0.6
+    keyword_weight: Optional[float] = 0.4
+    fusion_method: Optional[str] = "weighted_sum"
+
+class CacheInvalidationRequest(BaseModel):
+    course_id: str
+    book_id: Optional[str] = None
+
+@app.post("/hybrid-search/config")
+async def configure_hybrid_search(config: HybridSearchConfig):
+    """Configure hybrid search parameters"""
+    try:
+        rag_service._init_hybrid_search()
+        if rag_service.hybrid_search:
+            rag_service.hybrid_search.update_weights(config.semantic_weight, config.keyword_weight)
+            rag_service.hybrid_search.set_fusion_method(config.fusion_method)
+            return {
+                "success": True,
+                "message": "Hybrid search configuration updated",
+                "config": {
+                    "semantic_weight": config.semantic_weight,
+                    "keyword_weight": config.keyword_weight,
+                    "fusion_method": config.fusion_method
+                }
+            }
+        else:
+            raise HTTPException(status_code=503, detail="Hybrid search service not available")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/hybrid-search")
+async def hybrid_search(search_request: HybridSearchRequest):
+    """Execute hybrid search with custom parameters"""
+    try:
+        rag_service._init_hybrid_search()
+        if not rag_service.hybrid_search:
+            raise HTTPException(status_code=503, detail="Hybrid search service not available")
+
+        # Update configuration temporarily
+        original_semantic = rag_service.hybrid_search.semantic_weight
+        original_keyword = rag_service.hybrid_search.keyword_weight
+        original_fusion = rag_service.hybrid_search.fusion_method
+
+        rag_service.hybrid_search.update_weights(search_request.semantic_weight, search_request.keyword_weight)
+        rag_service.hybrid_search.set_fusion_method(search_request.fusion_method)
+
+        # Execute search
+        result = await rag_service.hybrid_search.hybrid_search(
+            search_request.query,
+            search_request.course_id,
+            search_request.book_id,
+            search_request.k
+        )
+
+        # Restore original configuration
+        rag_service.hybrid_search.update_weights(original_semantic, original_keyword)
+        rag_service.hybrid_search.set_fusion_method(original_fusion)
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/hybrid-search/stats")
+async def get_hybrid_search_stats():
+    """Get hybrid search statistics and configuration"""
+    try:
+        stats = rag_service.get_hybrid_search_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Cache Management endpoints
+@app.get("/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics and performance metrics"""
+    try:
+        cache_metrics = await rag_service.get_cache_metrics()
+        return cache_metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/cache/clear")
+async def clear_cache(cache_type: Optional[str] = None):
+    """Clear cache (all or specific type)"""
+    try:
+        result = await rag_service.clear_cache(cache_type)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/cache/invalidate")
+async def invalidate_cache(invalidation_request: CacheInvalidationRequest):
+    """Invalidate cache for specific course/book"""
+    try:
+        rag_service.invalidate_course_cache(
+            invalidation_request.course_id,
+            invalidation_request.book_id
+        )
+        return {
+            "success": True,
+            "message": f"Cache invalidated for course {invalidation_request.course_id}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/cache/health")
+async def cache_health_check():
+    """Health check for cache system"""
+    try:
+        cache_metrics = await rag_service.get_cache_metrics()
+        return cache_metrics
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1218,6 +2308,56 @@ async def rebuild_course_rag_index(course_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class ReindexRequest(BaseModel):
+    course_id: str
+    new_model: Optional[str] = None
+
+@app.post("/rag/reindex")
+async def reindex_rag_with_model(request: ReindexRequest):
+    """Rebuild RAG index for a course with optional new embedding model"""
+    try:
+        # Get course and books information
+        course = course_service.get_course(request.course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        books = book_service.get_books_by_course(request.course_id)
+
+        # Delete existing documents for this course
+        rag_service.delete_course_documents(request.course_id)
+
+        # Re-index all PDFs with proper book_id
+        total_indexed = 0
+        for book in books:
+            book_dir = f"data/courses/{request.course_id}/books/{book['id']}"
+            if os.path.exists(book_dir):
+                for root, dirs, files in os.walk(book_dir):
+                    for filename in files:
+                        if filename.endswith('.pdf'):
+                            file_path = os.path.join(root, filename)
+                            try:
+                                await rag_service.index_pdf(file_path, request.course_id, book['id'])
+                                total_indexed += 1
+                                print(f"Successfully indexed: {filename} for book {book['title']}")
+                            except Exception as e:
+                                print(f"Error indexing {filename}: {e}")
+
+        response_message = f"Rebuilt RAG index for course {course['name']}"
+        if request.new_model:
+            response_message += f" with new model {request.new_model}"
+
+        return {
+            "success": True,
+            "message": response_message,
+            "books_processed": len(books),
+            "documents_indexed": total_indexed,
+            "new_model": request.new_model
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/mindmap")
 async def generate_mindmap(request: MindmapRequest):
     """Generate a mindmap using RAG system"""
@@ -1279,6 +2419,10 @@ Focus richiesti: {focus_description}
             k=6
         )
 
+        # Debug logging to verify book filtering
+        print(f"🔍 Mindmap generation - Course: {request.course_id}, Book: {request.book_id}")
+        print(f"📊 RAG context found: {len(rag_response.get('text', ''))} characters")
+
         context_text = rag_response.get("text", "")
 
         final_prompt = f"""{instructions}
@@ -1289,34 +2433,148 @@ CONTESTO RILEVANTE ESTRATTO DAI MATERIALI:
 Ricorda: restituisci SOLO JSON valido conforme allo schema indicato.
 """.strip()
 
-        llm_response = await llm_service.generate_response(
-            query=final_prompt,
-            context={"text": context_text, "sources": rag_response.get("sources", [])},
-            course_id=request.course_id
-        )
+        llm_timeout = int(os.getenv("MINDMAP_LLM_TIMEOUT", "25"))
+        llm_response = ""
 
-        raw_output = llm_response.strip()
+        try:
+            llm_response = await asyncio.wait_for(
+                llm_service.generate_response(
+                    query=final_prompt,
+                    context={"text": context_text, "sources": rag_response.get("sources", [])},
+                    course_id=request.course_id
+                ),
+                timeout=llm_timeout
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"LLM mindmap generation timed out after {llm_timeout} seconds – using fallback strategy")
+        except Exception as llm_error:
+            logger.error(f"LLM mindmap generation failed: {llm_error}")
+            # Preserve any textual output if available
+            if isinstance(llm_error, str):
+                llm_response = llm_error
 
-        # Extract JSON content if wrapped in code fences
+        raw_output = (llm_response or "").strip()
+        lower_output = raw_output.lower()
+        apology_markers = ["mi dispiace", "problema", "riprov", "errore"]
+
+        if not raw_output and context_text:
+            # Use retrieved context to synthesize a structured map when the LLM response is empty
+            raw_output = context_text
+        elif any(marker in lower_output for marker in apology_markers) and context_text:
+            logger.warning("LLM returned an apology message; falling back to RAG context for mindmap synthesis")
+            raw_output = context_text
+
+        # Try to extract JSON from response with multiple strategies
+        json_candidate = raw_output
+
+        # Strategy 1: Extract JSON from code fences
         if "```" in raw_output:
             fence_start = raw_output.find("```")
             fence_end = raw_output.rfind("```")
             if fence_end > fence_start:
                 possible = raw_output[fence_start + 3:fence_end]
                 possible = possible.replace("json", "", 1).strip()
-                raw_output = possible or raw_output
+                json_candidate = possible
+
+        # Strategy 2: Find JSON object boundaries
+        if json_candidate.startswith('{') and json_candidate.endswith('}'):
+            # Try to find complete JSON object
+            brace_count = 0
+            json_end = 0
+            for i, char in enumerate(json_candidate):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
+            if json_end > 0:
+                json_candidate = json_candidate[:json_end]
+
+        # Strategy 3: Clean common JSON issues
+        json_candidate = json_candidate.strip()
+        # Remove common prefixes/suffixes
+        if json_candidate.startswith('```json'):
+            json_candidate = json_candidate[7:].strip()
+        if json_candidate.endswith('```'):
+            json_candidate = json_candidate[:-3].strip()
 
         structured_map = None
         markdown_content = ""
+        parse_error = None
+        max_raw_output = int(os.getenv("MINDMAP_MAX_RAW_OUTPUT", "12000"))
+        raw_output_contains_json = "{" in raw_output and "}" in raw_output
 
-        try:
-            parsed_payload = json.loads(raw_output)
-            structured_map = _normalize_mindmap_payload(parsed_payload)
+        # Only force the legacy fallback when we are sure the response is just a huge blob of text.
+        if len(raw_output) > max_raw_output and not raw_output_contains_json:
+            logger.warning(
+                "Raw LLM output too large (%s chars) and missing JSON markers, forcing structured fallback",
+                len(raw_output)
+            )
+            structured_map = _create_structured_mindmap_from_text(raw_output, topic)
             markdown_content = _mindmap_to_markdown(structured_map)
-        except Exception:
-            # Fallback: treat response as markdown and parse
-            structured_map = _parse_markdown_to_structure(raw_output)
-            markdown_content = raw_output if raw_output.startswith("#") else _mindmap_to_markdown(structured_map)
+            logger.info("Created structured mindmap due to oversized raw output without JSON data")
+        else:
+            # Try JSON parsing with better error handling
+            try:
+                parsed_payload = json.loads(json_candidate)
+                # Always validate - the LLM often returns malformed data
+                if not _is_valid_mindmap_payload(parsed_payload):
+                    logger.warning("Parsed JSON is not a valid mindmap structure, forcing fallback")
+                    raise ValueError("Invalid mindmap structure")
+
+                # Additional safety check - if any field looks like JSON string, force fallback
+                if _has_json_strings_in_payload(parsed_payload):
+                    logger.warning("Payload contains JSON strings as values, forcing fallback")
+                    raise ValueError("JSON strings found in payload")
+
+                structured_map = _normalize_mindmap_payload(parsed_payload)
+                markdown_content = _mindmap_to_markdown(structured_map)
+                logger.info("Successfully parsed JSON mindmap")
+            except Exception as e:
+                parse_error = str(e)
+                logger.warning(f"JSON parsing failed: {parse_error}")
+                logger.warning(f"Raw output (first 500 chars): {raw_output[:500]}")
+
+                # More aggressive fallback strategies
+                try:
+                    # Strategy 1: Try to fix common JSON issues
+                    fixed_json = _fix_common_json_issues(json_candidate)
+                    if fixed_json:
+                        try:
+                            parsed_payload = json.loads(fixed_json)
+                            structured_map = _normalize_mindmap_payload(parsed_payload)
+                            markdown_content = _mindmap_to_markdown(structured_map)
+                            logger.info("Successfully parsed fixed JSON")
+                        except:
+                            pass
+
+                    # Strategy 2: Try to extract JSON from malformed text
+                    if not structured_map and '{' in raw_output:
+                        # Try multiple extraction strategies
+                        extracted_json = _extract_json_from_malformed_text(raw_output)
+                        if extracted_json:
+                            try:
+                                parsed_payload = json.loads(extracted_json)
+                                structured_map = _normalize_mindmap_payload(parsed_payload)
+                                markdown_content = _mindmap_to_markdown(structured_map)
+                                logger.info("Successfully parsed extracted JSON")
+                            except:
+                                pass
+
+                    # Strategy 3: Create structured mindmap from text content
+                    if not structured_map:
+                        structured_map = _create_structured_mindmap_from_text(raw_output, topic)
+                        markdown_content = _mindmap_to_markdown(structured_map)
+                        logger.info("Created structured mindmap from text content")
+
+                except Exception as fallback_error:
+                    logger.error(f"All parsing strategies failed: {fallback_error}")
+                    # Final fallback - create minimal mindmap
+                    structured_map = _create_minimal_mindmap(topic)
+                    markdown_content = _mindmap_to_markdown(structured_map)
+                    logger.info("Created minimal mindmap as final fallback")
 
         metadata = {
             "course_id": request.course_id,
@@ -1326,6 +2584,12 @@ Ricorda: restituisci SOLO JSON valido conforme allo schema indicato.
             "generated_at": datetime.now().isoformat(),
             "source_count": len(rag_response.get("sources", []))
         }
+
+        # Final safety check - ensure we have valid mindmap data
+        if not structured_map or not isinstance(structured_map, dict):
+            logger.error("CRITICAL: No valid structured_map created, using minimal fallback")
+            structured_map = _create_minimal_mindmap(topic)
+            markdown_content = _mindmap_to_markdown(structured_map)
 
         return {
             "success": True,
@@ -1338,7 +2602,19 @@ Ricorda: restituisci SOLO JSON valido conforme allo schema indicato.
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating mindmap: {str(e)}")
+        logger.error(f"Error generating mindmap: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "Error generating mindmap",
+                "detail": str(e),
+                "mindmap": None,
+                "markdown": "",
+                "references": [],
+                "sources": []
+            }
+        )
 
 # Background Task Management Endpoints
 @app.post("/study-plans/background")

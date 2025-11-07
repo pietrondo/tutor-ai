@@ -49,6 +49,7 @@ interface StudySession {
     }>
   }>
   quizzes?: Array<{
+    id?: string
     concept_id?: string
     concept_name?: string
     quiz_id?: string

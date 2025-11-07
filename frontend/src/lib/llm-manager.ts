@@ -43,10 +43,15 @@ export interface LLMRequest {
   maxTokens?: number
   stream?: boolean
   systemPrompt?: string
+  rag_enabled?: boolean
+  course_id?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface LLMResponse {
   content: string
+  message?: string
+  sources?: Array<Record<string, unknown>>
   usage?: {
     promptTokens: number
     completionTokens: number
@@ -358,6 +363,14 @@ class LLMManager {
     const provider = this.providers.get(providerId)
     if (!provider) return false
 
+    // Avoid hitting external APIs when the provider requires an API key that is not configured
+    const requiresKey = provider.type === 'openai' || provider.type === 'openrouter'
+    if (requiresKey && !provider.apiKey) {
+      console.info(`ℹ️ Skipping availability check for ${providerId}: API key not configured`)
+      this.providers.get(providerId)!.isAvailable = false
+      return false
+    }
+
     try {
       const baseUrl = provider.baseUrl || this.getDefaultBaseUrl(provider.type)
       if (!baseUrl) {
@@ -661,18 +674,32 @@ class LLMManager {
         break
     }
 
+    const sources = Array.isArray(data.sources)
+      ? data.sources
+      : Array.isArray(data.retrieved_chunks)
+        ? data.retrieved_chunks
+        : Array.isArray(data.chunks)
+          ? data.chunks
+          : undefined
+
     const cost = usage && provider.costPerToken
       ? usage.totalTokens * provider.costPerToken
       : undefined
 
     return {
       content,
+      message: content,
+      sources,
       usage,
       model: provider.model,
       provider: provider.id,
       responseTime,
       cost
     }
+  }
+
+  async invoke(request: LLMRequest): Promise<LLMResponse> {
+    return this.generateResponse(request)
   }
 
   async generateResponse(request: LLMRequest): Promise<LLMResponse> {

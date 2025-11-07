@@ -1,34 +1,65 @@
-# Docker Compose override for development
+# Docker Compose ottimizzato per sviluppo con hot reload e zero rebuild
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-version: '3.8'
 
 services:
   backend:
+    build:
+      target: development
+      cache_from:
+        - tutor-ai-backend:dev-cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: tutor-ai-backend:dev
     volumes:
+      # Bind mount del codice sorgente per hot reload
       - ./backend:/app
+      # Escludi cache Python per non sovrascrivere
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - /app/.mypy_cache
+      # Dati e configurazione
       - ./backend/.env:/app/.env
       - ./data:/app/data
       - rag_data:/app/rag
+      # Cache persistente apt (non viene sovrascritta dal bind mount)
+      - apt_cache:/var/cache/apt
+      - apt_lib_cache:/var/lib/apt
     environment:
       - PYTHONPATH=/app
-      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000
       - DEBUG=true
       - LOG_LEVEL=debug
+      - ENVIRONMENT=development
     ports:
       - "8000:8000"
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+    # Usa il CMD di default del Dockerfile (già configurato per sviluppo)
 
   frontend:
+    build:
+      target: development
+      cache_from:
+        - tutor-ai-frontend:dev-cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+        NODE_ENV: development
+    image: tutor-ai-frontend:dev
     volumes:
+      # Bind mount semplice per hot reload
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_DEBUG=true
+      - PORT=5000
+      - HOSTNAME=0.0.0.0
     ports:
-      - "5000:3000"
+      - "3001:5000"
+    # Next.js development server con hot reload veloce
     command: ["npm", "run", "dev"]
 
   redis:
@@ -36,11 +67,5 @@ services:
       - "6379:6379"
     command: redis-server --appendonly yes --notify-keyspace-events Ex
 
-  ollama:
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_ORIGINS=*
-    volumes:
-      - ollama_models:/root/.ollama
+  # Ollama service removed - using Z.AI instead
+

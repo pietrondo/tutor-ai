@@ -109,6 +109,7 @@ export function ChatWrapper() {
   const [conceptsLoading, setConceptsLoading] = useState(false)
   const [conceptError, setConceptError] = useState<string | null>(null)
   const [conceptsGenerating, setConceptsGenerating] = useState(false)
+  const [conceptProgress, setConceptProgress] = useState(0)
   const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
   const [activeQuiz, setActiveQuiz] = useState<ActiveQuizState | null>(null)
 
@@ -245,24 +246,55 @@ export function ChatWrapper() {
 
   const handleGenerateConceptMap = async () => {
     if (!selectedCourse) return
+
     setConceptsGenerating(true)
     setConceptError(null)
+
     try {
       const response = await fetch(`${API_BASE_URL}/courses/${selectedCourse}/concepts/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(90000),
         body: JSON.stringify({ book_id: selectedBook || undefined, force: true })
       })
+
       if (!response.ok) {
-        throw new Error('Errore generazione concept map')
+        let detail = 'Errore generazione concept map'
+        try {
+          const errorData = await response.json()
+          if (typeof errorData?.detail === 'string') {
+            detail = errorData.detail
+          }
+        } catch {
+          // Ignore JSON parsing errors for non-JSON responses
+        }
+        throw new Error(detail)
       }
+
       const data = await response.json()
       setConceptMap(data.concept_map)
       setSelectedConceptIds([])
       await loadConceptMetrics(selectedCourse)
+      setConceptProgress(100)
     } catch (error) {
       console.error('Errore generazione concept map:', error)
-      setConceptError('Impossibile generare la mappa concettuale. Riprova più tardi.')
+
+      const fallbackMessage = 'Impossibile generare la mappa concettuale. Riprova più tardi.'
+      let message = fallbackMessage
+
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        message = 'La generazione sta impiegando troppo tempo. Controlla che il backend sia attivo e riprova.'
+      } else if (error instanceof Error) {
+        message = error.message || fallbackMessage
+      }
+
+      if (message.toLowerCase().includes('nessun materiale')) {
+        message = 'Non sono stati indicizzati materiali per questo corso. Carica o reindicizza i contenuti prima di generare la mappa.'
+      }
+
+      setConceptError(message)
+      setConceptMap(null)
+      setConceptMetrics({})
     } finally {
       setConceptsGenerating(false)
     }
@@ -294,6 +326,34 @@ export function ChatWrapper() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (!conceptsGenerating) {
+      return
+    }
+
+    setConceptProgress(8)
+    const interval = setInterval(() => {
+      setConceptProgress(prev => {
+        if (prev >= 92) {
+          return prev
+        }
+        const increment = Math.random() * 9 + 3
+        return Math.min(prev + increment, 92)
+      })
+    }, 1500)
+
+    return () => {
+      clearInterval(interval)
+    }
+  }, [conceptsGenerating])
+
+  useEffect(() => {
+    if (!conceptsGenerating && conceptProgress > 0) {
+      const timeout = setTimeout(() => setConceptProgress(0), 600)
+      return () => clearTimeout(timeout)
+    }
+  }, [conceptsGenerating, conceptProgress])
 
   const selectedCourseData = useMemo(
     () => courses.find(c => c.id === selectedCourse) || null,
@@ -402,17 +462,39 @@ Caratteristiche chiave:
     try {
       const response: LLMResponse = await llmManager.invoke(llmRequest)
       const responseTime = performance.now() - startTime
+      const normalizedSources = (response.sources ?? []).map((chunk, index) => {
+        const chunkRecord = chunk as Record<string, unknown>
+        const rawSource = chunkRecord.source
+        const rawSimilarity = chunkRecord.similarity
+        const rawScore = chunkRecord.score
+        const rawRelevance = chunkRecord.relevance_score
+        const source =
+          typeof rawSource === 'string'
+            ? rawSource
+            : rawSource !== undefined && rawSource !== null
+              ? String(rawSource)
+              : `Fonte ${index + 1}`
+        const relevance =
+          typeof rawSimilarity === 'number'
+            ? rawSimilarity
+            : typeof rawRelevance === 'number'
+              ? rawRelevance
+              : typeof rawScore === 'number'
+                ? rawScore
+                : 0.75
+        return {
+          source,
+          chunk_index: index,
+          relevance_score: relevance
+        }
+      })
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.message,
+        content: response.message ?? response.content,
         role: 'assistant',
         timestamp: new Date().toISOString(),
-        sources: response.sources?.map((chunk, index) => ({
-          source: chunk.source,
-          chunk_index: index,
-          relevance_score: chunk.similarity || chunk.score || 0.75
-        })),
+        sources: normalizedSources,
         provider: response.provider,
         model: response.model,
         responseTime,
@@ -568,6 +650,25 @@ Caratteristiche chiave:
         {conceptError && (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             {conceptError}
+          </div>
+        )}
+        {conceptsGenerating && (
+          <div className="rounded-md border border-purple-100 bg-purple-50 p-3 text-xs text-purple-700">
+            <p className="mb-2 flex items-center gap-2 font-medium">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Generazione della mappa in corso…
+            </p>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-purple-100">
+              <div
+                className="h-full rounded-full bg-purple-500 transition-all duration-300 ease-out"
+                style={{ width: `${Math.min(conceptProgress, 100)}%` }}
+              />
+            </div>
+            <p className="mt-2 text-[11px] text-purple-600">
+              {conceptProgress >= 95
+                ? 'Allineamento con il modello completato, in attesa della risposta…'
+                : `Avanzamento stimato: ${Math.max(0, conceptProgress).toFixed(0)}%`}
+            </p>
           </div>
         )}
 

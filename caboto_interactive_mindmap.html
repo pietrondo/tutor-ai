@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Concettuale Interattiva - Sebastiano Caboto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #1a1a1a;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #15803d;
+        }
+
+        .btn-secondary {
+            background: #374151;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #1f2937;
+        }
+
+        .mindmap-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .panel-left {
+            border: 2px solid #dbeafe;
+        }
+
+        .panel-right {
+            border: 2px solid #e5e7eb;
+        }
+
+        .node {
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .node-header {
+            padding: 12px;
+            background: #f9fafb;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .node-header:hover {
+            background: #f3f4f6;
+        }
+
+        .node.expanded .node-header {
+            background: #eff6ff;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .node-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .node-priority {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .priority-high {
+            background: #dc2626;
+            color: white;
+        }
+
+        .priority-medium {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .priority-low {
+            background: #6b7280;
+            color: white;
+        }
+
+        .expand-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .node.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .node-content {
+            padding: 12px;
+            display: none;
+            border-top: 1px solid #f3f4f6;
+        }
+
+        .node.expanded .node-content {
+            display: block;
+        }
+
+        .node-description {
+            color: #4b5563;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .node-children {
+            margin-left: 20px;
+        }
+
+        .child-node {
+            padding: 8px;
+            margin: 4px 0;
+            background: #f9fafb;
+            border-left: 3px solid #3b82f6;
+            border-radius: 4px;
+        }
+
+        .study-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .study-action {
+            padding: 4px 8px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .study-action:hover {
+            background: #dbeafe;
+        }
+
+        .main-concept {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .main-concept .node-header {
+            background: transparent;
+        }
+
+        .main-concept .node-header:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .main-concept .node-title {
+            color: white;
+            font-size: 18px;
+        }
+
+        .main-concept .expand-icon {
+            color: white;
+        }
+
+        .main-concept .node-content {
+            border-top: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .main-concept .node-description {
+            color: rgba(255,255,255,0.9);
+        }
+
+        .ai-hint {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #92400e;
+        }
+
+        @media (max-width: 768px) {
+            .mindmap-container {
+                grid-template-columns: 1fr;
+            }
+
+            .header-actions {
+                flex-wrap: wrap;
+            }
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🧠 Mappa Concettuale Interattiva</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="regenerateMindmap()">
+                    🔄 Rigenera
+                </button>
+                <button class="btn btn-success" onclick="saveToCourse()">
+                    💾 Salva nel corso
+                </button>
+                <button class="btn btn-secondary" onclick="exportMarkdown()">
+                    📄 Esporta Markdown
+                </button>
+            </div>
+        </header>
+
+        <div class="mindmap-container">
+            <div class="panel panel-left">
+                <div class="main-concept node expanded" id="main-concept">
+                    <div class="node-header" onclick="toggleNode('main-concept')">
+                        <div class="node-title">
+                            <span class="expand-icon">▼</span>
+                            <span>Sebastiano Caboto - Geografia Storica</span>
+                        </div>
+                        <span class="node-priority priority-high">ALTA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            <strong>Università degli Studi di Milano (UNIMI) - 36 pagine</strong><br><br>
+                            Analisi approfondita della figura di Sebastiano Caboto esploratore e delle sue spedizioni geografiche, con particolare attenzione alle analogie con l'opera "Cuore di Tenebra" di Conrad.
+                        </div>
+
+                        <div class="ai-hint">
+                            💡 <strong>Suggerimento AI:</strong> Chiedi all'AI di approfondire i concetti di Sebastiano Caboto e le sue spedizioni
+                        </div>
+
+                        <div class="study-actions">
+                            <span class="study-action">📚 Analizzare i materiali</span>
+                            <span class="study-action">📝 Creare riassunti</span>
+                            <span class="study-action">🎯 Praticare esercizi</span>
+                        </div>
+
+                        <div class="node-children">
+                            <div class="child-node">
+                                <strong>📍 Contesto Storico:</strong> Spedizioni all'inizio del XVI secolo
+                            </div>
+                            <div class="child-node">
+                                <strong>🎯 Obiettivo Principale:</strong> Trovare rotte commerciali verso l'Asia
+                            </div>
+                            <div class="child-node">
+                                <strong>📖 Fonte:</strong> Documento Docsity condiviso da Pietro Capriata
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="node" id="spedizioni">
+                    <div class="node-header" onclick="toggleNode('spedizioni')">
+                        <div class="node-title">
+                            <span class="expand-icon">▶</span>
+                            <span>🚢 Spedizioni Principali</span>
+                        </div>
+                        <span class="node-priority priority-high">ALTA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            Le spedizioni organizzate dalla Casa de la Contratacion sotto la guida di Caboto, con particolare focus sulla mappatura delle coste nordamericane.
+                        </div>
+                        <div class="node-children">
+                            <div class="node" id="spedizione-gomez">
+                                <div class="node-header" onclick="toggleNode('spedizione-gomez')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>🗺️ Spedizione Gomez (Florida-Nuova Scozia)</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Prima spedizione allestita dalla Casa de la Contratacion che mappò le coste orientali del Nordamerica.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>📍 Percorso:</strong> Dalla Florida alla Nuova Scozia
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🎯 Obiettivo Fallito:</strong> Non trovò lo stretto sperato
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>📊 Risultato:</strong> Mappatura completa inserita nel Padron Real
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="node" id="miraggio-ricchezze">
+                                <div class="node-header" onclick="toggleNode('miraggio-ricchezze')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>💰 Il Miraggio delle Ricchezze (1525-1526)</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Il ritorno di Elcano con le spezie intensificò in Caboto la volontà di raggiungere i luoghi di produzione delle spezie.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>⚖️ Convegno Badajoz-Elvas:</strong> Fallimento degli accordi commerciali
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🎯 Strategia Spagnola:</strong> Contrastare la supremazia portoghese in Asia
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🧭 Piano Caboto:</strong> Trovare una rotta più breve verso l'Asia
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="node" id="casa-contratacion">
+                    <div class="node-header" onclick="toggleNode('casa-contratacion')">
+                        <div class="node-title">
+                            <span class="expand-icon">▶</span>
+                            <span>🏛️ Casa de la Contratacion</span>
+                        </div>
+                        <span class="node-priority priority-medium">MEDIA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            Istituzione spagnola responsabile dell'organizzazione e controllo delle spedizioni commerciali e di esplorazione verso le Americhe.
+                        </div>
+                        <div class="node-children">
+                            <div class="child-node">
+                                <strong>📋 Funzioni:</strong> Organizzazione spedizioni, controllo commerciale, mappatura territoriale
+                            </div>
+                            <div class="child-node">
+                                <strong>🗺️ Padron Real:</strong> Registro ufficiale delle scoperte geografiche
+                            </div>
+                            <div class="child-node">
+                                <strong>💼 Ruolo Caboto:</strong> Piloto mayor della Casa
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel panel-right">
+                <div class="node" id="analogie-conrad">
+                    <div class="node-header" onclick="toggleNode('analogie-conrad')">
+                        <div class="node-title">
+                            <span class="expand-icon">▶</span>
+                            <span>📚 Analogie con "Cuore di Tenebra" di Conrad</span>
+                        </div>
+                        <span class="node-priority priority-high">ALTA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            Tucci evidenzia le paralleli sorprendenti tra la spedizione di Caboto e l'opera letteraria di Conrad, esplorando temi universali del colonialismo.
+                        </div>
+                        <div class="node-children">
+                            <div class="node" id="temi-coloniali">
+                                <div class="node-header" onclick="toggleNode('temi-coloniali')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>🌍 Temi Coloniali Comuni</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Analisi dei temi ricorrenti sia nelle spedizioni di Caboto che nell'opera di Conrad.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>💰 Brama di Ricchezza:</strong> Motivazione economica primaria
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>👥 Sfruttamento dei Nativi:</strong> Relazioni di potere sbilanciate
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>⚔️ Delitti e Violenza:</strong> Aspetti oscuri dell'esplorazione
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🥘 Cannibalismo:</strong> Paura e realtà dei costumi indigeni
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🥁 Sottofondo di Tamburi:</strong> Atmosfera misteriosa e minacciosa
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>👑 Superiorità Europea:</strong> Presunta superiorità culturale
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🏰 Effimeri Imperi Personali:</strong> Ambizioni coloniali fallite
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="node" id="controversie">
+                    <div class="node-header" onclick="toggleNode('controversie')">
+                        <div class="node-title">
+                            <span class="expand-icon">▶</span>
+                            <span>⚖️ Controversie e Critiche</span>
+                        </div>
+                        <span class="node-priority priority-medium">MEDIA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            Analisi delle controversie surrounding la figura di Caboto e il dibattito tra esploratore e conquistador.
+                        </div>
+                        <div class="node-children">
+                            <div class="node" id="abusi-potere">
+                                <div class="node-header" onclick="toggleNode('abusi-potere')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>🔍 Abusi di Potere</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Testimonianze di abusi riservati da Caboto verso ufficiali e marinai, raccolte durante le indagini della Casa de la Contratacion.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>🧑‍⚖️ Juan de Junco (Tesoriere):</strong> Rivelò trattamenti ingiusti
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🎯 Casimiro Nuremberg:</strong> Criticò gli abusi e il cambio di rotta
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>📊 Alonso Santa Cruz:</strong> Ostile a Caboto, testimoniò gli abusi
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>📝 Deposizioni Contraddittorie:</strong> Versioni diametralmente opposte
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="node" id="congiura">
+                                <div class="node-header" onclick="toggleNode('congiura')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>🗡️ La Congiura di Rojas, Mendez e Rodas</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Caboto giustificò l'abbandono di tre ufficiali accusandoli di aver ordito una cospirazione per ucciderlo.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>📖 Versione Caboto:</strong> Abbandono necessario per congiura
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>❓ Versione Ufficiali:</strong> Cambio di rotta non accettato
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🎯 Verità Storica:</strong> Difficile da determinare con certezza
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="node" id="identita">
+                                <div class="node-header" onclick="toggleNode('identita')">
+                                    <div class="node-title">
+                                        <span class="expand-icon">▶</span>
+                                        <span>🤔 Caboto: Esploratore o Conquistador?</span>
+                                    </div>
+                                </div>
+                                <div class="node-content">
+                                    <div class="node-description">
+                                        Tucci critica gli armatori che cercarono di presentare Caboto come esploratore disinteressato, nonostante la sua mentalità da conquistador.
+                                    </div>
+                                    <div class="node-children">
+                                        <div class="child-node">
+                                            <strong>🎭 Mentalità Conquistador:</strong> Volontà di creare dominio personale
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🤝 Carisma sui Nativi:</strong> Abilità nel stringere alleanze
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>💪 Pugno di Ferro:</strong> Autorità sui subordinati
+                                        </div>
+                                        <div class="child-node">
+                                            <strong>🏗️ Insediamenti:</strong> Tentativi di fondare colonie spagnole
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="node" id="eredita">
+                    <div class="node-header" onclick="toggleNode('eredita')">
+                        <div class="node-title">
+                            <span class="expand-icon">▶</span>
+                            <span>🏆 Eredità e Impatto</span>
+                        </div>
+                        <span class="node-priority priority-low">BASSA</span>
+                    </div>
+                    <div class="node-content">
+                        <div class="node-description">
+                            Valutazione dell'impatto delle spedizioni di Caboto e del loro significato storico.
+                        </div>
+                        <div class="node-children">
+                            <div class="child-node">
+                                <strong>🗺️ Contributo Geografico:</strong> Mappatura completa della costa orientale nordamericana
+                            </div>
+                            <div class="child-node">
+                                <strong>🛣️ Rio de la Plata:</strong> Scoperta di importante via di penetrazione
+                            </div>
+                            <div class="child-node">
+                                <strong>📚 Documentazione:</strong> Registri storici dettagliati conservati
+                            </div>
+                            <div class="child-node">
+                                <strong>🌐 Influenza:</strong> Modellamento delle future esplorazioni spagnole
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleNode(nodeId) {
+            const node = document.getElementById(nodeId);
+            if (node) {
+                node.classList.toggle('expanded');
+            }
+        }
+
+        function regenerateMindmap() {
+            if (confirm('Vuoi rigenerare la mappa concettuale?')) {
+                // Ricarica la pagina o chiama API per rigenerare
+                location.reload();
+            }
+        }
+
+        function saveToCourse() {
+            if (confirm('Vuoi salvare questa mappa nel corso?')) {
+                // Implementa salvataggio nel corso
+                alert('Mappa salvata nel corso con successo!');
+            }
+        }
+
+        function exportMarkdown() {
+            // Genera contenuto markdown dalla struttura attuale
+            const content = generateMarkdownContent();
+            downloadFile('sebastiano-caboto-mindmap.md', content);
+        }
+
+        function generateMarkdownContent() {
+            let content = `# Sebastiano Caboto - Geografia Concettuale
+
+## 📍 Contesto Principale
+**Sebastiano Caboto - Geografia Storica**
+Università degli Studi di Milano (UNIMI) - 36 pagine
+
+Analisi approfondita della figura di Sebastiano Caboto esploratore e delle sue spedizioni geografiche, con particolare attenzione alle analogie con l'opera "Cuore di Tenebra" di Conrad.
+
+---
+
+## 🚢 Spedizioni Principali
+
+### Spedizione Gomez (Florida-Nuova Scozia)
+- **Percorso:** Dalla Florida alla Nuova Scozia
+- **Obiettivo Fallito:** Non trovò lo stretto sperato
+- **Risultato:** Mappatura completa inserita nel Padron Real
+
+### Il Miraggio delle Ricchezze (1525-1526)
+- **Motivazione:** Ritorno di Elcano con le spezie
+- **Strategia:** Contrasto supremazia portoghese in Asia
+- **Piano:** Trovare rotta più breve verso l'Asia
+
+---
+
+## 📚 Analogie con "Cuore di Tenebra"
+
+### Temi Coloniali Comuni
+- 💰 Brama di Ricchezza
+- 👥 Sfruttamento dei Nativi
+- ⚔️ Delitti e Violenza
+- 🥘 Cannibalismo
+- 🥁 Sottofondo di Tamburi
+- 👑 Superiorità Europea
+- 🏰 Effimeri Imperi Personali
+
+---
+
+## ⚖️ Controversie
+
+### Abusi di Potere
+Testimonianze di abusi verso ufficiali e marinai durante le indagini della Casa de la Contratacion.
+
+### La Congiura
+Caboto accusò Rojas, Mendez e Rodas di aver ordito una cospirazione per ucciderlo.
+
+### Identità Controversa
+**Caboto: Esploratore o Conquistador?**
+- Mentalità da conquistador
+- Volontà di dominio personale
+- Tentativi di fondare insediamenti
+
+---
+
+## 🏆 Eredità Storica
+- Mappatura completa costa orientale nordamericana
+- Scoperta Rio de la Plata
+- Documentazione storica dettagliata
+- Influenza su esplorazioni future
+`;
+            return content;
+        }
+
+        function downloadFile(filename, content) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        // Espandi automaticamente il concetto principale al caricamento
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aggiungi animazione di entrata
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach((node, index) => {
+                node.style.opacity = '0';
+                node.style.transform = 'translateY(20px)';
+                node.style.transition = 'all 0.3s ease';
+
+                setTimeout(() => {
+                    node.style.opacity = '1';
+                    node.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+    </script>
+</body>
+</html>

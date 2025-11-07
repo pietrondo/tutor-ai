@@ -151,7 +151,8 @@ const normalizeChapter = (chapter: unknown): BookChapter | null => {
     return {
       title,
       summary: '',
-      estimated_minutes: null
+      estimated_minutes: null,
+      topics: []
     }
   }
 
@@ -169,10 +170,16 @@ const normalizeChapter = (chapter: unknown): BookChapter | null => {
       estimated = Number.isFinite(parsed) && parsed >= 0 ? parsed : null
     }
 
+    const topicsSource = Array.isArray(data.topics) ? data.topics : []
+    const topics = topicsSource
+      .map(topic => toStringValue(topic))
+      .filter((topic): topic is string => Boolean(topic))
+
     return {
       title,
       summary: typeof data.summary === 'string' ? data.summary.trim() : '',
-      estimated_minutes: estimated
+      estimated_minutes: estimated,
+      topics
     }
   }
 

@@ -9,10 +9,28 @@ interface MindmapExplorerProps {
   onExpandNode?: (path: StudyMindmapNode[]) => Promise<void>
 }
 
-export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps) {
+interface MindmapExplorerProps {
+  mindmap: StudyMindmap
+  onExpandNode?: (path: StudyMindmapNode[]) => Promise<void>
+  onEditNode?: (node: StudyMindmapNode, instruction: string) => Promise<void>
+}
+
+export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapExplorerProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
+  const [editingNodes, setEditingNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+
+  // Log dettagliati per debugging
+  console.log('🔍 MindmapExplorer - Dati ricevuti:', {
+    mindmapTitle: mindmap.title,
+    nodesCount: mindmap.nodes.length,
+    firstNodeTitle: mindmap.nodes[0]?.title,
+    firstNodeSummary: mindmap.nodes[0]?.summary,
+    firstNodeChildrenCount: mindmap.nodes[0]?.children?.length || 0,
+    allNodeTitles: mindmap.nodes.map(n => n.title),
+    allNodeSources: mindmap.nodes.map(n => n.references || [])
+  })
 
   const getPriorityMeta = (priority: number | null | undefined) => {
     if (priority === null || priority === undefined) return null
@@ -56,17 +74,33 @@ export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps)
   }
 
   useEffect(() => {
-    // Expand root nodes on load
-    const nextExpanded = new Set<string>()
-    mindmap.nodes.forEach((node) => nextExpanded.add(node.id))
-    setExpandedNodes(nextExpanded)
-
-    if (mindmap.nodes.length > 0) {
-      setSelectedNodeId(mindmap.nodes[0].id)
-    } else {
-      setSelectedNodeId(null)
+    const collectIds = (nodes: StudyMindmapNode[], acc: Set<string>) => {
+      nodes.forEach((node) => {
+        acc.add(node.id)
+        collectIds(node.children, acc)
+      })
+      return acc
     }
-  }, [mindmap])
+
+    const allIds = collectIds(mindmap.nodes, new Set<string>())
+
+    // Keep previously expanded nodes but ensure new root nodes are shown
+    setExpandedNodes((prev) => {
+      const next = new Set<string>()
+      prev.forEach((id) => {
+        if (allIds.has(id)) next.add(id)
+      })
+      mindmap.nodes.forEach((node) => next.add(node.id))
+      return next
+    })
+
+    setSelectedNodeId((prev) => {
+      if (prev && allIds.has(prev)) {
+        return prev
+      }
+      return mindmap.nodes.length > 0 ? mindmap.nodes[0].id : null
+    })
+  }, [mindmap.nodes])
 
   const findNodeById = (nodes: StudyMindmapNode[], id: string | null): StudyMindmapNode | null => {
     if (!id) return null
@@ -132,10 +166,32 @@ export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps)
     }
   }
 
+  const handleEdit = async (node: StudyMindmapNode) => {
+    if (!onEditNode) return
+
+    const instruction = prompt('Come vorresti modificare questo nodo? Esempi: "Rendi più semplice", "Aggiungi esempi pratici", "Approfondisci questo aspetto"')
+    if (!instruction) return
+
+    const nextEditing = new Set(editingNodes)
+    nextEditing.add(node.id)
+    setEditingNodes(nextEditing)
+
+    try {
+      await onEditNode(node, instruction)
+    } finally {
+      setEditingNodes((prev) => {
+        const updated = new Set(prev)
+        updated.delete(node.id)
+        return updated
+      })
+    }
+  }
+
   const renderNode = (node: StudyMindmapNode, depth: number, path: StudyMindmapNode[]) => {
     const isExpanded = expandedNodes.has(node.id)
     const hasChildren = node.children.length > 0
     const isLoading = loadingNodes.has(node.id)
+    const isEditing = editingNodes.has(node.id)
 
     const nodePath = [...path, node]
 
@@ -144,7 +200,7 @@ export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps)
         <div className="flex items-start gap-2">
           <button
             onClick={() => toggleNode(node.id)}
-            className="mt-1 text-gray-500 hover:text-gray-700 transition-colors"
+            className="mt-1 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
             aria-label={isExpanded ? 'Comprimi nodo' : 'Espandi nodo'}
           >
             {hasChildren || onExpandNode ? (
@@ -155,41 +211,64 @@ export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps)
           </button>
           <div
             onClick={() => setSelectedNodeId(node.id)}
-            className={`flex-1 p-3 rounded-lg border cursor-pointer transition-colors ${
-              selectedNodeId === node.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+            className={`flex-1 p-3 rounded-lg border cursor-pointer transition-all min-w-0 ${
+              selectedNodeId === node.id 
+                ? 'border-blue-500 bg-blue-50 shadow-sm' 
+                : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
             }`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <div className="font-semibold text-gray-900">{node.title}</div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0 pr-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-semibold text-gray-900 truncate">{node.title}</div>
                   {renderPriorityBadge(node.priority)}
                 </div>
-                {node.summary && <div className="text-sm text-gray-600 mt-1">{node.summary}</div>}
+                {node.summary && (
+                  <div className="text-sm text-gray-600 mt-1 line-clamp-2">{node.summary}</div>
+                )}
                 {node.study_actions.length > 0 && (
                   <div className="mt-2 text-xs text-gray-500">
                     <span className="font-medium text-gray-700">Attività:</span>{' '}
-                    {node.study_actions.slice(0, 2).join('; ')}
-                    {node.study_actions.length > 2 && '…'}
+                    <span className="line-clamp-1">
+                      {node.study_actions.slice(0, 2).join('; ')}
+                      {node.study_actions.length > 2 && '…'}
+                    </span>
                   </div>
                 )}
                 <div className="mt-2 flex items-center gap-1 text-[11px] text-gray-500">
-                  <GitBranch className="h-3 w-3" />
-                  <span>{node.children.length} sotto-concetti collegati</span>
+                  <GitBranch className="h-3 w-3 flex-shrink-0" />
+                  <span>{node.children.length} sotto-concetti</span>
                 </div>
               </div>
-              {onExpandNode && (
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleExpand(nodePath)
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
-                >
-                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  <span>Espandi</span>
-                </button>
-              )}
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                {onExpandNode && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleExpand(nodePath)
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors whitespace-nowrap border border-purple-200"
+                    title="Espandi con AI"
+                  >
+                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    <span>Espandi</span>
+                  </button>
+                )}
+                {onEditNode && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleEdit(node)
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors whitespace-nowrap border border-blue-200"
+                    title="Modifica con AI"
+                    disabled={isEditing}
+                  >
+                    {isEditing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Lightbulb className="h-3 w-3" />}
+                    <span>{isEditing ? 'Modifica...' : 'Modifica'}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -199,7 +278,7 @@ export function MindmapExplorer({ mindmap, onExpandNode }: MindmapExplorerProps)
             {isLoading && (
               <div className="flex items-center gap-2 text-sm text-purple-600 mt-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Generazione con l'AI in corso…
+                <span>Generazione con l'AI in corso...</span>
               </div>
             )}
           </div>
