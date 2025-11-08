@@ -95,9 +95,9 @@ COPY rag/ ./rag/
 RUN mkdir -p data/courses data/vector_db data/uploads data/tracking && \
     chmod -R 755 data/
 
-EXPOSE 8000
+EXPOSE 8001
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
 
 ########################
 # Stage: production
@@ -126,6 +126,6 @@ RUN mkdir -p data/courses data/vector_db data/uploads data/tracking && \
 
 USER appuser
 
-EXPOSE 8000
+EXPOSE 8001
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]

@@ -79,7 +79,9 @@ class ConceptMapService:
         documents_result = await self.rag_service.search_documents(course_id)
         documents = documents_result.get("documents", [])
         if not documents:
-            raise ValueError("Nessun materiale disponibile per generare i concetti del corso.")
+            logger.warning("No documents found for concept generation, using fallback concepts")
+            # Fallback: genera concetti base basati sul corso
+            return await self._generate_fallback_concept_map(course_id, book_id)
 
         # Aggregate context snippets for LLM
         context_snippets: List[str] = []
@@ -395,6 +397,126 @@ Materiali di riferimento (estratti):
 
         self._save_metrics(metrics)
         return concept_metrics
+
+
+async def _generate_fallback_concept_map(self, course_id: str, book_id: Optional[str] = None) -> Dict[str, Any]:
+    """Generate a fallback concept map when no documents are available."""
+    logger.info("Generating fallback concept map", course_id=course_id, book_id=book_id)
+
+    # Concetti universali per corsi universitari
+    fallback_concepts = [
+        {
+            "id": "introduzione",
+            "name": "Introduzione al Corso",
+            "summary": "Concetti fondamentali e panoramica della materia",
+            "chapter": {"title": "Capitolo 1", "index": 1},
+            "related_topics": ["concetti base", "terminologia", "obiettivi del corso"],
+            "learning_objectives": [
+                "Comprendere gli obiettivi principali del corso",
+                "Familiarizzare con la terminologia di base",
+                "Identificare le aree tematiche principali"
+            ],
+            "suggested_reading": ["Materiale introduttivo del corso"],
+            "recommended_minutes": 30,
+            "quiz_outline": [
+                "Quali sono gli obiettivi principali di questo corso?",
+                "Spiegare i concetti fondamentali introdotti"
+            ]
+        },
+        {
+            "id": "concetti-fondamentali",
+            "name": "Concetti Fondamentali",
+            "summary": "Principi teorici e base della disciplina",
+            "chapter": {"title": "Capitolo 2", "index": 2},
+            "related_topics": ["teoria principale", "principi base", "fondamenti"],
+            "learning_objectives": [
+                "Comprendere i principi teorici fondamentali",
+                "Applicare i concetti base a problemi semplici",
+                "Distinguere tra teoria e pratica"
+            ],
+            "suggested_reading": ["Testi di riferimento principali"],
+            "recommended_minutes": 45,
+            "quiz_outline": [
+                "Definire i concetti fondamentali della materia",
+                "Spiegare l'applicazione dei principi base"
+            ]
+        },
+        {
+            "id": "applicazioni-pratiche",
+            "name": "Applicazioni Pratiche",
+            "summary": "Esercizi e applicazioni reali dei concetti studiati",
+            "chapter": {"title": "Capitolo 3", "index": 3},
+            "related_topics": ["esercizi", "casi studio", "problemi pratici"],
+            "learning_objectives": [
+                "Applicare la teoria a problemi pratici",
+                "Risolvere esercizi tipici della materia",
+                "Analizzare casi studio reali"
+            ],
+            "suggested_reading": ["Eserciziari e casi studio"],
+            "recommended_minutes": 60,
+            "quiz_outline": [
+                "Risolvere un problema pratico applicando i concetti",
+                "Analizzare un caso studio specifico"
+            ]
+        },
+        {
+            "id": "approfondimenti",
+            "name": "Approfondimenti Tematici",
+            "summary": "Argomenti avanzati e aree specialistiche della disciplina",
+            "chapter": {"title": "Capitolo 4", "index": 4},
+            "related_topics": ["argomenti avanzati", "specializzazioni", "tematiche complesse"],
+            "learning_objectives": [
+                "Esplorare argomenti avanzati della materia",
+                "Comprendere le interconnessioni tra diversi concetti",
+                "Sviluppare competenze specialistiche"
+            ],
+            "suggested_reading": ["Articoli scientifici e testi avanzati"],
+            "recommended_minutes": 50,
+            "quiz_outline": [
+                "Spiegare le relazioni tra concetti avanzati",
+                "Applicare conoscenze specialistiche a problemi complessi"
+            ]
+        },
+        {
+            "id": "valutazione-e-revisione",
+            "name": "Valutazione e Revisione",
+            "summary": "Verifica dell'apprendimento e preparazione per esami",
+            "chapter": {"title": "Capitolo 5", "index": 5},
+            "related_topics": ["verifica", "esercizi di revisione", "preparazione esami"],
+            "learning_objectives": [
+                "Verificare la comprensione dei concetti principali",
+                "Identificare aree che richiedono ulteriore studio",
+                "Prepararsi efficacemente per le valutazioni"
+            ],
+            "suggested_reading": ["Materiale di ripasso e esercizi di valutazione"],
+            "recommended_minutes": 40,
+            "quiz_outline": [
+                "Valutare la comprensione generale della materia",
+                "Identificare punti di forza e di debolezza"
+            ]
+        }
+    ]
+
+    fallback_map = {
+        "course_id": course_id,
+        "generated_at": datetime.now().isoformat(),
+        "source_count": 0,
+        "is_fallback": True,
+        "concepts": fallback_concepts
+    }
+
+    # Salva la mappa fallback
+    concept_maps = self._load_concept_maps()
+    concept_maps["concept_maps"][course_id] = fallback_map
+    self._save_concept_maps(concept_maps)
+
+    logger.info(
+        "Fallback concept map generated",
+        course_id=course_id,
+        concepts=len(fallback_concepts)
+    )
+
+    return fallback_map
 
 
 concept_map_service = ConceptMapService()

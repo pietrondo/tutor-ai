@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen, Presentation, Calendar } from 'lucide-react'
+import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen, Presentation, Calendar, Target } from 'lucide-react'
 import { StudyProgress } from '@/components/StudyProgress'
 import BackgroundTaskProgress from '@/components/BackgroundTaskProgress'
 
@@ -218,7 +218,7 @@ export default function CourseDetailPage() {
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'books' | 'progress' | 'quiz' | 'slides' | 'plans'>('books')
+  const [activeTab, setActiveTab] = useState<'books' | 'progress' | 'quiz' | 'slides' | 'plans' | 'chat' | 'practice'>('books')
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [taskPreferences, setTaskPreferences] = useState({
@@ -240,7 +240,7 @@ export default function CourseDetailPage() {
 
   const fetchCourse = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -260,7 +260,7 @@ export default function CourseDetailPage() {
 
   const fetchBooks = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}/books`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/books`)
       if (response.ok) {
         const data = await response.json()
         const normalized = Array.isArray(data.books) ? data.books.map(normalizeBook) : []
@@ -279,7 +279,7 @@ export default function CourseDetailPage() {
     setMetricsLoading(true)
     setMetricsError('')
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}/concepts/metrics`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/concepts/metrics`)
       if (response.ok) {
         const data = await response.json()
         const metricsMap = data.metrics ?? {}
@@ -330,7 +330,7 @@ export default function CourseDetailPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`, {
         method: 'DELETE',
       })
 
@@ -349,7 +349,7 @@ export default function CourseDetailPage() {
     if (!courseId) return
 
     try {
-      const response = await fetch('http://localhost:8000/study-plans/background', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/study-plans/background`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -467,11 +467,19 @@ export default function CourseDetailPage() {
             </Link>
 
             <Link
-              href={`/chat?course=${course.id}`}
+              href={`/courses/${course.id}/chat`}
               className="btn btn-secondary flex items-center space-x-2"
             >
               <MessageSquare className="h-4 w-4" />
               <span>Chat con Tutor</span>
+            </Link>
+
+            <Link
+              href={`/courses/${course.id}/practice`}
+              className="btn btn-secondary flex items-center space-x-2"
+            >
+              <Target className="h-4 w-4" />
+              <span>Practice SRS</span>
             </Link>
 
             <Link
@@ -531,6 +539,28 @@ export default function CourseDetailPage() {
               }`}
             >
               Generatore Slide
+            </button>
+
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'chat'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Chat Tutor AI
+            </button>
+
+            <button
+              onClick={() => setActiveTab('practice')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'practice'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Practice SRS
             </button>
 
             <button
@@ -906,7 +936,153 @@ export default function CourseDetailPage() {
           )}
 
           {/* Study Plans Tab */}
-          {activeTab === 'plans' && (
+          {activeTab === 'chat' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Chat Tutor AI</h3>
+                  <p className="text-sm text-gray-600">
+                    Conversa con il tutor AI specializzato per questo corso
+                  </p>
+                </div>
+                <Link
+                  href={`/courses/${courseId}/chat`}
+                  className="btn btn-primary flex items-center space-x-2"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Apri Chat Completa</span>
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-blue-600 mb-2">🧠</div>
+                  <h4 className="font-medium text-blue-900 mb-1">Contesto Intelligente</h4>
+                  <p className="text-sm text-blue-700">Il tutor ricorda le conversazioni precedenti e adatta le risposte</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 mb-2">📚</div>
+                  <h4 className="font-medium text-green-900 mb-1">Basato sui Materiali</h4>
+                  <p className="text-sm text-green-700">Risposte basate sui libri e materiali del corso</p>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="text-purple-600 mb-2">🎯</div>
+                  <h4 className="font-medium text-purple-900 mb-1">Personalizzato</h4>
+                  <p className="text-sm text-purple-700">Apprende il tuo stile e il tuo livello di conoscenza</p>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="text-orange-600 mb-2">💬</div>
+                  <h4 className="font-medium text-orange-900 mb-1">Sessioni Persistenti</h4>
+                  <p className="text-sm text-orange-700">Le conversazioni vengono salvate e possono essere continuate</p>
+                </div>
+                <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-red-600 mb-2">📊</div>
+                  <h4 className="font-medium text-red-900 mb-1">Analisi di Apprendimento</h4>
+                  <p className="text-sm text-red-700">Traccia i progressi e i concetti discussi</p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-gray-600 mb-2">🔍</div>
+                  <h4 className="font-medium text-gray-900 mb-1">Ricerca Avanzata</h4>
+                  <p className="text-sm text-gray-700">Trova informazioni velocemente tra tutti i materiali</p>
+                </div>
+              </div>
+
+              {books.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun materiale per la chat</h3>
+                  <p className="text-gray-600 mb-4">
+                    Aggiungi libri e materiali al corso per iniziare a chattare con il tutor AI
+                  </p>
+                  <Link
+                    href={`/courses/${courseId}/books`}
+                    className="btn btn-primary"
+                  >
+                    Aggiungi Materiali
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">
+                    Hai <span className="font-semibold">{books.length}</span> libri disponibili per la chat
+                  </p>
+                  <Link
+                    href={`/courses/${courseId}/chat`}
+                    className="btn btn-primary"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Inizia a Chattare
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'practice' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Practice SRS</h3>
+                  <p className="text-sm text-gray-600">
+                    Sistema di ripetizione spaziata per massimizzare la ritenzione a lungo termine
+                  </p>
+                </div>
+                <Link
+                  href={`/courses/${courseId}/practice`}
+                  className="btn btn-primary flex items-center space-x-2"
+                >
+                  <Target className="h-4 w-4" />
+                  <span>Inizia Practice</span>
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-blue-600 mb-2">🧠</div>
+                  <h4 className="font-medium text-blue-900 mb-1">SM-2 Algorithm</h4>
+                  <p className="text-sm text-blue-700">Algoritmo scientificamente provato per scheduling ottimale</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-green-600 mb-2">📈</div>
+                  <h4 className="font-medium text-green-900 mb-1">Adattivo</h4>
+                  <p className="text-sm text-green-700">Si adatta al tuo ritmo e performance</p>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="text-purple-600 mb-2">🎯</div>
+                  <h4 className="font-medium text-purple-900 mb-1">Intelligente</h4>
+                  <p className="text-sm text-purple-700">Genera schede automaticamente dalle conversazioni</p>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="text-orange-600 mb-2">⚡</div>
+                  <h4 className="font-medium text-orange-900 mb-1">Efficiente</h4>
+                  <p className="text-sm text-orange-700">Studia solo quando serve, ottimizzando il tempo</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                      <Target className="h-5 w-5 text-amber-600" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-medium text-amber-900 mb-2">Come funziona il Practice SRS?</h4>
+                    <div className="text-sm text-amber-800 space-y-2">
+                      <p>• Le schede vengono presentate quando è il momento ottimale per ripassare</p>
+                      <p>• Valuta la tua qualità di risposta con un click (0-5)</p>
+                      <p>• L'algoritmo calcola automaticamente quando ripresentare la scheda</p>
+                      <p>• Le schede difficili vengono ripetite più spesso, quelle facili meno spesso</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        {activeTab === 'plans' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>

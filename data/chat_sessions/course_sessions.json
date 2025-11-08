@@ -1,0 +1,20 @@
+{
+  "6099f371-470b-44c8-a95e-befe70d23f7e": {
+    "id": "6099f371-470b-44c8-a95e-befe70d23f7e",
+    "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+    "created_at": "2025-11-08T08:51:45.072482+00:00",
+    "last_activity": "2025-11-08T08:51:45.072485+00:00",
+    "messages": [],
+    "context": {
+      "topic_history": {
+        "discussed_topics": [],
+        "topic_frequency": {},
+        "last_discussed": {}
+      },
+      "concept_map": {
+        "concepts": {},
+        "relationships": {},
+        "misunderstandings": {}
+      },
+      "study_progress": {
+        "covered_materials": 

@@ -6,7 +6,7 @@ services:
     image: tutor-ai-backend:ready
     container_name: tutor-ai-backend
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./data:/app/data
       - ./backend/.env:/app/.env
@@ -22,15 +22,16 @@ services:
               capabilities: [gpu]
     environment:
       - PYTHONPATH=/app
-      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+      - DATA_DIR=/app/data
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - REDIS_URL=redis://redis:6379
     restart: unless-stopped
     depends_on:
       redis:
         condition: service_healthy
-    entrypoint: ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    entrypoint: ["/opt/venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -43,9 +44,9 @@ services:
     image: tutor-ai-frontend:latest
     container_name: tutor-ai-frontend
     ports:
-      - "5000:3000"
+      - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     restart: unless-stopped
@@ -105,6 +106,6 @@ x-dev-volumes: &dev-volumes
 # Development override
 x-dev-frontend: &dev-frontend
   environment:
-    - NEXT_PUBLIC_API_URL=http://localhost:8000
+    - NEXT_PUBLIC_API_URL=http://localhost:8001
     - NODE_ENV=development
   volumes: *dev-volumes

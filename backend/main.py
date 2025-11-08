@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from dataclasses import asdict
 import re
 import unicodedata
 import os
@@ -24,6 +25,115 @@ from services.background_task_service import background_task_service
 from services.annotation_service import AnnotationService
 from services.ocr_service import ocr_service
 from services.advanced_search_service import advanced_search_service, SearchType, SortOrder, SearchFilter, SearchQuery
+from services.course_chat_session import course_chat_session_manager
+from services.course_rag_service import init_course_rag_service
+from services.spaced_repetition_service import spaced_repetition_service
+from services.active_recall_service import active_recall_engine
+from services.dual_coding_service import dual_coding_service
+from services.interleaved_practice_service import interleaved_practice_service
+from services.metacognition_service import metacognition_service
+from services.elaboration_network_service import elaboration_network_service
+from services.knowledge_area_service import KnowledgeAreaService
+from models.spaced_repetition import (
+    LearningCardCreate, LearningCardResponse, CardReviewRequest, CardReviewResponse,
+    StudySessionRequest, StudySessionResponse, LearningAnalytics,
+    StudyRecommendations, AutoGenerateCardsRequest, AutoGenerateCardsResponse
+)
+from models.active_recall import (
+    QuestionGenerationRequest, QuestionGenerationResponse, AdaptiveQuestionRequest,
+    AdaptiveQuestionResponse, QuestionSubmission, QuestionSubmissionResponse,
+    QuizSessionStart, QuizSessionStartResponse, QuizSessionResponse,
+    ActiveRecallAnalytics, ActiveRecallAnalyticsResponse, ConceptExtraction,
+    ConceptExtractionResponse, PerformanceMetrics, LearningRecommendations
+)
+from models.dual_coding import (
+    DualCodingRequest, DualCodingResponse, DualCodingAnalytics, DualCodingAnalyticsResponse,
+    ContentEnhancementRequest, EnhancedContentResponse, LearningPathRequest,
+    LearningPathResponse, AssessmentRequest, AssessmentResponse,
+    FeedbackSubmissionRequest, FeedbackResponse, PersonalizationUpdate,
+    PersonalizationResponse
+)
+from models.interleaved_practice import (
+    InterleavedScheduleRequest, InterleavedScheduleResponse, ScheduleOptimizationRequest,
+    ScheduleOptimizationResponse, InterleavedAnalytics, InterleavedAnalyticsResponse,
+    SessionFeedback, PatternFeedback, LearningProgress, ProgressUpdate,
+    UserPreferences, AdaptiveAdjustment, PerformanceMetrics
+)
+from models.metacognition import (
+    MetacognitiveSessionCreate, MetacognitiveSessionResponse, ReflectionActivityRequest,
+    ReflectionActivityResponse, SelfRegulationRequest, SelfRegulationResponse,
+    MetacognitiveAnalytics, MetacognitiveAnalyticsResponse, LearningStrategyRequest,
+    LearningStrategyResponse, MetacognitiveFeedbackRequest, MetacognitiveFeedbackResponse
+)
+from models.elaboration_network import (
+    ElaborationNetworkRequest, ElaborationNetworkResponse, NetworkOptimizationRequest,
+    NetworkOptimizationResponse, ConnectionEnhancementRequest, ConnectionEnhancementResponse,
+    PathwayCreationRequest, PathwayCreationResponse, ElaborationAnalytics,
+    ElaborationAnalyticsResponse, NetworkVisualizationData, ComparativeRequest,
+    ComparativeResponse, UserNetworkProfile, NetworkPersonalization
+)
+
+# Knowledge Area Service models
+from pydantic import BaseModel
+from typing import List, Optional
+
+class KnowledgeAreaExtractionRequest(BaseModel):
+    course_id: str
+    book_id: Optional[str] = None
+    force_regenerate: bool = False
+
+class KnowledgeArea(BaseModel):
+    id: str
+    name: str
+    description: str
+    keywords: List[str]
+    difficulty_level: float
+    prerequisite_areas: List[str]
+    related_areas: List[str]
+    material_sources: List[str]
+    coverage_score: float
+    mastery_level: float
+    last_assessed: Optional[str]
+    assessment_count: int
+    quiz_questions_available: int
+    concepts: List[str]
+
+class KnowledgeAreaResponse(BaseModel):
+    success: bool
+    areas: List[KnowledgeArea]
+    message: Optional[str] = None
+
+class QuizRecommendation(BaseModel):
+    area_id: str
+    area_name: str
+    quiz_type: str
+    difficulty: float
+    num_questions: int
+    rationale: str
+    time_estimate_minutes: int
+
+class QuizRecommendationsResponse(BaseModel):
+    success: bool
+    recommendations: List[QuizRecommendation]
+    total_areas: int
+    covered_areas: int
+
+class ProgressUpdateRequest(BaseModel):
+    user_id: str
+    course_id: str
+    area_id: str
+    correct: bool
+    confidence: float
+    response_time: float
+
+class ProgressSummaryResponse(BaseModel):
+    course_id: str
+    total_areas: int
+    mastered_areas: int
+    in_progress_areas: int
+    not_started_areas: int
+    overall_mastery: float
+    areas_detail: List[Dict[str, Any]]
 from app.api.slides import router as slides_router
 from app.api.mindmap_expand import router as mindmap_expand_router
 from app.api.mindmaps import router as mindmaps_router
@@ -232,7 +342,7 @@ async def security_middleware(request: Request, call_next):
         if request.url.path.startswith("/admin") or request.method in ["DELETE", "PUT"]:
             SecurityLogger.log_file_access(
                 f"{request.method} {request.url.path}",
-                context="security_middleware"
+                action="security_middleware"
             )
 
         response = await call_next(request)
@@ -290,6 +400,12 @@ study_tracker = StudyTracker()
 study_planner = StudyPlannerService()
 annotation_service = AnnotationService()
 
+# Initialize enhanced course chat services
+course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+# Initialize Knowledge Area Service
+knowledge_area_service = KnowledgeAreaService(rag_service, llm_service, active_recall_engine)
+
 # Data models
 class CourseCreate(BaseModel):
     name: str
@@ -301,6 +417,11 @@ class CourseUpdate(BaseModel):
     description: Optional[str] = None
     subject: Optional[str] = None
 
+class ChapterCreate(BaseModel):
+    title: str
+    summary: Optional[str] = ""
+    estimated_minutes: Optional[int] = None
+
 class BookCreate(BaseModel):
     title: str
     author: Optional[str] = ""
@@ -308,7 +429,7 @@ class BookCreate(BaseModel):
     description: Optional[str] = ""
     year: Optional[str] = ""
     publisher: Optional[str] = ""
-    chapters: Optional[List[str]] = []
+    chapters: Optional[List[ChapterCreate]] = []
     tags: Optional[List[str]] = []
 
 class BookUpdate(BaseModel):
@@ -318,7 +439,7 @@ class BookUpdate(BaseModel):
     description: Optional[str] = None
     year: Optional[str] = None
     publisher: Optional[str] = None
-    chapters: Optional[List[str]] = None
+    chapters: Optional[List[ChapterCreate]] = None
     tags: Optional[List[str]] = None
 
 class ChatMessage(BaseModel):
@@ -328,6 +449,18 @@ class ChatMessage(BaseModel):
     session_id: Optional[str] = None
     use_hybrid_search: Optional[bool] = False  # Enable hybrid search
     search_k: Optional[int] = 5  # Number of documents to retrieve
+
+class EnhancedChatMessage(BaseModel):
+    """Enhanced chat message for course-specific chatbot"""
+    message: str
+    course_id: str
+    session_id: Optional[str] = None  # Will auto-generate if not provided
+    book_id: Optional[str] = None
+    use_enhanced_rag: Optional[bool] = True  # Use enhanced RAG with personalization
+    search_k: Optional[int] = 7  # Increased for better context
+    response_length: Optional[str] = "medium"  # short, medium, long
+    include_examples: Optional[bool] = True
+    difficulty_preference: Optional[str] = "adaptive"  # adaptive, beginner, intermediate, advanced
 
 class QuizRequest(BaseModel):
     course_id: str
@@ -1632,7 +1765,7 @@ async def upload_material(course_id: str, file: UploadFile = File(...), request:
         # Log successful file upload
         SecurityLogger.log_file_access(
             validated_file_path,
-            context="file_upload"
+            action="file_upload"
         )
 
         # Process and index the PDF with error handling
@@ -1766,6 +1899,7 @@ async def upload_book_material(course_id: str, book_id: str, file: UploadFile = 
 
 @app.post("/chat")
 async def chat(chat_message: ChatMessage):
+    """Original chat endpoint - maintained for compatibility"""
     try:
         # Choose search method based on user preference with caching
         if chat_message.use_hybrid_search:
@@ -1819,6 +1953,347 @@ async def chat(chat_message: ChatMessage):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/course-chat")
+async def course_chat(chat_request: EnhancedChatMessage):
+    """
+    Enhanced course-specific chatbot with session management and personalization
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        # Get or create session
+        session = course_chat_session_manager.get_or_create_session(
+            course_id=chat_request.course_id,
+            session_id=chat_request.session_id
+        )
+
+        # Update session context with user preferences
+        if chat_request.difficulty_preference and chat_request.difficulty_preference != "adaptive":
+            course_chat_session_manager.update_session_context(
+                session.id,
+                course_chat_session_manager.session_manager.SessionContextType.DIFFICULTY_LEVEL,
+                {"current_level": chat_request.difficulty_preference}
+            )
+
+        # Retrieve enhanced context with personalization
+        if chat_request.use_enhanced_rag:
+            context = await course_rag_service.retrieve_context_enhanced(
+                course_id=chat_request.course_id,
+                session_id=session.id,
+                query=chat_request.message,
+                book_id=chat_request.book_id,
+                retrieval_k=chat_request.search_k
+            )
+        else:
+            # Fallback to basic RAG
+            context = await rag_service.retrieve_context(
+                query=chat_request.message,
+                course_id=chat_request.course_id,
+                book_id=chat_request.book_id,
+                k=chat_request.search_k
+            )
+
+        # Prepare enhanced prompt with session context
+        enhanced_prompt = await self._prepare_enhanced_prompt(
+            chat_request,
+            session,
+            context
+        )
+
+        # Generate response
+        response = await llm_service.generate_response(
+            enhanced_prompt["message"],
+            enhanced_prompt["context"],
+            chat_request.course_id
+        )
+
+        # Calculate response metrics
+        response_time_ms = int((time.time() - start_time) * 1000)
+        confidence_score = self._calculate_confidence_score(response, context)
+
+        # Extract topics from query and response
+        topic_tags = await self._extract_topic_tags(chat_request.message, response)
+
+        # Add message to session
+        message_record = course_chat_session_manager.add_message(
+            session_id=session.id,
+            role="user",
+            content=chat_request.message,
+            context_used=list(enhanced_prompt.get("context_types_used", [])),
+            response_time_ms=response_time_ms,
+            topic_tags=topic_tags
+        )
+
+        # Add assistant response to session
+        assistant_message_record = course_chat_session_manager.add_message(
+            session_id=session.id,
+            role="assistant",
+            content=response,
+            sources=context.get("sources", []),
+            context_used=list(enhanced_prompt.get("context_types_used", [])),
+            confidence_score=confidence_score,
+            response_time_ms=0,  # Generation time already counted
+            topic_tags=topic_tags,
+            parent_message_id=message_record.id
+        )
+
+        # Update study tracker
+        study_tracker.track_interaction(
+            chat_request.course_id,
+            session.id,
+            chat_request.message,
+            response
+        )
+
+        return {
+            "response": response,
+            "session_id": session.id,
+            "message_id": message_record.id,
+            "sources": context.get("sources", [])[:3],  # Limit sources for response
+            "context_info": {
+                "personalization_applied": context.get("personalization_applied", False),
+                "session_context_used": context.get("session_context_used", False),
+                "context_layers": context.get("context_layers", {}),
+                "topics_discussed": topic_tags
+            },
+            "chat_metadata": {
+                "response_time_ms": response_time_ms,
+                "confidence_score": confidence_score,
+                "enhanced_rag_used": chat_request.use_enhanced_rag,
+                "session_message_count": len(session.messages),
+                "personalization_factors": self._get_session_personalization_factors(session.id)
+            },
+            "learning_insights": {
+                "suggested_follow_up_questions": await self._generate_follow_up_questions(
+                    chat_request.course_id, session.id, chat_request.message
+                ),
+                "concepts_covered": self._get_recent_concepts(session.id),
+                "mastery_indicators": await self._get_mastery_indicators(chat_request.course_id, session.id)
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Helper methods for enhanced chat endpoint
+async def _prepare_enhanced_prompt(chat_request: EnhancedChatMessage, session, context):
+    """Prepare enhanced prompt with session context"""
+    from services.course_chat_session import SessionContextType
+
+    # Get session contexts
+    topic_history = course_chat_session_manager.get_session_context(
+        session.id, SessionContextType.TOPIC_HISTORY
+    )
+    learning_style = course_chat_session_manager.get_session_context(
+        session.id, SessionContextType.LEARNING_STYLE
+    )
+    study_progress = course_chat_session_manager.get_session_context(
+        session.id, SessionContextType.STUDY_PROGRESS
+    )
+
+    # Build context types used
+    context_types_used = []
+    prompt_parts = [chat_request.message]
+
+    # Add learning style context
+    if learning_style:
+        context_types_used.append("learning_style")
+        preferred_format = learning_style.get("preferred_format", "explanations")
+        prompt_parts.append(
+            f"Adatta le tue risposte al formato {preferred_format}. "
+            f"Interazione preferita: {learning_style.get('interaction_style', 'conversational')}."
+        )
+
+    # Add difficulty context
+    difficulty_level = course_chat_session_manager.get_session_context(
+        session.id, SessionContextType.DIFFICULTY_LEVEL
+    )
+    if difficulty_level:
+        context_types_used.append("difficulty_level")
+        current_level = difficulty_level.get("current_level", "intermediate")
+        if chat_request.difficulty_preference != "adaptive":
+            current_level = chat_request.difficulty_preference
+        prompt_parts.append(f"Rispondi a livello {current_level}.")
+        prompt_parts.append(f"La difficoltà attuale indicata è: {current_level}.")
+
+    # Add study progress context
+    if study_progress:
+        context_types_used.append("study_progress")
+        mastery_levels = study_progress.get("mastery_levels", {})
+        if mastery_levels:
+            recent_mastery = list(mastery_levels.items())[-3:]  # Last 3 items
+            mastery_text = ", ".join([f"{k}: {v}" for k, v in recent_mastery])
+            if mastery_text:
+                prompt_parts.append(f"Risultati recenti di apprendimento: {mastery_text}.")
+
+    # Add response length preference
+    if chat_request.response_length:
+        length_guidelines = {
+            "short": "Fornisci risposte concise e dirette (2-3 frasi).",
+            "medium": "Fornisci spiegazioni dettagliate ma ben strutturate (4-6 frasi).",
+            "long": "Fornisci spiegazioni molto dettagliate con esempi approfonditi (7+ frasi)."
+        }
+        prompt_parts.append(length_guidelines.get(chat_request.response_length, ""))
+
+    # Add examples preference
+    if chat_request.include_examples:
+        prompt_parts.append("Includi esempi pratici quando possibile per chiarire i concetti.")
+
+    # Combine context sources if using enhanced RAG
+    if context.get("personalization_applied") or context.get("session_context_used"):
+        context_parts = []
+        for layer_name, layer_info in context.get("context_layers", {}).items():
+            if layer_info["sources"]:
+                context_parts.append(f"Contesto {layer_name}: {layer_info['description']}")
+
+    return {
+        "message": " ".join(prompt_parts),
+        "context": context.get("context", ""),
+        "context_types_used": context_types_used
+    }
+
+def _calculate_confidence_score(response: str, context: Dict[str, Any]) -> float:
+    """Calculate confidence score based on response quality and context"""
+    # Base confidence on source availability
+    base_score = 0.7
+    if context.get("sources"):
+        source_count = len(context["sources"])
+        base_score = min(0.9, 0.6 + (source_count * 0.1))
+
+    # Adjust based on personalization
+    if context.get("personalization_applied"):
+        base_score += 0.1
+
+    # Adjust based on session context usage
+    if context.get("session_context_used"):
+        base_score += 0.1
+
+    # Basic quality checks
+    if len(response) > 500:  # Substantial response
+        base_score += 0.05
+
+    return min(1.0, base_score)
+
+async def _extract_topic_tags(query: str, response: str) -> List[str]:
+    """Extract topic tags from query and response"""
+    import re
+
+    # Combine query and response for better extraction
+    combined_text = f"{query} {response}".lower()
+
+    # Define topic patterns for academic/educational content
+    topic_patterns = [
+        r'\b(calcolo|matematica|algebra|geometria|statistica|probabilità)\b',
+        r'\b(fisica|chimica|biologia|scienze|laboratorio)\b',
+        r'\b(storia|filosofia|letteratura|grammatica|lingua)\b',
+        r'\b(geografia|economia|diritto|politica|sociologia)\b',
+        r'\b(informatica|programmazione|algoritmo|database|rete)\b',
+        r'\b(psicologia|pedagogia|didattica|apprendimento)\b',
+        r'\b(concetto|principio|teoria|definizione|esempio)\b',
+        r'\b(esercizio|problema|soluzione|metodo|procedura)\b',
+        r'\b(spiegazione|descrizione|introduzione|riassunto)\b'
+    ]
+
+    topics = set()
+    for pattern in topic_patterns:
+        matches = re.findall(pattern, combined_text)
+        topics.update(matches)
+
+    return list(topics)[:5]  # Limit to 5 topics
+
+def _get_session_personalization_factors(session_id: str) -> List[str]:
+    """Get list of personalization factors active in session"""
+    factors = []
+
+    # Check if session has learning style preferences
+    learning_style = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.LEARNING_STYLE
+    )
+    if learning_style:
+        factors.append("learning_style_personalization")
+
+    # Check if session has difficulty preferences
+    difficulty = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.DIFFICULTY_LEVEL
+    )
+    if difficulty and difficulty.get("current_level") != "intermediate":
+        factors.append("difficulty_adaptation")
+
+    # Check if session has concept mapping
+    concept_map = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.CONCEPT_MAP
+    )
+    if concept_map and concept_map.get("concepts"):
+        factors.append("concept_relationship_tracking")
+
+    return factors
+
+async def _generate_follow_up_questions(course_id: str, session_id: str, current_query: str) -> List[str]:
+    """Generate intelligent follow-up questions based on context"""
+    # Get session context
+    topic_history = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.TOPIC_HISTORY
+    )
+
+    # Extract key concepts from current query
+    key_concepts = re.findall(r'\b\w{3,}\b', current_query.lower())
+
+    follow_ups = []
+
+    # Generate generic follow-ups
+    generic_follow_ups = [
+        "Vorresti un esempio pratico di questo concetto?",
+        "Come questo si relaziona con altri argomenti del corso?",
+        "Ci sono applicazioni pratiche che potremmo esplorare?",
+        "Posso chiarire meglio qualche aspetto della spiegazione?",
+        "Potremmo approfondire questo argomento con esercizi?"
+    ]
+
+    # Personalize based on recent topics
+    if topic_history:
+        recent_topics = list(topic_history.get("topic_frequency", {}).keys())[:3]
+        if recent_topics:
+            follow_ups.append(f"Come si collega questo con gli argomenti che abbiamo discusso: {', '.join(recent_topics[:2])}?")
+
+    # Add specific follow-ups based on key concepts
+    if key_concepts:
+        follow_ups.append(f"Potresti spiegarmi meglio il concetto di {key_concepts[0]}?")
+
+    # Limit and return
+    return list(set(follow_ups + generic_follow_ups))[:3]
+
+def _get_recent_concepts(session_id: str) -> List[str]:
+    """Get recently discussed concepts from session"""
+    concept_map = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.CONCEPT_MAP
+    )
+
+    if concept_map:
+        return list(concept_map.get("concepts", {}).keys())[:5]
+    return []
+
+async def _get_mastery_indicators(course_id: str, session_id: str) -> Dict[str, Any]:
+    """Get mastery indicators for the session"""
+    study_progress = course_chat_session_manager.get_session_context(
+        session_id, course_chat_session_manager.SessionContextType.STUDY_PROGRESS
+    )
+
+    if not study_progress:
+        return {"status": "no_data"}
+
+    mastery_levels = study_progress.get("mastery_levels", {})
+    study_streak = study_progress.get("study_streak", 0)
+    last_study = study_progress.get("last_study_session")
+
+    return {
+        "concepts_mastered": len([k for k, v in mastery_levels.items() if v in ["advanced", "mastery"]]),
+        "total_concepts": len(mastery_levels),
+        "study_streak": study_streak,
+        "last_study_session": last_study,
+        "overall_progress": "active" if study_streak > 0 else "inactive"
+    }
+
 @app.post("/quiz")
 async def generate_quiz(quiz_request: QuizRequest):
     try:
@@ -1829,6 +2304,97 @@ async def generate_quiz(quiz_request: QuizRequest):
             quiz_request.num_questions
         )
         return {"quiz": quiz}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/course-chat/{course_id}/sessions")
+async def get_course_sessions(course_id: str):
+    """Get all chat sessions for a course"""
+    try:
+        analytics = course_chat_session_manager.get_course_analytics(course_id)
+        return {
+            "course_id": course_id,
+            "analytics": analytics,
+            "total_sessions": analytics.get("total_sessions", 0)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/course-chat/session/{session_id}")
+async def get_session_details(session_id: str):
+    """Get detailed information about a specific session"""
+    try:
+        session = course_chat_session_manager.load_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        return {
+            "session_id": session.id,
+            "course_id": session.course_id,
+            "created_at": session.created_at.isoformat(),
+            "last_activity": session.last_activity.isoformat(),
+            "message_count": len(session.messages),
+            "statistics": session.statistics,
+            "context": session.context
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/course-chat/session/{session_id}/context")
+async def update_session_context(
+    session_id: str,
+    context_type: str,
+    context_data: Dict[str, Any]
+):
+    """Update specific context type for a session"""
+    try:
+        from services.course_chat_session import SessionContextType
+
+        # Validate context type
+        try:
+            context_type_enum = SessionContextType(context_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid context type: {context_type}. "
+                f"Valid types: {[t.value for t in SessionContextType]}"
+            )
+
+        course_chat_session_manager.update_session_context(
+            session_id, context_type_enum, context_data
+        )
+
+        return {"message": "Session context updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/course-chat/session/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a chat session"""
+    try:
+        success = course_chat_session_manager.delete_session(session_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        return {"message": "Session deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/course-chat/cleanup")
+async def cleanup_expired_sessions():
+    """Clean up expired chat sessions"""
+    try:
+        deleted_count = course_chat_session_manager.cleanup_expired_sessions()
+        return {
+            "message": "Cleanup completed",
+            "deleted_sessions": deleted_count
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2078,6 +2644,22 @@ async def test_local_connection():
     """Test connection with local LLM provider"""
     try:
         return await llm_service.test_local_connection()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/models/openrouter/test")
+async def test_openrouter_connection():
+    """Test connection with OpenRouter API"""
+    try:
+        return await llm_service.test_openrouter_connection()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/models/zai/test")
+async def test_zai_connection():
+    """Test connection with ZAI API"""
+    try:
+        return await llm_service.test_zai_connection()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2681,6 +3263,76 @@ async def cancel_task(task_id: str):
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+@app.get("/ai/provider")
+async def get_ai_provider_info():
+    """Get current AI provider information"""
+    try:
+        from services.llm_service import LLMService
+        llm_service = LLMService()
+
+        provider_info = {
+            "provider": llm_service.model_type,
+            "model": llm_service.model,
+            "provider_name": "",
+            "model_name": "",
+            "description": "",
+            "capabilities": []
+        }
+
+        # Add provider-specific details
+        if llm_service.model_type == "openai":
+            provider_info.update({
+                "provider_name": "OpenAI",
+                "model_name": llm_service.model,
+                "description": "GPT models by OpenAI",
+                "capabilities": ["chat", "reasoning", "coding", "analysis"],
+                "badge_color": "green"
+            })
+        elif llm_service.model_type == "zai":
+            provider_info.update({
+                "provider_name": "Z.AI",
+                "model_name": llm_service.model,
+                "description": "Advanced AI models with thinking capabilities",
+                "capabilities": ["chat", "reasoning", "coding", "thinking", "study_plans"],
+                "badge_color": "blue"
+            })
+        elif llm_service.model_type == "openrouter":
+            provider_info.update({
+                "provider_name": "OpenRouter",
+                "model_name": llm_service.model,
+                "description": "Multi-model API gateway",
+                "capabilities": ["chat", "reasoning", "multiple_models"],
+                "badge_color": "purple"
+            })
+        elif llm_service.model_type in ["ollama", "lmstudio"]:
+            provider_info.update({
+                "provider_name": "Local",
+                "model_name": llm_service.model,
+                "description": "Local AI models",
+                "capabilities": ["chat", "reasoning", "offline"],
+                "badge_color": "orange"
+            })
+        else:
+            provider_info.update({
+                "provider_name": "Unknown",
+                "model_name": llm_service.model,
+                "description": "AI provider",
+                "capabilities": ["chat"],
+                "badge_color": "gray"
+            })
+
+        return provider_info
+    except Exception as e:
+        return {
+            "provider": "unknown",
+            "model": "unknown",
+            "provider_name": "Unknown",
+            "model_name": "Unknown",
+            "description": "AI provider information unavailable",
+            "capabilities": [],
+            "badge_color": "gray"
+        }
+
 @app.get("/api/courses/{course_id}/presentations")
 async def get_presentations(course_id: str):
     """Mock endpoint for compatibility with frontend"""
@@ -3128,6 +3780,1621 @@ async def get_search_stats():
         }
     except Exception as e:
         logger.error(f"Error getting search stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== SPACED REPETITION SYSTEM ====================
+
+@app.post("/api/spaced-repetition/card", response_model=LearningCardResponse)
+async def create_learning_card(card_request: LearningCardCreate):
+    """Create a new learning card"""
+    try:
+        card_id = spaced_repetition_service.create_card(
+            course_id=card_request.course_id,
+            question=card_request.question,
+            answer=card_request.answer,
+            card_type=card_request.card_type,
+            concept_id=card_request.concept_id,
+            context_tags=card_request.context_tags,
+            source_material=card_request.source_material
+        )
+
+        # Retrieve the created card
+        from services.spaced_repetition_service import SpacedRepetitionService
+        temp_service = SpacedRepetitionService()
+        cards = temp_service.get_due_cards(card_request.course_id, limit=1)
+
+        for card in cards:
+            if card.id == card_id:
+                return LearningCardResponse(
+                    id=card.id,
+                    course_id=card.course_id,
+                    concept_id=card.concept_id,
+                    question=card.question,
+                    answer=card.answer,
+                    card_type=card.card_type,
+                    difficulty=card.difficulty,
+                    ease_factor=card.ease_factor,
+                    interval_days=card.interval_days,
+                    repetitions=card.repetitions,
+                    next_review=card.next_review,
+                    created_at=card.created_at,
+                    last_reviewed=card.last_reviewed,
+                    review_count=card.review_count,
+                    total_quality=card.total_quality,
+                    context_tags=card.context_tags,
+                    source_material=card.source_material
+                )
+
+        raise HTTPException(status_code=404, detail="Card not found after creation")
+    except Exception as e:
+        logger.error(f"Error creating learning card: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/spaced-repetition/cards/due/{course_id}", response_model=List[LearningCardResponse])
+async def get_due_cards(course_id: str, limit: int = 20, card_types: str = None):
+    """Get cards due for review"""
+    try:
+        card_types_list = card_types.split(',') if card_types else None
+        cards = spaced_repetition_service.get_due_cards(
+            course_id=course_id,
+            limit=limit,
+            card_types=card_types_list
+        )
+
+        return [
+            LearningCardResponse(
+                id=card.id,
+                course_id=card.course_id,
+                concept_id=card.concept_id,
+                question=card.question,
+                answer=card.answer,
+                card_type=card.card_type,
+                difficulty=card.difficulty,
+                ease_factor=card.ease_factor,
+                interval_days=card.interval_days,
+                repetitions=card.repetitions,
+                next_review=card.next_review,
+                created_at=card.created_at,
+                last_reviewed=card.last_reviewed,
+                review_count=card.review_count,
+                total_quality=card.total_quality,
+                context_tags=card.context_tags,
+                source_material=card.source_material
+            )
+            for card in cards
+        ]
+    except Exception as e:
+        logger.error(f"Error getting due cards: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spaced-repetition/review", response_model=CardReviewResponse)
+async def review_card(review_request: CardReviewRequest):
+    """Process card review and update scheduling"""
+    try:
+        result = spaced_repetition_service.review_card(
+            card_id=review_request.card_id,
+            quality_rating=review_request.quality_rating,
+            response_time_ms=review_request.response_time_ms,
+            session_id=review_request.session_id
+        )
+
+        return CardReviewResponse(
+            card_id=result["card_id"],
+            next_review=datetime.fromisoformat(result["next_review"]),
+            interval_days=result["interval_days"],
+            ease_factor=result["ease_factor"],
+            repetitions=result["repetitions"],
+            quality_rating=result["quality_rating"],
+            review_session_id=result["review_session_id"]
+        )
+    except Exception as e:
+        logger.error(f"Error reviewing card: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/spaced-repetition/analytics/{course_id}", response_model=LearningAnalytics)
+async def get_learning_analytics(course_id: str, days: int = 30):
+    """Get comprehensive learning analytics for a course"""
+    try:
+        analytics = spaced_repetition_service.get_learning_analytics(
+            course_id=course_id,
+            days=days
+        )
+
+        return LearningAnalytics(
+            period_days=analytics["period_days"],
+            card_statistics=analytics["card_statistics"],
+            review_statistics=analytics["review_statistics"],
+            learning_curve=analytics["learning_curve"]
+        )
+    except Exception as e:
+        logger.error(f"Error getting learning analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/spaced-repetition/recommendations/{course_id}", response_model=StudyRecommendations)
+async def get_study_recommendations(course_id: str):
+    """Get personalized study recommendations"""
+    try:
+        recommendations = spaced_repetition_service.get_study_recommendations(course_id)
+
+        return StudyRecommendations(
+            recommendations=recommendations["recommendations"],
+            optimal_session_size=recommendations["optimal_session_size"],
+            next_session_focus=recommendations["next_session_focus"]
+        )
+    except Exception as e:
+        logger.error(f"Error getting study recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spaced-repetition/auto-generate", response_model=AutoGenerateCardsResponse)
+async def auto_generate_cards(generate_request: AutoGenerateCardsRequest):
+    """Auto-generate learning cards from content"""
+    try:
+        card_ids = spaced_repetition_service.generate_cards_from_content(
+            course_id=generate_request.course_id,
+            content=generate_request.content,
+            source_material=generate_request.source_material
+        )
+
+        return AutoGenerateCardsResponse(
+            cards_generated=len(card_ids),
+            card_ids=card_ids,
+            generation_summary=f"Generated {len(card_ids)} learning cards from provided content"
+        )
+    except Exception as e:
+        logger.error(f"Error auto-generating cards: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spaced-repetition/session", response_model=StudySessionResponse)
+async def create_study_session(session_request: StudySessionRequest):
+    """Create a new study session with due cards"""
+    try:
+        import uuid
+        session_id = str(uuid.uuid4())
+
+        cards = spaced_repetition_service.get_due_cards(
+            course_id=session_request.course_id,
+            limit=session_request.limit,
+            card_types=session_request.card_types
+        )
+
+        card_responses = [
+            LearningCardResponse(
+                id=card.id,
+                course_id=card.course_id,
+                concept_id=card.concept_id,
+                question=card.question,
+                answer=card.answer,
+                card_type=card.card_type,
+                difficulty=card.difficulty,
+                ease_factor=card.ease_factor,
+                interval_days=card.interval_days,
+                repetitions=card.repetitions,
+                next_review=card.next_review,
+                created_at=card.created_at,
+                last_reviewed=card.last_reviewed,
+                review_count=card.review_count,
+                total_quality=card.total_quality,
+                context_tags=card.context_tags,
+                source_material=card.source_material
+            )
+            for card in cards
+        ]
+
+        return StudySessionResponse(
+            session_id=session_id,
+            course_id=session_request.course_id,
+            cards=card_responses,
+            total_cards=len(card_responses),
+            session_type=session_request.session_type,
+            started_at=datetime.now()
+        )
+    except Exception as e:
+        logger.error(f"Error creating study session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spaced-repetition/generate-from-chat")
+async def generate_cards_from_chat(
+    course_id: str,
+    session_id: str,
+    max_cards: int = 5
+):
+    """Generate learning cards from chat conversation"""
+    try:
+        # Initialize course RAG service
+        rag_service = RAGService()
+        llm_service = LLMService()
+        course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+        card_ids = await course_rag_service.auto_generate_cards_from_conversation(
+            course_id=course_id,
+            session_id=session_id,
+            max_cards=max_cards
+        )
+
+        return {
+            "cards_generated": len(card_ids),
+            "card_ids": card_ids,
+            "message": f"Generated {len(card_ids)} learning cards from conversation"
+        }
+    except Exception as e:
+        logger.error(f"Error generating cards from chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spaced-repetition/generate-from-sources")
+async def generate_cards_from_sources(
+    course_id: str,
+    sources: List[Dict[str, Any]],
+    max_cards: int = 10
+):
+    """Generate learning cards from RAG sources"""
+    try:
+        # Initialize course RAG service
+        rag_service = RAGService()
+        llm_service = LLMService()
+        course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+        card_ids = await course_rag_service.generate_cards_from_sources(
+            course_id=course_id,
+            sources=sources,
+            max_cards=max_cards
+        )
+
+        return {
+            "cards_generated": len(card_ids),
+            "card_ids": card_ids,
+            "message": f"Generated {len(card_ids)} learning cards from sources"
+        }
+    except Exception as e:
+        logger.error(f"Error generating cards from sources: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== ACTIVE RECALL ENDPOINTS ====================
+
+@app.post("/api/active-recall/generate-questions", response_model=QuestionGenerationResponse)
+async def generate_questions(request: QuestionGenerationRequest):
+    """Generate questions from provided content"""
+    try:
+        response = await active_recall_engine.generate_questions(request)
+        return response
+    except Exception as e:
+        logger.error(f"Error generating questions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/adaptive-questions", response_model=AdaptiveQuestionResponse)
+async def get_adaptive_questions(request: AdaptiveQuestionRequest):
+    """Get adaptive questions based on user performance"""
+    try:
+        response = await active_recall_engine.get_adaptive_questions(request)
+        return response
+    except Exception as e:
+        logger.error(f"Error getting adaptive questions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/submit-answer", response_model=QuestionSubmissionResponse)
+async def submit_answer(submission: QuestionSubmission):
+    """Submit and evaluate a question answer"""
+    try:
+        response = await active_recall_engine.evaluate_answer(submission)
+        return response
+    except Exception as e:
+        logger.error(f"Error submitting answer: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/session/start", response_model=QuizSessionStartResponse)
+async def start_quiz_session(session_start: QuizSessionStart):
+    """Start a new quiz session"""
+    try:
+        response = await active_recall_engine.start_session(
+            session_id=session_start.session_id,
+            time_limit_minutes=session_start.time_limit_minutes
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error starting quiz session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/session/complete", response_model=QuizSessionResponse)
+async def complete_quiz_session(session_id: str):
+    """Complete a quiz session and get results"""
+    try:
+        response = await active_recall_engine.complete_session(session_id)
+        return response
+    except Exception as e:
+        logger.error(f"Error completing quiz session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/active-recall/session/{session_id}/next-question")
+async def get_next_question(session_id: str):
+    """Get the next question in a quiz session"""
+    try:
+        question = await active_recall_engine.get_next_question(session_id)
+        if question:
+            return {"success": True, "question": question}
+        else:
+            return {"success": False, "message": "No more questions in session"}
+    except Exception as e:
+        logger.error(f"Error getting next question: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/extract-concepts", response_model=ConceptExtractionResponse)
+async def extract_concepts(request: ConceptExtraction):
+    """Extract key concepts from content"""
+    try:
+        response = await active_recall_engine.extract_concepts(request)
+        return response
+    except Exception as e:
+        logger.error(f"Error extracting concepts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/analytics", response_model=ActiveRecallAnalyticsResponse)
+async def get_active_recall_analytics(analytics: ActiveRecallAnalytics):
+    """Get Active Recall analytics and performance metrics"""
+    try:
+        response = await active_recall_engine.get_analytics(
+            user_id=analytics.user_id,
+            course_id=analytics.course_id,
+            period_days=analytics.period_days
+        )
+        return response
+    except Exception as e:
+        logger.error(f"Error getting Active Recall analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/active-recall/recommendations/{user_id}/{course_id}")
+async def get_learning_recommendations(user_id: str, course_id: str):
+    """Get personalized learning recommendations"""
+    try:
+        recommendations = await active_recall_engine.get_learning_recommendations(
+            user_id=user_id,
+            course_id=course_id
+        )
+        return {"success": True, "recommendations": recommendations}
+    except Exception as e:
+        logger.error(f"Error getting learning recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/active-recall/session/{session_id}")
+async def cancel_quiz_session(session_id: str):
+    """Cancel a quiz session"""
+    try:
+        await active_recall_engine.cancel_session(session_id)
+        return {"success": True, "message": "Session cancelled"}
+    except Exception as e:
+        logger.error(f"Error cancelling session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/active-recall/question-types")
+async def get_supported_question_types():
+    """Get list of supported question types"""
+    try:
+        question_types = await active_recall_engine.get_supported_question_types()
+        return {"success": True, "question_types": question_types}
+    except Exception as e:
+        logger.error(f"Error getting question types: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== ACTIVE RECALL INTEGRATION ENDPOINTS ====================
+
+@app.post("/api/active-recall/generate-from-chat")
+async def generate_questions_from_chat(
+    course_id: str,
+    session_id: str,
+    max_questions: int = 5
+):
+    """Generate Active Recall questions from chat conversation"""
+    try:
+        # Initialize course RAG service
+        rag_service = RAGService()
+        llm_service = LLMService()
+        course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+        question_ids = await course_rag_service.auto_generate_questions_from_conversation(
+            course_id=course_id,
+            session_id=session_id,
+            max_questions=max_questions
+        )
+
+        return {
+            "questions_generated": len(question_ids),
+            "question_ids": question_ids,
+            "message": f"Generated {len(question_ids)} Active Recall questions from conversation"
+        }
+    except Exception as e:
+        logger.error(f"Error generating questions from chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/contextual-questions")
+async def generate_contextual_questions(
+    course_id: str,
+    session_id: str,
+    topic: str,
+    difficulty: str = "medium",
+    question_count: int = 3
+):
+    """Generate contextual Active Recall questions based on topic"""
+    try:
+        # Initialize course RAG service
+        rag_service = RAGService()
+        llm_service = LLMService()
+        course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+        question_ids = await course_rag_service.generate_contextual_questions(
+            course_id=course_id,
+            session_id=session_id,
+            topic=topic,
+            difficulty=difficulty,
+            question_count=question_count
+        )
+
+        return {
+            "questions_generated": len(question_ids),
+            "question_ids": question_ids,
+            "topic": topic,
+            "difficulty": difficulty,
+            "message": f"Generated {len(question_ids)} contextual questions for topic: {topic}"
+        }
+    except Exception as e:
+        logger.error(f"Error generating contextual questions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/active-recall/adaptive-practice")
+async def get_adaptive_practice_session(
+    course_id: str,
+    session_id: str,
+    user_id: str,
+    question_count: int = 5,
+    focus_weak_areas: bool = True
+):
+    """Get adaptive practice questions based on user performance"""
+    try:
+        # Initialize course RAG service
+        rag_service = RAGService()
+        llm_service = LLMService()
+        course_rag_service = init_course_rag_service(rag_service, llm_service)
+
+        question_ids = await course_rag_service.get_adaptive_practice_session(
+            course_id=course_id,
+            session_id=session_id,
+            user_id=user_id,
+            question_count=question_count,
+            focus_weak_areas=focus_weak_areas
+        )
+
+        return {
+            "questions_provided": len(question_ids),
+            "question_ids": question_ids,
+            "focus_weak_areas": focus_weak_areas,
+            "message": f"Generated adaptive practice session with {len(question_ids)} questions"
+        }
+    except Exception as e:
+        logger.error(f"Error getting adaptive practice session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== DUAL CODING ENDPOINTS ====================
+
+@app.post("/api/dual-coding/create", response_model=DualCodingResponse)
+async def create_dual_coding_content(request: DualCodingRequest):
+    """Create integrated visual-verbal learning content"""
+    try:
+        # Initialize the dual coding service with proper services
+        rag_service = RAGService()
+        llm_service = LLMService()
+        dual_coding_engine = dual_coding_service.__class__(llm_service, rag_service)
+
+        response = await dual_coding_engine.create_dual_coding_content(
+            content=request.content,
+            content_type=request.content_type.value,
+            target_audience=request.target_audience,
+            learning_style=request.learning_style.value
+        )
+
+        if response["success"]:
+            # Add additional metadata from request
+            response["metadata"].update({
+                "course_id": request.course_id,
+                "session_id": request.session_id,
+                "focus_concepts": request.focus_concepts,
+                "max_visual_elements": request.max_visual_elements
+            })
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error creating dual coding content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/dual-coding/enhance", response_model=EnhancedContentResponse)
+async def enhance_content(request: ContentEnhancementRequest):
+    """Enhance existing content with dual coding elements"""
+    try:
+        # Initialize services
+        rag_service = RAGService()
+        llm_service = LLMService()
+        dual_coding_engine = dual_coding_service.__class__(llm_service, rag_service)
+
+        # Create basic dual coding content first
+        base_response = await dual_coding_engine.create_dual_coding_content(
+            content=request.content,
+            content_type="text",
+            target_audience="intermediate",
+            learning_style="balanced"
+        )
+
+        if not base_response["success"]:
+            return EnhancedContentResponse(
+                success=False,
+                enhanced_content="",
+                message="Failed to create base dual coding content"
+            )
+
+        # Apply enhancements based on request
+        enhanced_content = request.content
+        added_visuals = []
+        added_explanations = []
+        added_interactions = []
+
+        if request.enhancement_type in ["visual_elements", "all"]:
+            added_visuals = base_response.get("visual_elements", [])[:3]
+
+        if request.enhancement_type in ["verbal_explanations", "all"]:
+            verbal = base_response.get("verbal_content", {})
+            added_explanations = [
+                verbal.get("introduction", ""),
+                verbal.get("summary", "")
+            ]
+
+        if request.enhancement_type in ["interactions", "all"]:
+            added_interactions = base_response.get("interactions", [])[:2]
+
+        # Calculate improvement metrics
+        improvement_metrics = {
+            "visual_elements_added": len(added_visuals),
+            "explanations_added": len(added_explanations),
+            "interactions_added": len(added_interactions),
+            "estimated_retention_improvement": min(len(added_visuals) * 0.15, 0.5)
+        }
+
+        return EnhancedContentResponse(
+            success=True,
+            enhanced_content=enhanced_content,
+            added_visual_elements=added_visuals,
+            added_explanations=added_explanations,
+            added_interactions=added_interactions,
+            improvement_metrics=improvement_metrics
+        )
+
+    except Exception as e:
+        logger.error(f"Error enhancing content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dual-coding/visual-types")
+async def get_supported_visual_types():
+    """Get list of supported visual element types"""
+    try:
+        visual_types = {
+            "mind_map": {
+                "name": "Mind Map",
+                "description": "Radial visualization of concepts and relationships",
+                "complexity": "medium",
+                "cognitive_impact": 0.95
+            },
+            "flowchart": {
+                "name": "Flowchart",
+                "description": "Process flow visualization with steps and decisions",
+                "complexity": "low",
+                "cognitive_impact": 0.85
+            },
+            "table": {
+                "name": "Comparison Table",
+                "description": "Structured comparison of concepts",
+                "complexity": "low",
+                "cognitive_impact": 0.75
+            },
+            "timeline": {
+                "name": "Timeline",
+                "description": "Chronological visualization of events",
+                "complexity": "low",
+                "cognitive_impact": 0.8
+            },
+            "hierarchy": {
+                "name": "Hierarchy Diagram",
+                "description": "Tree structure showing parent-child relationships",
+                "complexity": "medium",
+                "cognitive_impact": 0.85
+            },
+            "comparison": {
+                "name": "Comparison Diagram",
+                "description": "Side-by-side comparison of concepts",
+                "complexity": "low",
+                "cognitive_impact": 0.8
+            },
+            "diagram": {
+                "name": "General Diagram",
+                "description": "Flexible visual representation",
+                "complexity": "medium",
+                "cognitive_impact": 0.9
+            },
+            "process_diagram": {
+                "name": "Process Diagram",
+                "description": "Detailed process visualization with inputs/outputs",
+                "complexity": "high",
+                "cognitive_impact": 0.9
+            },
+            "infographic": {
+                "name": "Infographic",
+                "description": "Information-rich visual summary",
+                "complexity": "medium",
+                "cognitive_impact": 0.85
+            },
+            "concept_map": {
+                "name": "Concept Map",
+                "description": "Network of interconnected concepts",
+                "complexity": "high",
+                "cognitive_impact": 0.95
+            }
+        }
+
+        return {"success": True, "visual_types": visual_types}
+
+    except Exception as e:
+        logger.error(f"Error getting visual types: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== INTERLEAVED PRACTICE ENDPOINTS ====================
+
+@app.post("/api/interleaved-practice/create-schedule", response_model=InterleavedScheduleResponse)
+async def create_interleaved_schedule(request: InterleavedScheduleRequest):
+    """Create an optimized interleaved practice schedule"""
+    try:
+        response = await interleaved_practice_service.create_interleaved_schedule(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            concepts=[concept.dict() for concept in request.concepts],
+            session_duration_minutes=request.session_duration_minutes,
+            learning_objectives=request.learning_objectives,
+            difficulty_preference=request.difficulty_preference.value
+        )
+
+        if response["success"]:
+            # Add additional request metadata
+            response["metadata"].update({
+                "max_concepts_per_session": request.max_concepts_per_session,
+                "interleaving_intensity": request.interleaving_intensity,
+                "focus_areas": request.focus_areas,
+                "avoid_concepts": request.avoid_concepts,
+                "previous_performance": request.previous_performance
+            })
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error creating interleaved schedule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/interleaved-practice/patterns")
+async def get_supported_patterns():
+    """Get list of supported interleaving patterns"""
+    try:
+        patterns = {
+            "ABAB": {
+                "name": "Simple Alternating",
+                "description": "Alternates between 2 concepts (A-B-A-B)",
+                "best_for": ["beginners", "similar concepts", "quick learning"],
+                "complexity": "low",
+                "recommended_concepts": 2
+            },
+            "ABCABC": {
+                "name": "Three-Way Interleaving",
+                "description": "Rotates through 3 concepts (A-B-C-A-B-C)",
+                "best_for": ["intermediate learners", "related topics", "balanced practice"],
+                "complexity": "medium",
+                "recommended_concepts": 3
+            },
+            "ABCDABCD": {
+                "name": "Four-Way Interleaving",
+                "description": "Rotates through 4 concepts (A-B-C-D-A-B-C-D)",
+                "best_for": ["advanced learners", "diverse topics", "comprehensive practice"],
+                "complexity": "high",
+                "recommended_concepts": 4
+            },
+            "mixed": {
+                "name": "Mixed Pattern",
+                "description": "Complex variations with random elements",
+                "best_for": ["experienced learners", "maximum challenge", "problem solving"],
+                "complexity": "very_high",
+                "recommended_concepts": "3+"
+            },
+            "adaptive": {
+                "name": "Adaptive Pattern",
+                "description": "Dynamically adjusts based on performance",
+                "best_for": ["personalized learning", "mixed abilities", "optimal efficiency"],
+                "complexity": "variable",
+                "recommended_concepts": "2-6"
+            }
+        }
+
+        return {"success": True, "patterns": patterns}
+
+    except Exception as e:
+        logger.error(f"Error getting patterns: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interleaved-practice/optimize-schedule", response_model=ScheduleOptimizationResponse)
+async def optimize_schedule(request: ScheduleOptimizationRequest):
+    """Optimize an existing schedule based on feedback and performance"""
+    try:
+        # This would typically fetch and optimize the existing schedule
+        # For now, return a simulated optimization response
+
+        optimizations = [
+            "Increased interleaving intensity based on positive feedback",
+            "Reduced cognitive load by adding more transition breaks",
+            "Adjusted concept spacing for better retention"
+        ]
+
+        performance_impact = {
+            "expected_improvement": 0.15,
+            "discrimination_boost": 0.12,
+            "transfer_enhancement": 0.18,
+            "retention_improvement": 0.10
+        }
+
+        next_recommendations = [
+            "Focus on contrasting activities for similar concepts",
+            "Increase reflection frequency during transitions",
+            "Monitor cognitive load indicators"
+        ]
+
+        # Simulate optimized schedule (in real implementation, this would be actual optimization)
+        optimized_schedule = {
+            "success": True,
+            "schedule_id": request.schedule_id + "_optimized",
+            "user_id": "optimized_user",
+            "course_id": "optimized_course",
+            "concept_analysis": {"optimized": True},
+            "interleaving_strategy": {"optimized": True},
+            "practice_sequence": [],
+            "effectiveness_metrics": {"optimized": True},
+            "metadata": {"optimization_applied": True}
+        }
+
+        return ScheduleOptimizationResponse(
+            success=True,
+            optimized_schedule=optimized_schedule,
+            improvements_made=optimizations,
+            performance_impact=performance_impact,
+            next_recommendations=next_recommendations
+        )
+
+    except Exception as e:
+        logger.error(f"Error optimizing schedule: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interleaved-practice/session-feedback")
+async def submit_session_feedback(feedback: SessionFeedback):
+    """Submit feedback for an interleaved practice session"""
+    try:
+        import uuid
+
+        feedback_id = str(uuid.uuid4())
+
+        # Validate feedback ratings
+        ratings = {
+            "pattern_effectiveness": feedback.pattern_effectiveness,
+            "cognitive_load": feedback.cognitive_load_rating,
+            "concept_clarity": feedback.concept_clarity,
+            "engagement": feedback.engagement_level,
+            "transfer_confidence": feedback.transfer_confidence
+        }
+
+        for rating_name, rating_value in ratings.items():
+            if not (1 <= rating_value <= 5):
+                raise HTTPException(status_code=400, detail=f"Invalid rating for {rating_name}: {rating_value}")
+
+        # Here you would typically save to database
+        # For now, just acknowledge receipt
+
+        return {
+            "success": True,
+            "feedback_id": feedback_id,
+            "message": "Session feedback submitted successfully. Thank you for your input!",
+            "pattern_insights": {
+                "effectiveness": "high" if feedback.pattern_effectiveness >= 4 else "moderate",
+                "engagement": "high" if feedback.engagement_level >= 4 else "moderate",
+                "recommendations": ["Continue with similar patterns"] if feedback.pattern_effectiveness >= 4 else ["Consider pattern adjustments"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error submitting session feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interleaved-practice/analytics", response_model=InterleavedAnalyticsResponse)
+async def get_interleaved_analytics(analytics: InterleavedAnalytics):
+    """Get analytics on interleaved practice effectiveness"""
+    try:
+        response = await interleaved_practice_service.get_interleaving_analytics(
+            user_id=analytics.user_id,
+            course_id=analytics.course_id,
+            period_days=analytics.period_days
+        )
+
+        if response["success"]:
+            return InterleavedAnalyticsResponse(**response)
+        else:
+            raise HTTPException(status_code=500, detail=response.get("error", "Analytics retrieval failed"))
+
+    except Exception as e:
+        logger.error(f"Error getting interleaved analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/interleaved-practice/schedule/{schedule_id}")
+async def get_schedule_details(schedule_id: str):
+    """Retrieve details of a specific interleaved practice schedule"""
+    try:
+        # This would typically query the database for the schedule
+        # For now, return a mock response
+
+        return {
+            "success": True,
+            "schedule_id": schedule_id,
+            "schedule_details": {
+                "created_at": datetime.now().isoformat(),
+                "status": "active",
+                "total_segments": 8,
+                "estimated_duration": 60,
+                "concepts_count": 3,
+                "pattern": "ABCABC"
+            },
+            "exists": True
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving schedule details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interleaved-practice/user-preferences")
+async def update_user_preferences(preferences: UserPreferences):
+    """Update user preferences for interleaved practice"""
+    try:
+        import uuid
+
+        preference_id = str(uuid.uuid4())
+
+        # Validate preference values
+        if not (0.1 <= preferences.interleaving_intensity_preference <= 1.0):
+            raise HTTPException(status_code=400, detail="Interleaving intensity must be between 0.1 and 1.0")
+
+        if not (15 <= preferences.session_duration_preference <= 180):
+            raise HTTPException(status_code=400, detail="Session duration must be between 15 and 180 minutes")
+
+        # Here you would typically save to database
+        # For now, just acknowledge receipt
+
+        return {
+            "success": True,
+            "preference_id": preference_id,
+            "message": "User preferences updated successfully",
+            "preferences_applied": {
+                "patterns": preferences.preferred_patterns,
+                "intensity": preferences.interleaving_intensity_preference,
+                "duration": preferences.session_duration_preference,
+                "adaptation_sensitivity": preferences.adaptation_sensitivity
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating user preferences: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/interleaved-practice/user-preferences/{user_id}")
+async def get_user_preferences(user_id: str):
+    """Get user preferences for interleaved practice"""
+    try:
+        # This would typically query the database for user preferences
+        # For now, return default preferences
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "preferences": {
+                "preferred_patterns": ["ABAB", "ABCABC"],
+                "interleaving_intensity_preference": 0.7,
+                "transition_preference": "quick_review",
+                "reflection_preference": "guided",
+                "difficulty_preference": "adaptive",
+                "session_duration_preference": 60,
+                "adaptation_sensitivity": 0.5,
+                "max_concepts_per_session": 4,
+                "min_spacing_minutes": 3
+            },
+            "last_updated": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting user preferences: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interleaved-practice/progress-update")
+async def update_learning_progress(progress: ProgressUpdate):
+    """Update learning progress for interleaved practice"""
+    try:
+        import uuid
+
+        progress_id = str(uuid.uuid4())
+
+        # Validate progress values
+        if not (-1.0 <= progress.mastery_change <= 1.0):
+            raise HTTPException(status_code=400, detail="Mastery change must be between -1.0 and 1.0")
+
+        # Here you would typically save to database and update analytics
+        # For now, just acknowledge receipt
+
+        progress_summary = {
+            "mastery_change": progress.mastery_change,
+            "discrimination_change": progress.discrimination_change,
+            "transfer_change": progress.transfer_change,
+            "overall_trend": "improving" if progress.mastery_change > 0 else "stable" if progress.mastery_change == 0 else "declining"
+        }
+
+        return {
+            "success": True,
+            "progress_id": progress_id,
+            "message": "Learning progress updated successfully",
+            "progress_summary": progress_summary,
+            "next_recommendations": [
+                "Continue with current interleaving pattern",
+                "Focus on areas with negative changes",
+                "Schedule reinforcement practice for improved concepts"
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating learning progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =================== METACOGNITION ENDPOINTS ===================
+
+@app.post("/api/metacognition/session", response_model=MetacognitiveSessionResponse)
+async def create_metacognitive_session(request: MetacognitiveSessionCreate):
+    """Create a comprehensive metacognitive session"""
+    try:
+        session = await metacognition_service.create_metacognitive_session(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            learning_context=request.learning_context,
+            session_type=request.session_type
+        )
+        return session
+    except Exception as e:
+        logger.error(f"Error creating metacognitive session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/metacognition/reflection-activity", response_model=ReflectionActivityResponse)
+async def create_reflection_activity(request: ReflectionActivityRequest):
+    """Create a reflection activity for metacognitive development"""
+    try:
+        activity = await metacognition_service.create_reflection_activity(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            activity_type=request.activity_type,
+            reflection_context=request.reflection_context
+        )
+        return activity
+    except Exception as e:
+        logger.error(f"Error creating reflection activity: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/metacognition/self-regulation", response_model=SelfRegulationResponse)
+async def create_self_regulation_activity(request: SelfRegulationRequest):
+    """Create a self-regulation activity"""
+    try:
+        activity = await metacognition_service.create_self_regulation_activity(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            regulation_phase=request.regulation_phase,
+            context=request.context
+        )
+        return activity
+    except Exception as e:
+        logger.error(f"Error creating self-regulation activity: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/metacognition/analytics", response_model=MetacognitiveAnalyticsResponse)
+async def get_metacognitive_analytics(request: MetacognitiveAnalytics):
+    """Get metacognitive analytics for a user"""
+    try:
+        analytics = await metacognition_service.get_metacognitive_analytics(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            period_days=request.period_days
+        )
+        return analytics
+    except Exception as e:
+        logger.error(f"Error getting metacognitive analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/metacognition/learning-strategy", response_model=LearningStrategyResponse)
+async def recommend_learning_strategy(request: LearningStrategyRequest):
+    """Get personalized learning strategy recommendations"""
+    try:
+        strategy = await metacognition_service.recommend_learning_strategy(
+            user_id=request.user_id,
+            learning_context=request.learning_context,
+            performance_data=request.performance_data
+        )
+        return strategy
+    except Exception as e:
+        logger.error(f"Error recommending learning strategy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/metacognition/feedback", response_model=MetacognitiveFeedbackResponse)
+async def process_metacognitive_feedback(request: MetacognitiveFeedbackRequest):
+    """Process metacognitive feedback and generate insights"""
+    try:
+        feedback = await metacognition_service.process_metacognitive_feedback(
+            user_id=request.user_id,
+            feedback_type=request.feedback_type,
+            feedback_data=request.feedback_data
+        )
+        return feedback
+    except Exception as e:
+        logger.error(f"Error processing metacognitive feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =================== ELABORATION NETWORK ENDPOINTS ===================
+
+@app.post("/api/elaboration-network/build", response_model=ElaborationNetworkResponse)
+async def build_elaboration_network(request: ElaborationNetworkRequest):
+    """Build a comprehensive elaboration network integrating all CLE phases"""
+    try:
+        network = await elaboration_network_service.build_elaboration_network(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            knowledge_base=request.knowledge_base,
+            learning_objectives=request.learning_objectives,
+            integration_level=request.integration_level,
+            transfer_goals=request.transfer_goals,
+            focus_concepts=request.focus_concepts
+        )
+        return network
+    except Exception as e:
+        logger.error(f"Error building elaboration network: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/optimize", response_model=NetworkOptimizationResponse)
+async def optimize_network(request: NetworkOptimizationRequest):
+    """Optimize an existing elaboration network"""
+    try:
+        optimized = await elaboration_network_service.optimize_network(
+            network_id=request.network_id,
+            optimization_goals=request.optimization_goals,
+            user_feedback=request.user_feedback,
+            performance_data=request.performance_data
+        )
+        return optimized
+    except Exception as e:
+        logger.error(f"Error optimizing network: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/enhance-connections", response_model=ConnectionEnhancementResponse)
+async def enhance_connections(request: ConnectionEnhancementRequest):
+    """Enhance specific connections in the elaboration network"""
+    try:
+        enhanced = await elaboration_network_service.enhance_connections(
+            network_id=request.network_id,
+            connection_ids=request.connection_ids,
+            enhancement_type=request.enhancement_type,
+            enhancement_reason=request.enhancement_reason,
+            target_outcomes=request.target_outcomes
+        )
+        return enhanced
+    except Exception as e:
+        logger.error(f"Error enhancing connections: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/create-pathways", response_model=PathwayCreationResponse)
+async def create_transfer_pathways(request: PathwayCreationRequest):
+    """Create transfer pathways between concepts"""
+    try:
+        pathways = await elaboration_network_service.create_transfer_pathways(
+            network_id=request.network_id,
+            source_concepts=request.source_concepts,
+            target_domains=request.target_domains,
+            pathway_type=request.pathway_type,
+            constraints=request.constraints,
+            preferences=request.preferences
+        )
+        return pathways
+    except Exception as e:
+        logger.error(f"Error creating transfer pathways: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/analytics", response_model=ElaborationAnalyticsResponse)
+async def get_elaboration_analytics(request: ElaborationAnalytics):
+    """Get comprehensive elaboration network analytics"""
+    try:
+        analytics = await elaboration_network_service.get_elaboration_analytics(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            period_days=request.period_days,
+            analysis_type=request.analysis_type
+        )
+        return analytics
+    except Exception as e:
+        logger.error(f"Error getting elaboration analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/visualize", response_model=NetworkVisualizationData)
+async def visualize_network(request: dict):
+    """Generate visualization data for the elaboration network"""
+    try:
+        network_id = request.get("network_id")
+        visualization_config = request.get("config", {})
+
+        visualization = await elaboration_network_service.generate_network_visualization(
+            network_id=network_id,
+            config=visualization_config
+        )
+        return visualization
+    except Exception as e:
+        logger.error(f"Error generating network visualization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/comparative-analysis", response_model=ComparativeResponse)
+async def comparative_analysis(request: ComparativeRequest):
+    """Perform comparative analysis of network development"""
+    try:
+        analysis = await elaboration_network_service.perform_comparative_analysis(
+            user_id=request.user_id,
+            comparison_type=request.comparison_type,
+            time_periods=request.time_periods,
+            baseline_period=request.baseline_period,
+            metrics_to_compare=request.metrics_to_compare,
+            include_visualizations=request.include_visualizations
+        )
+        return analysis
+    except Exception as e:
+        logger.error(f"Error performing comparative analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/user-profile", response_model=UserNetworkProfile)
+async def update_user_profile(request: UserNetworkProfile):
+    """Update user network profile and preferences"""
+    try:
+        profile = await elaboration_network_service.update_user_profile(
+            user_id=request.user_id,
+            profile_data=request.dict()
+        )
+        return profile
+    except Exception as e:
+        logger.error(f"Error updating user profile: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elaboration-network/personalize", response_model=NetworkPersonalization)
+async def personalize_network(request: NetworkPersonalization):
+    """Create personalized network adaptations"""
+    try:
+        personalization = await elaboration_network_service.create_network_personalization(
+            user_id=request.user_id,
+            network_id=request.network_id,
+            customization_preferences=request.customization_preferences,
+            learning_objectives=request.learning_objectives,
+            challenge_areas=request.challenge_areas,
+            strength_areas=request.strength_areas
+        )
+        return personalization
+    except Exception as e:
+        logger.error(f"Error creating network personalization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elaboration-network/{network_id}/export")
+async def export_network(network_id: str, format: str = "json"):
+    """Export elaboration network in specified format"""
+    try:
+        export_data = await elaboration_network_service.export_network(
+            network_id=network_id,
+            format=format,
+            include_analytics=True,
+            include_activities=True
+        )
+        return export_data
+    except Exception as e:
+        logger.error(f"Error exporting network: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elaboration-network/{network_id}/activities")
+async def get_network_activities(network_id: str, limit: int = 50):
+    """Get elaboration activities for a network"""
+    try:
+        activities = await elaboration_network_service.get_network_activities(
+            network_id=network_id,
+            limit=limit
+        )
+        return {"success": True, "activities": activities, "total_count": len(activities)}
+    except Exception as e:
+        logger.error(f"Error getting network activities: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elaboration-network/{network_id}/pathways")
+async def get_transfer_pathways(network_id: str, domain: Optional[str] = None):
+    """Get transfer pathways for a network"""
+    try:
+        pathways = await elaboration_network_service.get_transfer_pathways(
+            network_id=network_id,
+            domain_filter=domain
+        )
+        return {"success": True, "pathways": pathways, "total_count": len(pathways)}
+    except Exception as e:
+        logger.error(f"Error getting transfer pathways: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elaboration-network/{network_id}/connections")
+async def get_network_connections(network_id: str, connection_type: Optional[str] = None):
+    """Get connections in the elaboration network"""
+    try:
+        connections = await elaboration_network_service.get_network_connections(
+            network_id=network_id,
+            connection_type_filter=connection_type
+        )
+        return {"success": True, "connections": connections, "total_count": len(connections)}
+    except Exception as e:
+        logger.error(f"Error getting network connections: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== KNOWLEDGE AREA SERVICE ENDPOINTS ====================
+
+@app.post("/api/knowledge-areas/extract", response_model=KnowledgeAreaResponse)
+async def extract_knowledge_areas(request: KnowledgeAreaExtractionRequest):
+    """Extract knowledge areas from course materials"""
+    try:
+        # Check if areas already exist and we're not forcing regeneration
+        existing_areas = knowledge_area_service.get_knowledge_areas(request.course_id)
+        if existing_areas and not request.force_regenerate:
+            logger.info(f"Returning existing {len(existing_areas)} knowledge areas for course {request.course_id}")
+            return KnowledgeAreaResponse(
+                success=True,
+                areas=[KnowledgeArea(**asdict(area)) for area in existing_areas],
+                message=f"Found {len(existing_areas)} existing knowledge areas"
+            )
+
+        # Extract new areas
+        logger.info(f"Extracting knowledge areas for course {request.course_id}")
+        areas = await knowledge_area_service.extract_knowledge_areas_from_course(
+            course_id=request.course_id,
+            book_id=request.book_id
+        )
+
+        return KnowledgeAreaResponse(
+            success=True,
+            areas=[KnowledgeArea(**asdict(area)) for area in areas],
+            message=f"Extracted {len(areas)} knowledge areas from materials"
+        )
+
+    except Exception as e:
+        logger.error(f"Error extracting knowledge areas: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge-areas/{course_id}", response_model=KnowledgeAreaResponse)
+async def get_knowledge_areas(course_id: str):
+    """Get all knowledge areas for a course"""
+    try:
+        areas = knowledge_area_service.get_knowledge_areas(course_id)
+
+        # Convert new KnowledgeArea format to old response format
+        converted_areas = []
+        for area in areas:
+            main_concepts_list = area.get_main_concepts()
+
+            # Convert to old format for compatibility
+            area_response = {
+                "id": area.id,
+                "name": area.name,
+                "description": area.description,
+                "keywords": [keyword for concept in main_concepts_list for keyword in concept.keywords],
+                "difficulty_level": area.difficulty_level,
+                "prerequisite_areas": [],
+                "related_areas": [],
+                "material_sources": area.material_sources,
+                "coverage_score": area.coverage_score,
+                "mastery_level": area.mastery_level,
+                "last_assessed": None,
+                "assessment_count": 0,
+                "quiz_questions_available": len(main_concepts_list) * 3,
+                "concepts": [concept.name for concept in main_concepts_list],
+                # Include new hierarchical data
+                "main_concepts": [asdict(concept) for concept in main_concepts_list],
+                "all_concepts": {cid: asdict(concept) for cid, concept in area.all_concepts.items()},
+                "last_updated": area.last_updated.isoformat() if area.last_updated else None
+            }
+            converted_areas.append(area_response)
+
+        return KnowledgeAreaResponse(
+            success=True,
+            areas=converted_areas
+        )
+    except Exception as e:
+        logger.error(f"Error getting knowledge areas: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/knowledge-areas/{course_id}/quiz-recommendations")
+async def get_quiz_recommendations(
+    course_id: str,
+    user_id: str,
+    max_quizzes: int = 5
+):
+    """Get recommended quizzes for a user based on their progress"""
+    try:
+        recommendations = await knowledge_area_service.get_recommended_quizzes(
+            user_id=user_id,
+            course_id=course_id,
+            max_quizzes=max_quizzes
+        )
+
+        total_areas = len(knowledge_area_service.get_knowledge_areas(course_id))
+        covered_areas = len([area for area in recommendations if area.difficulty > 0.3])
+
+        return QuizRecommendationsResponse(
+            success=True,
+            recommendations=[QuizRecommendation(**asdict(rec)) for rec in recommendations],
+            total_areas=total_areas,
+            covered_areas=covered_areas
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting quiz recommendations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/knowledge-areas/progress/update")
+async def update_progress(request: ProgressUpdateRequest):
+    """Update user progress after answering a quiz question"""
+    try:
+        knowledge_area_service.update_progress(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            area_id=request.area_id,
+            correct=request.correct,
+            confidence=request.confidence,
+            response_time=request.response_time
+        )
+
+        return {"success": True, "message": "Progress updated successfully"}
+
+    except Exception as e:
+        logger.error(f"Error updating progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge-areas/{course_id}/progress/{user_id}", response_model=ProgressSummaryResponse)
+async def get_progress_summary(course_id: str, user_id: str):
+    """Get comprehensive progress summary for a user"""
+    try:
+        summary = knowledge_area_service.get_user_progress_summary(user_id, course_id)
+        return ProgressSummaryResponse(**summary)
+
+    except Exception as e:
+        logger.error(f"Error getting progress summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== CHAT INTEGRATION FOR CONTEXTUAL QUIZZES ====================
+
+@app.post("/api/chat/contextual-quiz")
+async def generate_contextual_quiz_in_chat(
+    course_id: str,
+    session_id: str,
+    user_id: str,
+    topic_filter: Optional[str] = None,
+    num_questions: int = 3
+):
+    """Generate contextual quiz based on current chat context"""
+    try:
+        # Get recommended quizzes
+        recommendations = await knowledge_area_service.get_recommended_quizzes(
+            user_id=user_id,
+            course_id=course_id,
+            max_quizzes=num_questions
+        )
+
+        if not recommendations:
+            return {
+                "success": False,
+                "message": "No quiz recommendations available",
+                "quiz_suggestions": []
+            }
+
+        # Format for chat integration
+        quiz_suggestions = []
+        for rec in recommendations:
+            if not topic_filter or rec.area_name.lower().find(topic_filter.lower()) != -1:
+                quiz_suggestions.append({
+                    "area_name": rec.area_name,
+                    "quiz_type": rec.quiz_type,
+                    "difficulty": rec.difficulty,
+                    "rationale": rec.rationale,
+                    "time_estimate": rec.time_estimate_minutes,
+                    "action_prompt": f"Vuoi testare la tua conoscenza su {rec.area_name}? {rec.rationale}"
+                })
+
+        return {
+            "success": True,
+            "message": f"Trovate {len(quiz_suggestions)} aree di valutazione",
+            "quiz_suggestions": quiz_suggestions
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating contextual quiz: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/chat/auto-assess-progress")
+async def auto_assess_progress(
+    course_id: str,
+    session_id: str,
+    user_id: str,
+    max_questions: int = 5
+):
+    """Automatically assess user progress across knowledge areas"""
+    try:
+        # Get recommended quizzes
+        recommendations = await knowledge_area_service.get_recommended_quizzes(
+            user_id=user_id,
+            course_id=course_id,
+            max_quizzes=max_questions
+        )
+
+        # Get progress summary
+        progress_summary = knowledge_area_service.get_user_progress_summary(user_id, course_id)
+
+        # Generate assessment suggestions
+        assessment_suggestions = []
+
+        if "error" not in progress_summary:
+            mastery_score = progress_summary["overall_mastery"]
+
+            if mastery_score < 0.3:
+                assessment_suggestions.append({
+                    "type": "initial_assessment",
+                    "message": "Sembra che sei all'inizio del tuo percorso. Ti consiglio di iniziare con una valutazione delle aree fondamentali.",
+                    "recommended_action": "start_with_fundamentals"
+                })
+            elif mastery_score < 0.7:
+                assessment_suggestions.append({
+                    "type": "targeted_practice",
+                    "message": f"Hai coperto il {mastery_score:.0%} del materiale. Concentriamoci sulle aree dove hai più difficoltà.",
+                    "recommended_action": "focus_weak_areas"
+                })
+            else:
+                assessment_suggestions.append({
+                    "type": "mastery_testing",
+                    "message": f"Ottimo! Hai dominato il {mastery_score:.0%} del materiale. Sfidiam le tue competenze con domande più complesse.",
+                    "recommended_action": "challenge_mastery"
+                })
+
+        return {
+            "success": True,
+            "progress_summary": progress_summary,
+            "available_quizzes": len(recommendations),
+            "assessment_suggestions": assessment_suggestions,
+            "next_recommended_action": assessment_suggestions[0]["recommended_action"] if assessment_suggestions else "continue_learning"
+        }
+
+    except Exception as e:
+        logger.error(f"Error in auto assessment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/knowledge-areas/{course_id}/extract-fast", response_model=KnowledgeAreaResponse)
+async def extract_main_concepts_fast(request: KnowledgeAreaExtractionRequest):
+    """Extract main concepts quickly from course materials"""
+    try:
+        knowledge_area = await knowledge_area_service.extract_main_concepts_fast(
+            course_id=request.course_id,
+            book_id=request.book_id
+        )
+
+        # Convert to response format that matches old KnowledgeArea model
+        main_concepts_list = knowledge_area.get_main_concepts()
+
+        # Create a response compatible with the existing KnowledgeArea model
+        area_response = {
+            "id": knowledge_area.id,
+            "name": knowledge_area.name,
+            "description": knowledge_area.description,
+            "keywords": [keyword for concept in main_concepts_list for keyword in concept.keywords],
+            "difficulty_level": knowledge_area.difficulty_level,
+            "prerequisite_areas": [],
+            "related_areas": [],
+            "material_sources": knowledge_area.material_sources,
+            "coverage_score": knowledge_area.coverage_score,
+            "mastery_level": knowledge_area.mastery_level,
+            "last_assessed": None,
+            "assessment_count": 0,
+            "quiz_questions_available": len(main_concepts_list) * 3,  # 3 questions per concept
+            "concepts": [concept.name for concept in main_concepts_list],
+            # Add new fields for hierarchical structure
+            "main_concepts": [asdict(concept) for concept in main_concepts_list],
+            "all_concepts": {cid: asdict(concept) for cid, concept in knowledge_area.all_concepts.items()},
+            "last_updated": knowledge_area.last_updated.isoformat() if knowledge_area.last_updated else None
+        }
+
+        return KnowledgeAreaResponse(
+            success=True,
+            areas=[area_response],
+            message=f"Extracted {len(knowledge_area.main_concepts)} main concepts quickly"
+        )
+    except Exception as e:
+        logger.error(f"Error in fast concept extraction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/knowledge-areas/create-sub-concept")
+async def create_sub_concept(
+    course_id: str,
+    parent_concept_id: str,
+    user_id: str,
+    context: str,
+    user_interaction: str
+):
+    """Create sub-concept dynamically based on user interaction"""
+    try:
+        sub_concept = await knowledge_area_service.create_sub_concept_dynamically(
+            course_id=course_id,
+            parent_concept_id=parent_concept_id,
+            context=context,
+            user_interaction=user_interaction
+        )
+
+        if sub_concept:
+            return {
+                "success": True,
+                "sub_concept": asdict(sub_concept),
+                "message": f"Created sub-concept: {sub_concept.name}"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Failed to create sub-concept"
+            }
+    except Exception as e:
+        logger.error(f"Error creating sub-concept: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge-areas/{course_id}/visualization/{user_id}")
+async def get_concept_visualization(course_id: str, user_id: str):
+    """Get visualization data for concepts and their relationships"""
+    try:
+        visualization_data = knowledge_area_service.generate_concept_visualization(course_id, user_id)
+        return {
+            "success": True,
+            "visualization": visualization_data
+        }
+    except Exception as e:
+        logger.error(f"Error generating concept visualization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/knowledge-areas/update-concept-progress")
+async def update_concept_progress(
+    user_id: str,
+    course_id: str,
+    concept_id: str,
+    correct: bool,
+    confidence: float,
+    response_time: float = 0.0
+):
+    """Update progress for a specific concept"""
+    try:
+        # Use existing update_progress method
+        knowledge_area_service.update_progress(
+            user_id=user_id,
+            course_id=course_id,
+            area_id=concept_id,
+            correct=correct,
+            confidence=confidence,
+            response_time=response_time
+        )
+
+        return {
+            "success": True,
+            "message": f"Updated progress for concept {concept_id}"
+        }
+    except Exception as e:
+        logger.error(f"Error updating concept progress: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

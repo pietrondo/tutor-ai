@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play } from 'lucide-react'
 import SlideGenerator from '@/components/SlideGenerator'
+import { fetchFromBackend } from '@/lib/api'
 
 interface BookChapter {
   title: string
@@ -130,7 +131,7 @@ export default function BookPage() {
 
   const fetchBook = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}/books/${bookId}`)
+      const response = await fetchFromBackend(`/api/courses/${courseId}/books/${bookId}`)
       if (response.ok) {
         const data = await response.json()
         setBook(normalizeBook(data.book))
@@ -146,7 +147,7 @@ export default function BookPage() {
 
   const fetchCourseInfo = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}`)
+      const response = await fetchFromBackend(`/api/courses/${courseId}`)
       if (response.ok) {
         const data = await response.json()
         setCourseName(data.course.name)
@@ -180,7 +181,7 @@ export default function BookPage() {
         formData.append('file', file)
 
         try {
-          const response = await fetch(`/api/courses/${courseId}/books/${bookId}/upload`, {
+          const response = await fetchFromBackend(`/api/courses/${courseId}/books/${bookId}/upload`, {
             method: 'POST',
             body: formData,
           })

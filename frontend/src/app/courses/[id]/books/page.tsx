@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, BookOpen, Search, Filter } from 'lucide-react'
 import BookCard from '@/components/BookCard'
+import { fetchFromBackend } from '@/lib/api'
 
 interface BookChapter {
   title: string
@@ -120,7 +121,7 @@ export default function BooksPage() {
 
   const fetchBooks = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}/books`)
+      const response = await fetchFromBackend(`/api/courses/${courseId}/books`)
       if (response.ok) {
         const data = await response.json()
         const normalized = Array.isArray(data.books) ? data.books.map(normalizeBook) : []
@@ -137,7 +138,7 @@ export default function BooksPage() {
 
   const fetchCourseInfo = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}`)
+      const response = await fetchFromBackend(`/api/courses/${courseId}`)
       if (response.ok) {
         const data = await response.json()
         setCourseName(data.course.name)
@@ -367,7 +368,7 @@ function CreateBookModal({ courseId, onClose, onBookCreated }: {
         tags: normalizedTags
       }
 
-      const response = await fetch(`/api/courses/${courseId}/books`, {
+      const response = await fetchFromBackend(`/api/courses/${courseId}/books`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

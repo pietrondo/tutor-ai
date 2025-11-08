@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CourseCard } from '@/components/CourseCard'
 import { StatsOverview } from '@/components/StatsOverview'
 import { Button } from '@/components/ui/Button'
+import AIProviderBadge from '@/components/AIProviderBadge'
 
 interface Course {
   id: string
@@ -28,7 +29,7 @@ export default function HomePage() {
 
   const fetchCourses = async () => {
     try {
-      const response = await fetch('http://localhost:8000/courses')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses`)
       const data = await response.json()
       setCourses(data.courses || [])
     } catch (error) {
@@ -64,10 +65,15 @@ export default function HomePage() {
             Tutor AI Universitario
           </h1>
 
-          <p className="text-xl text-white/90 mb-8 max-w-3xl mx-auto">
+          <p className="text-xl text-white/90 mb-4 max-w-3xl mx-auto">
             Studia in modo intelligente con l'AI che impara dai tuoi materiali.
             Carica PDF, genera mappe concettuali e slide personalizzate.
           </p>
+
+          <div className="flex items-center justify-center space-x-3 mb-6">
+            <span className="text-white/80 text-sm">Powered by:</span>
+            <AIProviderBadge showDetails={true} />
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/courses">

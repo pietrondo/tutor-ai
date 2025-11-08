@@ -40,8 +40,8 @@ export function StudyProgress({ courseId }: StudyProgressProps) {
   const fetchProgress = async () => {
     try {
       const [progressResponse, insightsResponse] = await Promise.all([
-        fetch(`http://localhost:8000/study-progress/${courseId}`),
-        fetch(`http://localhost:8000/study-insights/${courseId}`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/study-progress/${courseId}`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/study-insights/${courseId}`)
       ])
 
       const progressData = await progressResponse.json()

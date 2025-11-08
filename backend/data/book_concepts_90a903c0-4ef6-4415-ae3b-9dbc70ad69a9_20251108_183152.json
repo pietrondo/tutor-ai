@@ -1,0 +1,38 @@
+{
+  "generation_timestamp": "2025-11-08T18:31:52.323615",
+  "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+  "total_books": 4,
+  "total_concepts": 8,
+  "successful_books": 4,
+  "failed_books": 0,
+  "results": [
+    {
+      "book_id": "f92fed02-ecc3-48ea-b7af-7570464a2919",
+      "book_title": "La terra Piatta",
+      "status": "success",
+      "concepts_count": 2,
+      "materials_count": 0
+    },
+    {
+      "book_id": "7bd8fdca-80cf-44d6-8761-bd60dc5edada",
+      "book_title": "La natura sottomessa",
+      "status": "success",
+      "concepts_count": 2,
+      "materials_count": 0
+    },
+    {
+      "book_id": "7a8b3b91-46c0-4b47-9e2b-083f79dc9f29",
+      "book_title": "Sebastiano Caboto. El piloto mayor e la sua armada dalla Spagna all'incubo del Paranà",
+      "status": "success",
+      "concepts_count": 2,
+      "materials_count": 0
+    },
+    {
+      "book_id": "e92ed79d-b92b-44d7-9627-172298a6ca0c",
+      "book_title": "Manuale geografia storica",
+      "status": "success",
+      "concepts_count": 2,
+      "materials_count": 0
+    }
+  ]
+}

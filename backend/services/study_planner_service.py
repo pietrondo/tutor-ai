@@ -276,8 +276,15 @@ class StudyPlannerService:
         book_chapters: List[Dict[str, Any]],
         rag_chapters: List[Dict[str, Any]]
     ) -> List[StudySession]:
-        difficulty_level = preferences.get('difficulty_level', 'intermediate')
+        sessions_per_week = max(int(preferences.get('sessions_per_week', 3)), 1)
         base_duration = max(int(preferences.get('session_duration', 45)), 30)
+        difficulty_level = preferences.get('difficulty_level', 'intermediate')
+
+        logger.info(
+            "Generating chapter-based sessions",
+            available_chapters=len(book_chapters),
+            requested_sessions_per_week=sessions_per_week
+        )
 
         concept_items = concept_map.get("concepts", []) if concept_map else []
         assigned_concepts: set = set()
@@ -353,6 +360,24 @@ class StudyPlannerService:
             })
 
         sessions: List[StudySession] = []
+
+        # Calculate if we need to split chapters to meet sessions_per_week requirement
+        total_weeks = 4  # Default 4 weeks for planning
+        desired_total_sessions = sessions_per_week * total_weeks
+
+        logger.info(
+            "Session planning",
+            desired_total_sessions=desired_total_sessions,
+            available_chapters=len(session_specs),
+            sessions_per_week=sessions_per_week
+        )
+
+        # If we have fewer chapters than desired sessions, split some chapters
+        if len(session_specs) < desired_total_sessions:
+            session_specs = self._split_chapters_for_more_sessions(
+                session_specs, desired_total_sessions, base_duration
+            )
+
         for index, spec in enumerate(session_specs):
             session = await self._create_session_from_spec(
                 course_id=course_id,
@@ -363,6 +388,12 @@ class StudyPlannerService:
                 order_index=index
             )
             sessions.append(session)
+
+        logger.info(
+            "Final sessions generated",
+            total_sessions=len(sessions),
+            target_sessions=desired_total_sessions
+        )
 
         return sessions
 
@@ -1462,3 +1493,98 @@ class StudyPlannerService:
             }
             for task in tasks
         ]
+
+    def _split_chapters_for_more_sessions(
+        self,
+        session_specs: List[Dict[str, Any]],
+        desired_total_sessions: int,
+        base_duration: int
+    ) -> List[Dict[str, Any]]:
+        """Split chapters into multiple sessions to meet the desired number of sessions"""
+        if len(session_specs) >= desired_total_sessions:
+            return session_specs
+
+        logger.info(
+            "Splitting chapters for more sessions",
+            current_sessions=len(session_specs),
+            target_sessions=desired_total_sessions
+        )
+
+        new_specs = []
+        sessions_needed = desired_total_sessions - len(session_specs)
+
+        # Sort chapters by estimated complexity (topics + concepts) to split the most complex ones
+        sorted_specs = sorted(
+            session_specs,
+            key=lambda x: len(x.get('topics', [])) + len(x.get('concepts', [])),
+            reverse=True
+        )
+
+        # First, add all existing specs
+        for spec in session_specs:
+            if spec not in sorted_specs[:sessions_needed]:
+                new_specs.append(spec)
+
+        # Split the most complex chapters
+        for spec in sorted_specs[:sessions_needed]:
+            topics = spec.get('topics', [])
+            concepts = spec.get('concepts', [])
+
+            if len(topics) > 1 or len(concepts) > 1:
+                # Split topics and concepts across multiple sessions
+                mid_topic = len(topics) // 2
+                mid_concept = len(concepts) // 2
+
+                # First part
+                spec1 = {
+                    **spec,
+                    'topics': topics[:mid_topic] if mid_topic > 0 else topics[:1],
+                    'concepts': concepts[:mid_concept] if mid_concept > 0 else concepts[:1],
+                    'estimated_minutes': base_duration // 2 if spec.get('estimated_minutes') else None
+                }
+
+                # Second part
+                spec2 = {
+                    **spec,
+                    'topics': topics[mid_topic:] if mid_topic > 0 else topics[1:],
+                    'concepts': concepts[mid_concept:] if mid_concept > 0 else concepts[1:],
+                    'estimated_minutes': base_duration // 2 if spec.get('estimated_minutes') else None,
+                    'chapter_title': f"{spec.get('chapter_title', '')} (parte 2)" if spec.get('chapter_title') else None
+                }
+
+                new_specs.extend([spec1, spec2])
+
+                logger.info(
+                    "Split chapter",
+                    chapter=spec.get('chapter_title'),
+                    part1_topics=len(spec1.get('topics', [])),
+                    part2_topics=len(spec2.get('topics', []))
+                )
+            else:
+                # Can't split this chapter, add as-is
+                new_specs.append(spec)
+
+        # If we still need more sessions, create review sessions
+        if len(new_specs) < desired_total_sessions:
+            additional_needed = desired_total_sessions - len(new_specs)
+            for i in range(additional_needed):
+                review_spec = {
+                    'book_id': None,
+                    'book_title': 'Sessione di Ripasso',
+                    'chapter_title': f'Ripasso e Consolidamento {i + 1}',
+                    'chapter_index': None,
+                    'topics': ['Ripasso dei concetti chiave', 'Verifica dell\'apprendimento'],
+                    'estimated_minutes': base_duration,
+                    'chapter_summary': 'Sessione dedicata al ripasso e consolidamento dei concetti studiati.',
+                    'concepts': []
+                }
+                new_specs.append(review_spec)
+
+        logger.info(
+            "Session splitting completed",
+            original_sessions=len(session_specs),
+            final_sessions=len(new_specs),
+            target_sessions=desired_total_sessions
+        )
+
+        return new_specs[:desired_total_sessions]

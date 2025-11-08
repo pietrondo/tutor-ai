@@ -55,7 +55,7 @@ export default function SettingsPage() {
     notifications: true,
     autoSave: true,
     language: 'it',
-    apiEndpoint: 'http://localhost:8000'
+    apiEndpoint: 'http://localhost:8001'
   })
 
   const [apiKeys, setApiKeys] = useState({
@@ -916,7 +916,7 @@ export default function SettingsPage() {
                   apiEndpoint: e.target.value
                 }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                placeholder="http://localhost:8000"
+                placeholder="http://localhost:8001"
               />
             </div>
           </div>

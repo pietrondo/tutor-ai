@@ -1,0 +1,308 @@
+{
+  "concept_maps": {
+    "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9": {
+      "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+      "generated_at": "2025-11-08T17:07:09.676752",
+      "source_count": 4,
+      "is_fallback": true,
+      "concepts": [
+        {
+          "id": "concetti-geografici-base",
+          "name": "Concetti Geografici Fondamentali",
+          "summary": "Introduzione ai principi base della geografia e dell'analisi territoriale",
+          "chapter": {
+            "title": "Capitolo 1",
+            "index": 1
+          },
+          "related_topics": [
+            "spazio geografico",
+            "territorio",
+            "paesaggio",
+            "ambiente"
+          ],
+          "learning_objectives": [
+            "Comprendere i concetti fondamentali di spazio e territorio",
+            "Analizzare i diversi tipi di paesaggi",
+            "Applicare il concetto di scala geografica"
+          ],
+          "suggested_reading": [
+            "La terra Piatta",
+            "La natura sottomessa"
+          ],
+          "recommended_minutes": 45,
+          "quiz_outline": [
+            "Definire i concetti di spazio geografico e territorio",
+            "Spiegare la differenza tra i vari tipi di paesaggio",
+            "Applicare la scala geografica a esempi concreti"
+          ]
+        },
+        {
+          "id": "metodi-geografici",
+          "name": "Metodi e Strumenti della Geografia",
+          "summary": "Tecniche di analisi geografica e strumenti per lo studio del territorio",
+          "chapter": {
+            "title": "Capitolo 2",
+            "index": 2
+          },
+          "related_topics": [
+            "cartografia",
+            "GIS",
+            "analisi territoriale",
+            "rilevamento"
+          ],
+          "learning_objectives": [
+            "Utilizzare strumenti cartografici base",
+            "Applicare tecniche di analisi territoriale",
+            "Interpretare dati geografici"
+          ],
+          "suggested_reading": [
+            "Sebastiano Caboto. El piloto mayor e la sua armada dalla Spagna all'incubo del Paranà",
+            "Manuale geografia storica"
+          ],
+          "recommended_minutes": 50,
+          "quiz_outline": [
+            "Interpretare una carta geografica",
+            "Applicare metodi di analisi territoriale",
+            "Analizzare dati geografici spaziali"
+          ]
+        }
+      ],
+      "books": {
+        "f92fed02-ecc3-48ea-b7af-7570464a2919": {
+          "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+          "book_id": "f92fed02-ecc3-48ea-b7af-7570464a2919",
+          "book_title": "La terra Piatta",
+          "generated_at": "2025-11-08T18:32:35.694095",
+          "source_count": 1,
+          "extraction_method": "book_specific_analysis",
+          "is_book_specific": true,
+          "concepts": [
+            {
+              "id": "general-foundations-1",
+              "name": "Concetti Fondamentali",
+              "summary": "Principi base e concetti introduttivi del libro La terra Piatta",
+              "chapter": {
+                "title": "Introduzione",
+                "index": 1
+              },
+              "related_topics": [
+                "concetti base",
+                "terminologia",
+                "struttura"
+              ],
+              "learning_objectives": [
+                "Comprendere i concetti fondamentali",
+                "Familiarizzare con la terminologia",
+                "Identificare la struttura del libro"
+              ],
+              "suggested_reading": [
+                "Introduzione e capitoli iniziali"
+              ],
+              "recommended_minutes": 45,
+              "quiz_outline": [
+                "Definire i concetti fondamentali",
+                "Spiegare la terminologia specifica",
+                "Identificare la struttura tematica"
+              ]
+            }
+          ]
+        },
+        "7bd8fdca-80cf-44d6-8761-bd60dc5edada": {
+          "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+          "book_id": "7bd8fdca-80cf-44d6-8761-bd60dc5edada",
+          "book_title": "La natura sottomessa",
+          "generated_at": "2025-11-08T18:32:36.272543",
+          "source_count": 1,
+          "extraction_method": "book_specific_analysis",
+          "is_book_specific": true,
+          "concepts": [
+            {
+              "id": "general-foundations-1",
+              "name": "Concetti Fondamentali",
+              "summary": "Principi base e concetti introduttivi del libro La natura sottomessa",
+              "chapter": {
+                "title": "Introduzione",
+                "index": 1
+              },
+              "related_topics": [
+                "concetti base",
+                "terminologia",
+                "struttura"
+              ],
+              "learning_objectives": [
+                "Comprendere i concetti fondamentali",
+                "Familiarizzare con la terminologia",
+                "Identificare la struttura del libro"
+              ],
+              "suggested_reading": [
+                "Introduzione e capitoli iniziali"
+              ],
+              "recommended_minutes": 45,
+              "quiz_outline": [
+                "Definire i concetti fondamentali",
+                "Spiegare la terminologia specifica",
+                "Identificare la struttura tematica"
+              ]
+            }
+          ]
+        },
+        "7a8b3b91-46c0-4b47-9e2b-083f79dc9f29": {
+          "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+          "book_id": "7a8b3b91-46c0-4b47-9e2b-083f79dc9f29",
+          "book_title": "Sebastiano Caboto. El piloto mayor e la sua armada dalla Spagna all'incubo del Paranà",
+          "generated_at": "2025-11-08T18:32:36.926307",
+          "source_count": 36,
+          "extraction_method": "book_specific_analysis",
+          "is_book_specific": true,
+          "concepts": [
+            {
+              "id": "general-foundations-2",
+              "name": "Concetti Fondamentali",
+              "summary": "Principi base e concetti introduttivi del libro Sebastiano Caboto. El piloto mayor e la sua armada dalla Spagna all'incubo del Paranà",
+              "chapter": {
+                "title": "Introduzione",
+                "index": 2
+              },
+              "related_topics": [
+                "concetti base",
+                "terminologia",
+                "struttura"
+              ],
+              "learning_objectives": [
+                "Comprendere i concetti fondamentali",
+                "Familiarizzare con la terminologia",
+                "Identificare la struttura del libro"
+              ],
+              "suggested_reading": [
+                "Introduzione e capitoli iniziali"
+              ],
+              "recommended_minutes": 45,
+              "quiz_outline": [
+                "Definire i concetti fondamentali",
+                "Spiegare la terminologia specifica",
+                "Identificare la struttura tematica"
+              ]
+            }
+          ]
+        },
+        "e92ed79d-b92b-44d7-9627-172298a6ca0c": {
+          "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+          "book_id": "e92ed79d-b92b-44d7-9627-172298a6ca0c",
+          "book_title": "Manuale geografia storica",
+          "generated_at": "2025-11-08T18:32:37.745005",
+          "source_count": 8,
+          "extraction_method": "book_specific_analysis",
+          "is_book_specific": true,
+          "concepts": [
+            {
+              "id": "geo-foundations-1",
+              "name": "Fondamenti di Geografia",
+              "summary": "Concetti fondamentali di geografia trattati nel libro",
+              "chapter": {
+                "title": "Fondamenti",
+                "index": 1
+              },
+              "related_topics": [
+                "spazio geografico",
+                "territorio",
+                "paesaggio",
+                "scala"
+              ],
+              "learning_objectives": [
+                "Comprendere i concetti di base della geografia",
+                "Analizzare le diverse scale geografiche",
+                "Interpretare i rapporti tra società e ambiente"
+              ],
+              "suggested_reading": [
+                "docsity manuale di geografia de vecchis g e boria e 2022",
+                "docsity manuale di geografia di g de vecchis e e boria riassunto completo",
+                "manuale geo storica nuovo",
+                "boria",
+                "geografia finael",
+                "man gio nuovo"
+              ],
+              "recommended_minutes": 60,
+              "quiz_outline": [
+                "Definire i concetti geografici fondamentali",
+                "Spiegare le scale di analisi",
+                "Analizzare esempi concreti"
+              ]
+            },
+            {
+              "id": "geo-analysis-2",
+              "name": "Metodi di Analisi Geografica",
+              "summary": "Strumenti e metodi per l'analisi territoriale",
+              "chapter": {
+                "title": "Analisi Territoriale",
+                "index": 2
+              },
+              "related_topics": [
+                "cartografia",
+                "mappe",
+                "GIS",
+                "rilevamento"
+              ],
+              "learning_objectives": [
+                "Utilizzare strumenti cartografici",
+                "Interpretare diverse tipologie di carte",
+                "Applicare metodi di analisi spaziale"
+              ],
+              "suggested_reading": [
+                "docsity manuale di geografia de vecchis g e boria e 2022",
+                "docsity manuale di geografia di g de vecchis e e boria riassunto completo",
+                "manuale geo storica nuovo"
+              ],
+              "recommended_minutes": 50,
+              "quiz_outline": [
+                "Interpretare carte geografiche",
+                "Utilizzare coordinate geografiche",
+                "Analizzare dati territoriali"
+              ]
+            },
+            {
+              "id": "methodology-3",
+              "name": "Metodologia di Studio",
+              "summary": "Approcci e metodi per studiare efficacemente il contenuti del libro",
+              "chapter": {
+                "title": "Metodologia",
+                "index": 3
+              },
+              "related_topics": [
+                "tecniche di studio",
+                "organizzazione",
+                "approfondimento"
+              ],
+              "learning_objectives": [
+                "Applicare tecniche di studio efficaci",
+                "Organizzare il tempo di studio",
+                "Utilizzare approfondimenti mirati"
+              ],
+              "suggested_reading": [
+                "docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022",
+                "docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo",
+                "manuale-geo-storica-nuovo"
+              ],
+              "recommended_minutes": 40,
+              "quiz_outline": [
+                "Spiegare le migliori tecniche di studio",
+                "Organizzare un piano di studio efficace",
+                "Utilizzare risorse di approfondimento"
+              ],
+              "source_materials_count": 5,
+              "is_methodological": true
+            }
+          ]
+        },
+        "test-book-id": {
+          "test": "book concept map",
+          "concepts": [
+            {
+              "id": "test",
+              "name": "Test Concept"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

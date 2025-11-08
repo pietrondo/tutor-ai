@@ -443,11 +443,17 @@ class RAGService:
                 # Get all documents for the course
                 results = self.collection.get(
                     where={"course_id": course_id},
-                    limit=1000
+                    limit=5000  # Increased limit to handle more documents
                 )
 
             # Group by source document
             documents_by_source = {}
+
+            # Pre-calculate chunk counts for each source
+            source_chunk_counts = {}
+            for metadata in results.get('metadatas', []):
+                source = metadata.get('source', 'Unknown')
+                source_chunk_counts[source] = source_chunk_counts.get(source, 0) + 1
 
             for i, (doc, metadata) in enumerate(zip(results['documents'], results['metadatas'])):
                 source = metadata.get('source', 'Unknown')
@@ -462,7 +468,8 @@ class RAGService:
                     "index": metadata.get('chunk_index', i),
                     "content": doc[:200] + "..." if len(doc) > 200 else doc
                 })
-                documents_by_source[source]["total_chunks"] = metadata.get('total_chunks', len(documents_by_source[source]["chunks"]))
+                # Use the pre-calculated count
+                documents_by_source[source]["total_chunks"] = source_chunk_counts[source]
 
             return {
                 "documents": list(documents_by_source.values()),

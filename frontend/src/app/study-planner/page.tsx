@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock, BookOpen, Target, CheckCircle, Circle, Plus, Trash2, ChevronRight, BookMarked, MessageSquare } from 'lucide-react'
+import AIProviderBadge from '@/components/AIProviderBadge'
 
 interface StudySession {
   id: string
@@ -150,6 +151,11 @@ export default function StudyPlannerPage() {
 const [missions, setMissions] = useState<StudyMission[]>([])
 const [missionsLoading, setMissionsLoading] = useState(false)
 const [missionsError, setMissionsError] = useState('')
+const [planGenerationProgress, setPlanGenerationProgress] = useState({
+  stage: '',
+  progress: 0,
+  message: ''
+})
 
   const normalizeMissionTask = (taskRaw: unknown, fallbackId: string): MissionTask => {
     const record = taskRaw && typeof taskRaw === 'object' ? taskRaw as Record<string, unknown> : {}
@@ -219,7 +225,7 @@ const [missionsError, setMissionsError] = useState('')
 
   const fetchCourses = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
       const response = await fetch(`${apiUrl}/courses`)
       const data = await response.json()
       setCourses(data.courses || [])
@@ -232,7 +238,7 @@ const [missionsError, setMissionsError] = useState('')
     try {
       setLoading(true)
       const allPlans: StudyPlan[] = []
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
       for (const course of courses) {
         try {
@@ -255,7 +261,7 @@ const [missionsError, setMissionsError] = useState('')
   }
 
   const fetchMissions = async (planId: string, fallback: StudyMission[] = []) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
     if (fallback.length > 0) {
       setMissions(fallback)
     }
@@ -286,7 +292,7 @@ const [missionsError, setMissionsError] = useState('')
 
   const toggleMissionTask = async (missionId: string, taskId: string, completed: boolean) => {
     if (!selectedPlan) return
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
     const updating = new Set(updatingTaskIds)
     updating.add(taskId)
     setUpdatingTaskIds(updating)
@@ -368,7 +374,21 @@ const [missionsError, setMissionsError] = useState('')
 
     try {
       setCreatingPlan(true)
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      console.log('🚀 Inizio creazione piano di studio...')
+      setPlanGenerationProgress({
+        stage: 'initialization',
+        progress: 10,
+        message: 'Inizializzazione creazione piano...'
+      })
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      console.log('📡 Invio richiesta al backend:', apiUrl)
+      setPlanGenerationProgress({
+        stage: 'request',
+        progress: 25,
+        message: 'Invio richiesta al server...'
+      })
+
       const response = await fetch(`${apiUrl}/study-plans`, {
         method: 'POST',
         headers: {
@@ -377,9 +397,32 @@ const [missionsError, setMissionsError] = useState('')
         body: JSON.stringify(newPlan)
       })
 
+      console.log('📡 Risposta ricevuta, stato:', response.status)
+      setPlanGenerationProgress({
+        stage: 'processing',
+        progress: 50,
+        message: 'Elaborazione dati in corso...'
+      })
+
       const data = await response.json()
+      console.log('📊 Dati ricevuti:', data)
+
+      setPlanGenerationProgress({
+        stage: 'finalization',
+        progress: 75,
+        message: 'Finalizzazione piano...'
+      })
+
       if (data.success) {
+        console.log('✅ Piano creato con successo!')
         const createdPlan: StudyPlan = data.plan
+        console.log('📋 Dettagli piano:', {
+          id: createdPlan.id,
+          title: createdPlan.title,
+          sessions: createdPlan.total_sessions,
+          missions: createdPlan.missions?.length || 0
+        })
+
         setPlans(prev => [createdPlan, ...prev])
         setShowCreateForm(false)
         setNewPlan({
@@ -395,11 +438,32 @@ const [missionsError, setMissionsError] = useState('')
         setMissions(normalizeMissions(createdPlan.missions || []))
         setMissionsError('')
         setExpandedSessions(new Set())
+
+        setPlanGenerationProgress({
+          stage: 'completed',
+          progress: 100,
+          message: 'Piano creato con successo!'
+        })
+
+        setTimeout(() => {
+          setPlanGenerationProgress({ stage: '', progress: 0, message: '' })
+        }, 2000)
       } else {
+        console.error('❌ Errore dal backend:', data)
+        setPlanGenerationProgress({
+          stage: 'error',
+          progress: 0,
+          message: 'Errore nella creazione del piano'
+        })
         alert('Errore nella creazione del piano di studio')
       }
     } catch (error) {
-      console.error('Error creating plan:', error)
+      console.error('💥 Errore durante la creazione del piano:', error)
+      setPlanGenerationProgress({
+        stage: 'error',
+        progress: 0,
+        message: 'Errore di connessione al server'
+      })
       alert('Errore nella creazione del piano di studio')
     } finally {
       setCreatingPlan(false)
@@ -408,7 +472,7 @@ const [missionsError, setMissionsError] = useState('')
 
   const updateSessionProgress = async (planId: string, sessionId: string, completed: boolean) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
       const response = await fetch(`${apiUrl}/study-plans/${planId}/sessions/${sessionId}`, {
         method: 'PUT',
         headers: {
@@ -439,7 +503,7 @@ const [missionsError, setMissionsError] = useState('')
     if (!confirm('Sei sicuro di voler eliminare questo piano di studio?')) return
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
       const response = await fetch(`${apiUrl}/study-plans/${planId}`, {
         method: 'DELETE'
       })
@@ -564,7 +628,7 @@ const [missionsError, setMissionsError] = useState('')
     const session = selectedPlan.sessions.find(s => s.id === activeQuiz.sessionId)
     const timeSeconds = quizStartTime ? (Date.now() - quizStartTime) / 1000 : 0
     const scoreRatio = total > 0 ? correct / total : 0
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
     try {
       const response = await fetch(`${apiUrl}/courses/${courseId}/concepts/${conceptId}/quiz-results`, {
@@ -627,7 +691,10 @@ const [missionsError, setMissionsError] = useState('')
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Piani di Studio</h1>
-                <p className="text-gray-600 mt-1">Crea e gestisci piani di studio personalizzati</p>
+                <div className="flex items-center space-x-3 mt-1">
+                  <p className="text-gray-600">Crea e gestisci piani di studio personalizzati</p>
+                  <AIProviderBadge showDetails={false} />
+                </div>
               </div>
             </div>
             <button
@@ -772,6 +839,101 @@ const [missionsError, setMissionsError] = useState('')
                 >
                   Annulla
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Plan Generation Progress Modal */}
+        {creatingPlan && planGenerationProgress.stage && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md">
+              <div className="text-center">
+                <div className="mb-4">
+                  <div className="relative mx-auto w-16 h-16">
+                    <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-purple-600 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-bold mb-2 text-gray-900">
+                  {planGenerationProgress.stage === 'completed' ? 'Piano Creato!' :
+                   planGenerationProgress.stage === 'error' ? 'Errore' :
+                   'Creazione Piano in Corso...'}
+                </h3>
+
+                <p className="text-gray-600 mb-4">
+                  {planGenerationProgress.message}
+                </p>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                  <div
+                    className={`h-3 rounded-full transition-all duration-500 ${
+                      planGenerationProgress.stage === 'completed' ? 'bg-green-500' :
+                      planGenerationProgress.stage === 'error' ? 'bg-red-500' :
+                      'bg-gradient-to-r from-blue-500 to-purple-600'
+                    }`}
+                    style={{ width: `${planGenerationProgress.progress}%` }}
+                  ></div>
+                </div>
+
+                {/* Stage indicators */}
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className={`flex items-center space-x-2 ${
+                    ['initialization', 'request', 'processing', 'finalization', 'completed', 'error'].includes(planGenerationProgress.stage) ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      planGenerationProgress.progress >= 10 ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}></div>
+                    <span>Inizializzazione</span>
+                  </div>
+                  <div className={`flex items-center space-x-2 ${
+                    ['request', 'processing', 'finalization', 'completed', 'error'].includes(planGenerationProgress.stage) ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      planGenerationProgress.progress >= 25 ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}></div>
+                    <span>Invio richiesta</span>
+                  </div>
+                  <div className={`flex items-center space-x-2 ${
+                    ['processing', 'finalization', 'completed', 'error'].includes(planGenerationProgress.stage) ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      planGenerationProgress.progress >= 50 ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}></div>
+                    <span>Elaborazione</span>
+                  </div>
+                  <div className={`flex items-center space-x-2 ${
+                    ['finalization', 'completed', 'error'].includes(planGenerationProgress.stage) ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      planGenerationProgress.progress >= 75 ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}></div>
+                    <span>Finalizzazione</span>
+                  </div>
+                  <div className={`flex items-center space-x-2 ${
+                    planGenerationProgress.stage === 'completed' ? 'text-green-600' :
+                    planGenerationProgress.stage === 'error' ? 'text-red-600' : 'text-gray-400'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      planGenerationProgress.progress >= 100 ? 'bg-green-600' :
+                      planGenerationProgress.stage === 'error' ? 'bg-red-600' : 'bg-gray-300'
+                    }`}></div>
+                    <span>
+                      {planGenerationProgress.stage === 'completed' ? 'Completato' :
+                       planGenerationProgress.stage === 'error' ? 'Errore' : 'In attesa'}
+                    </span>
+                  </div>
+                </div>
+
+                {planGenerationProgress.stage === 'error' && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">
+                      Si è verificato un errore durante la creazione del piano. Riprova più tardi.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

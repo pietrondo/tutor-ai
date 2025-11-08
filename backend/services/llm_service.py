@@ -104,6 +104,218 @@ ZAI_CONFIG = {
 
 ZAI_AGENT_API_URL = "https://api.z.ai/api/v1"
 
+# Configurazioni per OpenRouter API
+OPENROUTER_CONFIG = {
+    "base_url": "https://openrouter.ai/api/v1",
+    "chat_endpoint": "/chat/completions",
+    "models_endpoint": "/models",
+    "timeout": float(os.getenv("OPENROUTER_TIMEOUT", "60.0")),
+    "max_retries": 3,
+    "supports_streaming": True,
+    "supports_function_calling": True,
+    "supports_vision": True,
+    "headers": {
+        "HTTP-Referer": os.getenv("OPENROUTER_REFERER", "https://tutor-ai.local"),
+        "X-Title": os.getenv("OPENROUTER_APP_NAME", "Tutor AI")
+    }
+}
+
+# Modelli OpenRouter disponibili con le loro caratteristiche
+OPENROUTER_MODELS = {
+    # OpenAI Models via OpenRouter
+    "openai/gpt-5": {
+        "name": "GPT-5",
+        "context_window": 400000,
+        "max_tokens": 8192,
+        "description": "Modello flagship per coding, reasoning e agentic tasks con context window esteso",
+        "use_cases": ["complex_reasoning", "coding", "study_plans", "content_analysis", "agentic_tasks"],
+        "cost_per_1k_tokens": {"input": 0.025, "output": 0.125},
+        "provider": "OpenAI",
+        "supports_vision": False
+    },
+    "openai/gpt-4-turbo": {
+        "name": "GPT-4 Turbo",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello potente con conoscenza aggiornata",
+        "use_cases": ["complex_reasoning", "quiz", "study_plans"],
+        "cost_per_1k_tokens": {"input": 0.01, "output": 0.03},
+        "provider": "OpenAI",
+        "supports_vision": False
+    },
+    "openai/gpt-4o": {
+        "name": "GPT-4 Omni",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello più recente e versatile, eccellente per testo, codice e ragionamento",
+        "use_cases": ["chat", "quiz", "study_plans", "content_analysis"],
+        "cost_per_1k_tokens": {"input": 0.005, "output": 0.015},
+        "provider": "OpenAI",
+        "supports_vision": True
+    },
+    "openai/gpt-4o-mini": {
+        "name": "GPT-4 Omni Mini",
+        "context_window": 128000,
+        "max_tokens": 16384,
+        "description": "Versione più economica di GPT-4o, veloce e capace",
+        "use_cases": ["chat", "quick_responses", "simple_quiz"],
+        "cost_per_1k_tokens": {"input": 0.00015, "output": 0.0006},
+        "provider": "OpenAI",
+        "supports_vision": True
+    },
+
+    # Anthropic Models via OpenRouter
+    "anthropic/claude-3.5-sonnet": {
+        "name": "Claude 3.5 Sonnet",
+        "context_window": 200000,
+        "max_tokens": 8192,
+        "description": "Modello Claude più avanzato per reasoning e analisi complessa",
+        "use_cases": ["complex_reasoning", "study_plans", "content_analysis", "coding"],
+        "cost_per_1k_tokens": {"input": 0.003, "output": 0.015},
+        "provider": "Anthropic",
+        "supports_vision": True
+    },
+    "anthropic/claude-3-opus": {
+        "name": "Claude 3 Opus",
+        "context_window": 200000,
+        "max_tokens": 4096,
+        "description": "Modello Claude di fascia alta per compiti molto complessi",
+        "use_cases": ["complex_reasoning", "research", "detailed_analysis"],
+        "cost_per_1k_tokens": {"input": 0.015, "output": 0.075},
+        "provider": "Anthropic",
+        "supports_vision": True
+    },
+    "anthropic/claude-3-sonnet": {
+        "name": "Claude 3 Sonnet",
+        "context_window": 200000,
+        "max_tokens": 4096,
+        "description": "Modello Claude bilanciato per task generici",
+        "use_cases": ["chat", "quiz", "study_plans"],
+        "cost_per_1k_tokens": {"input": 0.003, "output": 0.015},
+        "provider": "Anthropic",
+        "supports_vision": True
+    },
+    "anthropic/claude-3-haiku": {
+        "name": "Claude 3 Haiku",
+        "context_window": 200000,
+        "max_tokens": 4096,
+        "description": "Modello Claude veloce ed economico per task semplici",
+        "use_cases": ["chat", "quick_responses", "simple_quiz"],
+        "cost_per_1k_tokens": {"input": 0.00025, "output": 0.00125},
+        "provider": "Anthropic",
+        "supports_vision": True
+    },
+
+    # Google Models via OpenRouter
+    "google/gemini-pro": {
+        "name": "Gemini Pro",
+        "context_window": 32768,
+        "max_tokens": 2048,
+        "description": "Modello Google per task generici e multimodali",
+        "use_cases": ["chat", "quiz", "content_analysis"],
+        "cost_per_1k_tokens": {"input": 0.0005, "output": 0.0015},
+        "provider": "Google",
+        "supports_vision": False
+    },
+    "google/gemini-pro-vision": {
+        "name": "Gemini Pro Vision",
+        "context_window": 16384,
+        "max_tokens": 2048,
+        "description": "Modello Google con capacità vision per analisi di immagini",
+        "use_cases": ["visual_analysis", "document_analysis"],
+        "cost_per_1k_tokens": {"input": 0.0005, "output": 0.0015},
+        "provider": "Google",
+        "supports_vision": True
+    },
+
+    # Meta Models via OpenRouter
+    "meta-llama/llama-3.1-405b-instruct": {
+        "name": "Llama 3.1 405B Instruct",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello Llama più potente con 405 miliardi di parametri",
+        "use_cases": ["complex_reasoning", "study_plans", "coding"],
+        "cost_per_1k_tokens": {"input": 0.003, "output": 0.003},
+        "provider": "Meta",
+        "supports_vision": False
+    },
+    "meta-llama/llama-3.1-70b-instruct": {
+        "name": "Llama 3.1 70B Instruct",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello Llama potente e versatile",
+        "use_cases": ["chat", "study_plans", "quiz"],
+        "cost_per_1k_tokens": {"input": 0.0009, "output": 0.0009},
+        "provider": "Meta",
+        "supports_vision": False
+    },
+    "meta-llama/llama-3.1-8b-instruct": {
+        "name": "Llama 3.1 8B Instruct",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello Llama leggero e veloce per task quotidiani",
+        "use_cases": ["chat", "quick_responses", "simple_quiz"],
+        "cost_per_1k_tokens": {"input": 0.0002, "output": 0.0002},
+        "provider": "Meta",
+        "supports_vision": False
+    },
+
+    # Mistral Models via OpenRouter
+    "mistralai/mistral-large": {
+        "name": "Mistral Large",
+        "context_window": 32768,
+        "max_tokens": 4096,
+        "description": "Modello Mistral di fascia alta per reasoning multilingua",
+        "use_cases": ["complex_reasoning", "study_plans", "content_analysis"],
+        "cost_per_1k_tokens": {"input": 0.004, "output": 0.012},
+        "provider": "Mistral",
+        "supports_vision": False
+    },
+    "mistralai/mistral-medium": {
+        "name": "Mistral Medium",
+        "context_window": 32768,
+        "max_tokens": 4096,
+        "description": "Modello Mistral bilanciato per task generici",
+        "use_cases": ["chat", "quiz", "study_plans"],
+        "cost_per_1k_tokens": {"input": 0.0027, "output": 0.0081},
+        "provider": "Mistral",
+        "supports_vision": False
+    },
+    "mistralai/mistral-small": {
+        "name": "Mistral Small",
+        "context_window": 32768,
+        "max_tokens": 4096,
+        "description": "Modello Mistral veloce ed economico",
+        "use_cases": ["chat", "quick_responses", "simple_quiz"],
+        "cost_per_1k_tokens": {"input": 0.001, "output": 0.003},
+        "provider": "Mistral",
+        "supports_vision": False
+    },
+
+    # Other Popular Models via OpenRouter
+    "cohere/command-r-plus": {
+        "name": "Command R+",
+        "context_window": 128000,
+        "max_tokens": 4096,
+        "description": "Modello Cohere specializzato per reasoning e tool use",
+        "use_cases": ["complex_reasoning", "coding", "tool_use"],
+        "cost_per_1k_tokens": {"input": 0.003, "output": 0.015},
+        "provider": "Cohere",
+        "supports_vision": False
+    },
+    "perplexity/llama-3.1-sonar-large-128k-online": {
+        "name": "Sonar Large 128K Online",
+        "context_window": 127072,
+        "max_tokens": 4096,
+        "description": "Modello con accesso a internet per informazioni aggiornate",
+        "use_cases": ["research", "current_events", "fact_checking"],
+        "cost_per_1k_tokens": {"input": 0.001, "output": 0.001},
+        "provider": "Perplexity",
+        "supports_vision": False,
+        "online_search": True
+    }
+}
+
 # Modelli OpenAI disponibili con le loro caratteristiche
 OPENAI_MODELS = {
     "gpt-5": {
@@ -429,6 +641,217 @@ class ZAIModelManager:
         # This should never be reached, but just in case
         raise Exception("ZAI chat completion failed: Maximum retries exceeded")
 
+class OpenRouterModelManager:
+    """Gestisce l'interazione con OpenRouter API per multi-provider LLM access"""
+
+    def __init__(self, api_key: str, base_url: str = None):
+        self.api_key = api_key
+        self.base_url = base_url or OPENROUTER_CONFIG["base_url"]
+        self.config = OPENROUTER_CONFIG
+        self.timeout = self.config.get("timeout", 60.0)
+        self.max_retries = self.config.get("max_retries", 3)
+        self.default_headers = self.config.get("headers", {}).copy()
+
+    async def check_connection(self) -> bool:
+        """Verifica se l'API OpenRouter è accessibile"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                **self.default_headers
+            }
+            # Usa un endpoint semplice per verificare la connessione
+            test_url = f"{self.base_url}/models"
+            response = requests.get(test_url, headers=headers, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"OpenRouter connection check failed: {e}")
+            return False
+
+    async def list_available_models(self) -> List[str]:
+        """Elenca i modelli OpenRouter disponibili"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                **self.default_headers
+            }
+            response = requests.get(f"{self.base_url}/models", headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                # Estrai i nomi dei modelli dalla risposta API
+                api_models = [model["id"] for model in data.get("data", [])]
+                # Combina con i modelli preconfigurati
+                configured_models = list(OPENROUTER_MODELS.keys())
+                return list(set(api_models + configured_models))
+            return list(OPENROUTER_MODELS.keys())  # Fallback to configured models
+        except Exception as e:
+            logger.error(f"Failed to list OpenRouter models: {e}")
+            return list(OPENROUTER_MODELS.keys())
+
+    async def test_model(self, model_name: str) -> bool:
+        """Testa se un modello specifico OpenRouter funziona correttamente"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                **self.default_headers
+            }
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": "Test"}],
+                "max_tokens": 10,
+                "stream": False
+            }
+            response = requests.post(
+                f"{self.base_url}{self.config['chat_endpoint']}",
+                headers=headers,
+                json=payload,
+                timeout=self.timeout
+            )
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"OpenRouter model test failed for {model_name}: {e}")
+            return False
+
+    async def chat_completion(self, model_name: str, messages: List[Dict], **kwargs) -> Dict[str, Any]:
+        """Esegue una chat completion con i modelli OpenRouter con retry logic"""
+        import time
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            **self.default_headers
+        }
+
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "max_tokens": kwargs.get("max_tokens", 1500),
+            "temperature": kwargs.get("temperature", 0.7),
+            "stream": kwargs.get("stream", False)
+        }
+
+        # Aggiungi parametri opzionali se specificati
+        if "top_p" in kwargs:
+            payload["top_p"] = kwargs["top_p"]
+        if "frequency_penalty" in kwargs:
+            payload["frequency_penalty"] = kwargs["frequency_penalty"]
+        if "presence_penalty" in kwargs:
+            payload["presence_penalty"] = kwargs["presence_penalty"]
+        if "response_format" in kwargs:
+            payload["response_format"] = kwargs["response_format"]
+
+        max_retries = self.config.get("max_retries", 3)
+        base_delay = 1.0  # Base delay in seconds
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    f"{self.base_url}{self.config['chat_endpoint']}",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+                    # Don't retry on client errors (4xx)
+                    if 400 <= response.status_code < 500:
+                        raise Exception(f"OpenRouter API client error: {response.status_code} - {response.text}")
+
+                    # For server errors, retry with backoff
+                    if attempt < max_retries:
+                        delay = base_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(f"OpenRouter API request failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {delay}s...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        raise Exception(f"OpenRouter API request failed after {max_retries + 1} attempts: {response.status_code}")
+
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"OpenRouter API timeout (attempt {attempt + 1}/{max_retries + 1}): {e}")
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"OpenRouter API timed out after {max_retries + 1} attempts")
+                    raise Exception(f"OpenRouter API timeout after {max_retries + 1} attempts: {e}")
+
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"OpenRouter API connection error (attempt {attempt + 1}/{max_retries + 1}): {e}")
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"OpenRouter API connection failed after {max_retries + 1} attempts")
+                    raise Exception(f"OpenRouter API connection failed after {max_retries + 1} attempts: {e}")
+
+            except Exception as e:
+                logger.error(f"OpenRouter chat completion failed: {e}")
+                if attempt < max_retries and not isinstance(e, requests.exceptions.RequestException):
+                    # Retry for non-request exceptions
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Unexpected error (attempt {attempt + 1}/{max_retries + 1}), retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+                else:
+                    raise
+
+        # This should never be reached, but just in case
+        raise Exception("OpenRouter chat completion failed: Maximum retries exceeded")
+
+    async def get_model_info(self, model_name: str) -> Dict[str, Any]:
+        """Ottiene informazioni dettagliate su un modello specifico"""
+        # Prima controlla nei modelli preconfigurati
+        if model_name in OPENROUTER_MODELS:
+            return OPENROUTER_MODELS[model_name]
+
+        # Se non è preconfigurato, prova a ottenerlo dall'API
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                **self.default_headers
+            }
+            response = requests.get(f"{self.base_url}/models", headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                for model in data.get("data", []):
+                    if model["id"] == model_name:
+                        return {
+                            "name": model.get("name", model_name),
+                            "context_window": model.get("context_length", 4096),
+                            "max_tokens": model.get("top_provider", {}).get("max_completion_tokens", 4096),
+                            "description": model.get("description", f"Modello {model_name}"),
+                            "provider": model.get("organization", "Unknown"),
+                            "use_cases": ["chat"],
+                            "cost_per_1k_tokens": {
+                                "input": float(model.get("pricing", {}).get("prompt", "0")),
+                                "output": float(model.get("pricing", {}).get("completion", "0"))
+                            }
+                        }
+        except Exception as e:
+            logger.warning(f"Failed to get model info from API: {e}")
+
+        # Fallback con informazioni di base
+        return {
+            "name": model_name,
+            "context_window": 4096,
+            "max_tokens": 2048,
+            "description": f"Modello {model_name}",
+            "provider": "Unknown",
+            "use_cases": ["chat"],
+            "cost_per_1k_tokens": {"input": 0.001, "output": 0.001}
+        }
+
 class LocalModelManager:
     """Gestisce l'interazione con modelli locali (Ollama/LM Studio)"""
 
@@ -496,7 +919,7 @@ class ModelSelector:
             task_type: Tipo di task ('chat', 'quiz', 'study_plan', 'complex_reasoning', 'slide_creation')
             budget_conscious: Se True, preferisce modelli più economici
             context_size: Dimensione del contesto richiesto
-            model_type: "openai", "zai", o "local"
+            model_type: "openai", "zai", "openrouter", o "local"
 
         Returns:
             Nome del modello consigliato
@@ -530,6 +953,29 @@ class ModelSelector:
                 return "glm-4.5-air"  # Bilanciato per quiz
             else:  # chat
                 return "glm-4.5"  # Buon compromesso
+        elif model_type == "openrouter":
+            # Selezione per modelli OpenRouter
+            if budget_conscious:
+                if task_type == "quiz":
+                    return "anthropic/claude-3-haiku"  # Economico e veloce
+                elif context_size > 100000:
+                    return "meta-llama/llama-3.1-8b-instruct"  # Economico con grande context
+                else:
+                    return "openai/gpt-4o-mini"  # Buon compromesso
+
+            # Selezione basata sulle prestazioni per OpenRouter
+            if task_type in ["study_plan", "complex_reasoning", "coding"]:
+                return "anthropic/claude-3.5-sonnet"  # Migliore per task complessi
+            elif task_type in ["research", "detailed_analysis"]:
+                return "anthropic/claude-3-opus"  # Top per analisi approfondite
+            elif task_type == "quiz":
+                return "openai/gpt-4o"  # Ottimo per quiz
+            elif task_type in ["visual_analysis", "document_analysis"]:
+                return "google/gemini-pro-vision"  # Specializzato per vision
+            elif task_type in ["current_events", "fact_checking"]:
+                return "perplexity/llama-3.1-sonar-large-128k-online"  # Con accesso internet
+            else:  # chat
+                return "anthropic/claude-3-sonnet"  # Buon compromesso
         else:  # modelli locali
             # Raccomandazioni per modelli locali basate sulle performance
             if budget_conscious:
@@ -549,17 +995,20 @@ class ModelSelector:
             return OPENAI_MODELS.get(model_name, {})
         elif model_type == "zai":
             return ZAI_MODELS.get(model_name, {})
+        elif model_type == "openrouter":
+            return OPENROUTER_MODELS.get(model_name, {})
         else:
             return LOCAL_MODELS.get(model_name, {})
 
 class LLMService:
     def __init__(self):
         self.client = None
-        self.model_type = os.getenv("LLM_TYPE", "zai")  # "openai", "zai", "ollama", "lmstudio"
+        self.model_type = os.getenv("LLM_TYPE", "zai")  # "openai", "zai", "openrouter", "ollama", "lmstudio"
         self.default_model = os.getenv("ZAI_MODEL", "glm-4.6")
         self.budget_mode = os.getenv("BUDGET_MODE", "false").lower() == "true"
         self.local_manager = None
         self.zai_manager = None
+        self.openrouter_manager = None
         self.setup_client()
 
         # Setup model info based on type
@@ -567,6 +1016,8 @@ class LLMService:
             self.model_info = ZAI_MODELS.get(self.default_model, ZAI_MODELS["glm-4.6"])
         elif self.model_type == "openai":
             self.model_info = OPENAI_MODELS.get(self.default_model, OPENAI_MODELS["gpt-4o"])
+        elif self.model_type == "openrouter":
+            self.model_info = OPENROUTER_MODELS.get(self.default_model, OPENROUTER_MODELS["anthropic/claude-3-sonnet"])
         else:
             self.model_info = LOCAL_MODELS.get(self.default_model, {"name": self.default_model})
 
@@ -610,6 +1061,26 @@ class LLMService:
                 logger.error(f"Errore nell'inizializzazione del manager ZAI: {e}")
                 raise
 
+        elif self.model_type == "openrouter":
+            # Setup per OpenRouter API
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            base_url = os.getenv("OPENROUTER_BASE_URL", OPENROUTER_CONFIG["base_url"])
+
+            if not api_key:
+                logger.warning("Chiave API OpenRouter non trovata. Il servizio OpenRouter non sarà disponibile.")
+                self.model_type = "openai"  # Fallback
+                self.setup_client()  # Retry con OpenAI
+                return
+
+            try:
+                self.openrouter_manager = OpenRouterModelManager(api_key, base_url)
+                # Imposta il modello di default per OpenRouter
+                self.default_model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-sonnet")
+                logger.info(f"Manager OpenRouter inizializzato con modello: {self.default_model}")
+            except Exception as e:
+                logger.error(f"Errore nell'inizializzazione del manager OpenRouter: {e}")
+                raise
+
         elif self.model_type in ["ollama", "lmstudio"]:
             # Per provider locali
             base_url = os.getenv("LOCAL_LLM_URL",
@@ -649,6 +1120,20 @@ class LLMService:
                 result["models"] = ZAI_MODELS
                 result["available_models"] = []
                 result["error"] = "Connessione con ZAI non riuscita"
+        elif self.model_type == "openrouter" and self.openrouter_manager:
+            # Prima controlla la connessione
+            is_connected = await self.openrouter_manager.check_connection()
+            result["openrouter_connection"] = is_connected
+
+            if is_connected:
+                # Ottieni i modelli disponibili dall'API
+                available_models = await self.openrouter_manager.list_available_models()
+                result["models"] = OPENROUTER_MODELS
+                result["available_models"] = available_models
+            else:
+                result["models"] = OPENROUTER_MODELS
+                result["available_models"] = []
+                result["error"] = "Connessione con OpenRouter non riuscita"
         elif self.model_type in ["ollama", "lmstudio"] and self.local_manager:
             # Prima controlla la connessione
             is_connected = await self.local_manager.check_connection()
@@ -706,6 +1191,22 @@ class LLMService:
             else:
                 logger.warning(f"Il modello ZAI {model_name} non è disponibile o non funziona")
                 return False
+        elif self.model_type == "openrouter" and self.openrouter_manager:
+            # Testa se il modello OpenRouter funziona
+            if await self.openrouter_manager.test_model(model_name):
+                self.default_model = model_name
+                self.model_info = OPENROUTER_MODELS.get(model_name, {
+                    "name": model_name,
+                    "context_window": 128000,
+                    "max_tokens": 4096,
+                    "description": f"Modello OpenRouter {model_name}",
+                    "provider": "openrouter"
+                })
+                logger.info(f"Modello OpenRouter cambiato in: {model_name}")
+                return True
+            else:
+                logger.warning(f"Il modello OpenRouter {model_name} non è disponibile o non funziona")
+                return False
         elif self.model_type in ["ollama", "lmstudio"] and self.local_manager:
             # Testa se il modello funziona
             if await self.local_manager.test_model(model_name):
@@ -741,6 +1242,28 @@ class LLMService:
                 "connected": is_connected,
                 "provider": "zai",
                 "url": self.zai_manager.base_url,
+                "available_models": available_models
+            }
+        else:
+            return {
+                "connected": False,
+                "provider": "none",
+                "url": None,
+                "available_models": []
+            }
+
+    async def test_openrouter_connection(self) -> Dict[str, Any]:
+        """Testa la connessione con OpenRouter API"""
+        if self.openrouter_manager:
+            is_connected = await self.openrouter_manager.check_connection()
+            available_models = []
+            if is_connected:
+                available_models = await self.openrouter_manager.list_available_models()
+
+            return {
+                "connected": is_connected,
+                "provider": "openrouter",
+                "url": self.openrouter_manager.base_url,
                 "available_models": available_models
             }
         else:
@@ -798,6 +1321,23 @@ class LLMService:
             )
             # Usa il modello raccomandato se è disponibile, altrimenti usa quello configurato
             model_to_use = recommended_model if recommended_model in ZAI_MODELS else self.default_model
+        elif self.model_type == "openrouter":
+            # Usa il modello configurato ma seleziona il migliore se necessario
+            recommended_model = ModelSelector.select_model(
+                task_type="chat",
+                budget_conscious=self.budget_mode,
+                context_size=context_size,
+                model_type="openrouter"
+            )
+            # Usa il modello raccomandato se è disponibile, altrimenti usa quello configurato
+            if self.openrouter_manager:
+                available_models = await self.openrouter_manager.list_available_models()
+                if recommended_model in available_models:
+                    model_to_use = recommended_model
+                else:
+                    model_to_use = self.default_model
+            else:
+                model_to_use = self.default_model
         elif self.model_type in ["ollama", "lmstudio"]:
             # Usa il modello configurato ma seleziona il migliore se necessario
             recommended_model = ModelSelector.select_model(
@@ -907,6 +1447,51 @@ class LLMService:
                         logger.info(f"ZAI Model: {model_to_use}, Estimated cost: Low (ZAI pricing)")
 
                 return response["choices"][0]["message"]["content"] if response and "choices" in response else "Risposta non disponibile"
+            elif self.model_type == "openrouter" and self.openrouter_manager:
+                # Verifica se il modello OpenRouter ha abbastanza contesto
+                model_info = OPENROUTER_MODELS.get(model_to_use)
+                if model_info and context_size > model_info["context_window"] * 0.8:
+                    logger.warning(f"Context size ({context_size}) close to OpenRouter model limit ({model_info['context_window']})")
+                    # Tronca il contesto se necessario
+                    max_context = int(model_info["context_window"] * 0.7)
+                    context_text = context_text[-max_context:]
+                    system_prompt = system_prompt.replace(
+                        f"{context.get('text', '')}",
+                        context_text
+                    )
+
+                # API OpenRouter
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ]
+
+                response = await self.openrouter_manager.chat_completion(
+                    model_name=model_to_use,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=min(1500, model_info["max_tokens"] if model_info else 1500),
+                    top_p=0.9,
+                    frequency_penalty=0.2,
+                    presence_penalty=0.1
+                )
+
+                # Log per monitoraggio costi
+                if response and "choices" in response:
+                    logger.info(f"OpenRouter API call - Model: {model_to_use}, Response received")
+                    # Log dei costi per OpenRouter
+                    if model_info:
+                        usage = response.get("usage", {})
+                        if usage:
+                            input_tokens = usage.get("prompt_tokens", 0)
+                            output_tokens = usage.get("completion_tokens", 0)
+                            cost = (input_tokens * model_info["cost_per_1k_tokens"]["input"] / 1000 +
+                                   output_tokens * model_info["cost_per_1k_tokens"]["output"] / 1000)
+                            logger.info(f"OpenRouter Model: {model_to_use}, Tokens: {input_tokens + output_tokens}, Cost: ${cost:.4f}")
+                        else:
+                            logger.info(f"OpenRouter Model: {model_to_use}, No usage info available")
+
+                return response["choices"][0]["message"]["content"] if response and "choices" in response else "Risposta non disponibile"
             else:
                 # LLM Locale (Ollama/LM Studio)
                 import requests
@@ -938,6 +1523,13 @@ class LLMService:
                     return "Mi dispiace, ho raggiunto il limite di richieste ZAI. Riprova tra qualche istante."
                 else:
                     return "Mi dispiace, c'è stato un problema con il servizio ZAI. Riprova più tardi."
+            # Handle OpenRouter API errors
+            elif "OpenRouter" in str(e) or (self.model_type == "openrouter" and ("429" in str(e) or "rate" in str(e).lower())):
+                logger.error(f"OpenRouter API error: {e}")
+                if "429" in str(e) or "rate" in str(e).lower():
+                    return "Mi dispiace, ho raggiunto il limite di richieste OpenRouter. Riprova tra qualche istante."
+                else:
+                    return "Mi dispiace, c'è stato un problema con il servizio OpenRouter. Riprova più tardi."
             else:
                 logger.error(f"Errore nella generazione della risposta: {e}")
                 return "Mi dispiace, ho riscontrato un problema nell'elaborare la tua domanda. Riprova più tardi."

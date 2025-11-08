@@ -1,6 +1,4 @@
-const API_BASE_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000'
-  : 'http://localhost:8000' // For now, use localhost for both dev and production
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
 
 export const api = {
   courses: {

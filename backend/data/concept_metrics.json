@@ -1,0 +1,44 @@
+{
+  "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9": {
+    "introduzione": {
+      "stats": {
+        "average_score": 0.0,
+        "attempts_count": 0,
+        "average_time_seconds": 0.0
+      },
+      "last_attempt": null
+    },
+    "concetti-fondamentali": {
+      "stats": {
+        "average_score": 0.0,
+        "attempts_count": 0,
+        "average_time_seconds": 0.0
+      },
+      "last_attempt": null
+    },
+    "applicazioni-pratiche": {
+      "stats": {
+        "average_score": 0.0,
+        "attempts_count": 0,
+        "average_time_seconds": 0.0
+      },
+      "last_attempt": null
+    },
+    "approfondimenti": {
+      "stats": {
+        "average_score": 0.0,
+        "attempts_count": 0,
+        "average_time_seconds": 0.0
+      },
+      "last_attempt": null
+    },
+    "valutazione-e-revisione": {
+      "stats": {
+        "average_score": 0.0,
+        "attempts_count": 0,
+        "average_time_seconds": 0.0
+      },
+      "last_attempt": null
+    }
+  }
+}

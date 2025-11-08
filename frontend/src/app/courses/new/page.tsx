@@ -27,7 +27,7 @@ export default function NewCoursePage() {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:8000/courses', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -3,6 +3,7 @@
 import type { MouseEvent } from 'react'
 import Link from 'next/link'
 import { BookOpen, FileText, Clock, Trash2 } from 'lucide-react'
+import { fetchFromBackend } from '@/lib/api'
 
 interface BookChapter {
   title: string
@@ -41,7 +42,7 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
     }
 
     try {
-      const response = await fetch(`/api/courses/${courseId}/books/${book.id}`, {
+      const response = await fetchFromBackend(`/api/courses/${courseId}/books/${book.id}`, {
         method: 'DELETE',
       })
 

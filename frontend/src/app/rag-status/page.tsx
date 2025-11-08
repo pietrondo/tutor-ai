@@ -74,7 +74,7 @@ export default function RAGStatusPage() {
   const fetchRAGStatus = async () => {
     try {
       setError(null)
-      const response = await fetch('http://localhost:8000/rag/status')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/rag/status`)
       if (response.ok) {
         const data: RagStatusResponse = await response.json()
         setRagStatus(data)
@@ -91,7 +91,7 @@ export default function RAGStatusPage() {
 
   const fetchCourses = async () => {
     try {
-      const response = await fetch('http://localhost:8000/courses')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses`)
       if (response.ok) {
         const data: CoursesResponse = await response.json()
         const courseList: CourseSummary[] = Array.isArray(data.courses)
@@ -118,8 +118,8 @@ export default function RAGStatusPage() {
 
     try {
       const url = searchQuery
-        ? `http://localhost:8000/rag/documents/${selectedCourse}?search_query=${encodeURIComponent(searchQuery)}`
-        : `http://localhost:8000/rag/documents/${selectedCourse}`
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/rag/documents/${selectedCourse}?search_query=${encodeURIComponent(searchQuery)}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/rag/documents/${selectedCourse}`
 
       const response = await fetch(url)
       if (response.ok) {
@@ -144,7 +144,7 @@ export default function RAGStatusPage() {
 
     setReindexing(true)
     try {
-      const response = await fetch('http://localhost:8000/rag/reindex', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/rag/reindex`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +181,7 @@ export default function RAGStatusPage() {
 
     setReindexing(true)
     try {
-      const response = await fetch(`http://localhost:8000/rag/clear-index/${selectedCourse}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/rag/clear-index/${selectedCourse}`, {
         method: 'DELETE'
       })
 

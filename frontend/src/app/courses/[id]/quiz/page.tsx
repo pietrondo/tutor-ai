@@ -50,7 +50,7 @@ export default function QuizPage() {
 
   const fetchCourse = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -70,7 +70,7 @@ export default function QuizPage() {
 
   const fetchQuizzes = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}/quizzes`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/quizzes`)
       const data = await response.json()
 
       if (response.ok) {
@@ -102,8 +102,8 @@ export default function QuizPage() {
 
     try {
       const url = editingQuiz
-        ? `http://localhost:8000/courses/${courseId}/quizzes/${editingQuiz.id}`
-        : `http://localhost:8000/courses/${courseId}/quizzes`
+        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/quizzes/${editingQuiz.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/quizzes`
 
       const response = await fetch(url, {
         method: editingQuiz ? 'PUT' : 'POST',
@@ -146,7 +146,7 @@ export default function QuizPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/courses/${courseId}/quizzes/${quizId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/quizzes/${quizId}`, {
         method: 'DELETE',
       })
 

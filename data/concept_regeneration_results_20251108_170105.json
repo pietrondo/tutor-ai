@@ -1,0 +1,13 @@
+{
+  "regeneration_timestamp": "2025-11-08T17:01:05.247200",
+  "total_courses": 1,
+  "results": [
+    {
+      "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+      "course_name": "Geografia storica",
+      "status": "success",
+      "concepts_count": 0,
+      "generated_at": "2025-11-08T17:01:05.245322"
+    }
+  ]
+}

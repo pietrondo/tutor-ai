@@ -26,14 +26,15 @@ services:
       - apt_lib_cache:/var/lib/apt
     environment:
       - PYTHONPATH=/app
+      - DATA_DIR=/app/data
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - DEBUG=true
       - LOG_LEVEL=debug
       - ENVIRONMENT=development
     ports:
-      - "8000:8000"
+      - "8001:8001"
     # Usa il CMD di default del Dockerfile (già configurato per sviluppo)
 
   frontend:
@@ -46,19 +47,27 @@ services:
         NODE_ENV: development
     image: tutor-ai-frontend:dev
     volumes:
-      # Bind mount semplice per hot reload
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      # Bind mount selettivo per Next.js hot reload
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/styles:/app/styles
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/next.config.js:/app/next.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/package-lock.json:/app/package-lock.json
+      - frontend_node_modules:/app/node_modules
+      - frontend_cache:/app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_DEBUG=true
-      - PORT=5000
+      - PORT=3000
       - HOSTNAME=0.0.0.0
     ports:
-      - "3001:5000"
+      - "3000:3000"
     # Next.js development server con hot reload veloce
     command: ["npm", "run", "dev"]
 
@@ -68,4 +77,10 @@ services:
     command: redis-server --appendonly yes --notify-keyspace-events Ex
 
   # Ollama service removed - using Z.AI instead
+
+volumes:
+  frontend_node_modules:
+    driver: local
+  frontend_cache:
+    driver: local
 

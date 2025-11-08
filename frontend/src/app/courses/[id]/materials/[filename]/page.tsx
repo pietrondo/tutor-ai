@@ -47,7 +47,7 @@ export default function PDFViewerPage() {
     try {
       setLoading(true)
       // First get course info
-      const courseResponse = await fetch(`http://localhost:8000/courses/${courseId}`)
+      const courseResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
       if (!courseResponse.ok) {
         throw new Error('Corso non trovato')
       }
@@ -80,7 +80,7 @@ export default function PDFViewerPage() {
       })
 
       const baseUrl = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:8000'
+        ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
         : window.location.origin
       setPdfUrl(`${baseUrl}/uploads/${encodeURIComponent(filename)}`)
     } catch (error) {

@@ -21,6 +21,7 @@ import {
 import { ChatMessage } from '@/components/ChatMessage'
 import { CourseSelector } from '@/components/CourseSelector'
 import BookSelector from '@/components/BookSelector'
+import { ConceptVisualMap } from '@/components/ConceptVisualMap'
 import { llmManager, LLMRequest, LLMResponse } from '@/lib/llm-manager'
 import type { CourseConcept, ConceptMetrics, CourseConceptMap } from '@/types/concept'
 
@@ -88,7 +89,7 @@ interface ActiveQuizState {
   }
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 const MAX_FOCUS_CONCEPTS = 3
 
 export function ChatWrapper() {
@@ -112,6 +113,8 @@ export function ChatWrapper() {
   const [conceptProgress, setConceptProgress] = useState(0)
   const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
   const [activeQuiz, setActiveQuiz] = useState<ActiveQuizState | null>(null)
+  const [showConceptMap, setShowConceptMap] = useState(true)
+  const [mentionedConcepts, setMentionedConcepts] = useState<string[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -370,6 +373,60 @@ export function ChatWrapper() {
     [conceptMap, selectedConceptIds]
   )
 
+  // Funzione per estrarre concetti menzionati nelle risposte AI
+  const extractConceptsFromResponse = (response: string) => {
+    if (!conceptMap?.concepts) return
+
+    const concepts = conceptMap.concepts
+    const mentioned: string[] = []
+
+    concepts.forEach(concept => {
+      // Cerca menzioni dirette del nome del concetto
+      if (response.toLowerCase().includes(concept.name.toLowerCase())) {
+        mentioned.push(concept.id)
+      }
+
+      // Cerca menzioni di parole chiave correlate
+      const keywords = [...concept.related_topics, ...concept.learning_objectives]
+      keywords.forEach(keyword => {
+        if (response.toLowerCase().includes(keyword.toLowerCase()) && !mentioned.includes(concept.id)) {
+          mentioned.push(concept.id)
+        }
+      })
+    })
+
+    if (mentioned.length > 0) {
+      setMentionedConcepts(prev => [...new Set([...prev, ...mentioned])])
+    }
+  }
+
+  // Funzione per espandere automaticamente i concetti correlati
+  const expandRelatedConcepts = (mainConcepts: string[]) => {
+    if (!conceptMap?.concepts) return
+
+    const relatedIds = new Set<string>()
+
+    conceptMap.concepts.forEach(concept => {
+      if (mainConcepts.includes(concept.id)) {
+        // Aggiungi il concetto principale
+        relatedIds.add(concept.id)
+
+        // Aggiungi concetti correlati
+        concept.related_topics.forEach(topic => {
+          const relatedConcept = conceptMap.concepts.find(c =>
+            c.name.toLowerCase().includes(topic.toLowerCase()) ||
+            c.related_topics.some(rt => rt.toLowerCase() === topic.toLowerCase())
+          )
+          if (relatedConcept) {
+            relatedIds.add(relatedConcept.id)
+          }
+        })
+      }
+    })
+
+    setSelectedConceptIds(prev => [...new Set([...prev, ...Array.from(relatedIds).slice(0, MAX_FOCUS_CONCEPTS)])])
+  }
+
   const toggleConcept = (conceptId: string) => {
     setSelectedConceptIds(prev => {
       if (prev.includes(conceptId)) {
@@ -502,6 +559,14 @@ Caratteristiche chiave:
       }
 
       setMessages(prev => [...prev, assistantMessage])
+
+      // Estrai concetti dalla risposta AI e espandi automaticamente
+      extractConceptsFromResponse(assistantMessage.content)
+
+      // Se ci sono concetti selezionati, espandi anche quelli correlati
+      if (selectedConcepts.length > 0) {
+        expandRelatedConcepts(selectedConcepts.map(c => c.id))
+      }
     } catch (error) {
       console.error('Errore nell\'invio del messaggio:', error)
 
@@ -853,8 +918,11 @@ Caratteristiche chiave:
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="card">
+    <div className="max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main Chat Area */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="card">
         <div className="space-y-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <CourseSelector
@@ -904,13 +972,99 @@ Caratteristiche chiave:
         </div>
       </div>
 
-      {renderConceptFocus()}
+          {/* Concept Focus - Ora nella sidebar */}
+        </div>
 
-      <div className="card min-h-[320px]">
+        {/* Sidebar with Concept Map */}
+        <div className="lg:col-span-1 space-y-6">
+          <ConceptVisualMap
+            conceptMap={conceptMap}
+            conceptMetrics={conceptMetrics}
+            conceptsLoading={conceptsLoading}
+            conceptsGenerating={conceptsGenerating}
+            onConceptToggle={toggleConcept}
+            selectedConceptIds={selectedConceptIds}
+            onConceptQuiz={handleStartQuiz}
+            expandedByDefault={showConceptMap}
+          />
+
+          {/* Legacy concept focus info - ridotto */}
+          {selectedConcepts.length > 0 && (
+            <div className="bg-white border rounded-xl shadow-sm p-4">
+              <h4 className="font-medium text-gray-900 mb-2 text-sm">Focus Attuale</h4>
+              <div className="space-y-2">
+                {selectedConcepts.map(concept => (
+                  <div key={concept.id} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 truncate">{concept.name}</span>
+                    <button
+                      className="text-xs text-blue-600 hover:text-blue-700"
+                      onClick={() => handleStartQuiz(concept)}
+                    >
+                      Quiz
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Back to main chat area */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="card min-h-[320px]">
         {messages.length === 0 && !isLoading ? (
           <div className="flex h-48 flex-col items-center justify-center text-center text-sm text-gray-500">
             <Brain className="mb-3 h-8 w-8 text-purple-500" />
-            <p>Inizia selezionando un corso e, se vuoi, uno o più concetti su cui concentrarti.<br />Formula poi la tua domanda al tutor AI.</p>
+            {selectedCourse && selectedCourseData ? (
+                <div className="space-y-4">
+                  <p>Inizia la tua sessione di studio! Ecco alcuni suggerimenti:</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <button
+                      onClick={() => setInput("Spiegami i concetti fondamentali di questo corso")}
+                      className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-xs"
+                    >
+                      📚 Concetti fondamentali
+                    </button>
+                    <button
+                      onClick={() => setInput("Quali sono gli obiettivi principali di questo corso?")}
+                      className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs"
+                    >
+                      🎯 Obiettivi del corso
+                    </button>
+                    <button
+                      onClick={() => setInput("Dammi un esempio pratico di come applicare questi concetti")}
+                      className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-xs"
+                    >
+                      💡 Esempi pratici
+                    </button>
+                    <button
+                      onClick={() => setInput("Come posso prepararmi al meglio per gli esami?")}
+                      className="px-3 py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors text-xs"
+                    >
+                      📝 Preparazione esami
+                    </button>
+                    {selectedBook && selectedBookData && (
+                      <button
+                        onClick={() => setInput(`Analizziamo il libro "${selectedBookData.title}" e i suoi concetti principali`)}
+                        className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors text-xs"
+                      >
+                        📖 Analizza libro
+                      </button>
+                    )}
+                    {selectedConcepts.length > 0 && (
+                      <button
+                        onClick={() => setInput(`Approfondiamo i concetti: ${selectedConcepts.map(c => c.name).join(', ')}`)}
+                        className="px-3 py-2 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition-colors text-xs"
+                      >
+                        🧠 Approfondisci concetti
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">Oppure fai una domanda personalizzata...</p>
+                </div>
+              ) : (
+                <p>Seleziona prima un corso per iniziare a chattare con il tutor AI.</p>
+              )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -967,6 +1121,8 @@ Caratteristiche chiave:
       </div>
 
       {renderQuizModal()}
+        </div>
+      </div>
     </div>
   )
 }

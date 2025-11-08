@@ -1,11 +1,10 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: tutor-ai-backend:latest
+      target: development
+    image: tutor-ai-backend:simple
     container_name: tutor-ai-backend
     ports:
       - "8000:8000"
@@ -15,13 +14,24 @@ services:
       - ./backend:/app
     environment:
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - REDIS_URL=redis://redis:6379
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - ENVIRONMENT=development
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: tutor-ai-frontend:latest
+      target: development
+    image: tutor-ai-frontend:simple
     container_name: tutor-ai-frontend
     ports:
       - "3000:3000"
@@ -31,9 +41,22 @@ services:
       - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3000
     restart: unless-stopped
     depends_on:
       - backend
+
+  redis:
+    image: redis:7-alpine
+    container_name: tutor-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
 
 volumes:
   redis_data:

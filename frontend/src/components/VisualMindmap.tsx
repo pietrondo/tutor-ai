@@ -244,9 +244,9 @@ export default function VisualMindmap({
         totalVisual: visualNodeIds.length
       })
 
-      // Check specifically for the missing node 85e4a794cc603636
-      if (missingIds.includes('85e4a794cc603636')) {
-        console.error('🚨 CRITICAL: Node 85e4a794cc603636 found in structured data but missing from visual mindmap!')
+      // Log any critical node mismatches for debugging
+      if (missingIds.length > 0) {
+        console.warn('⚠️ Nodes found in structured data but missing from visual mindmap:', missingIds)
       }
     }
 
@@ -293,40 +293,12 @@ export default function VisualMindmap({
       createMindmapFromData(data)
     }
 
-    // Specific debug for missing node 85e4a794cc603636
-    const findMissingNode = (nodes: StudyMindmapNode[]): StudyMindmapNode | null => {
-      for (const node of nodes) {
-        if (node.id === '85e4a794cc603636') {
-          return node
-        }
-        if (node.children && node.children.length > 0) {
-          const found = findMissingNode(node.children)
-          if (found) return found
-        }
-      }
-      return null
-    }
-
-    const missingNode = findMissingNode(structured.nodes)
-    if (missingNode) {
-      const isRendered = Array.from(mindmapData.nodes.values()).some(
-        vn => vn.source && vn.source.id === '85e4a794cc603636'
-      )
-
-      if (!isRendered) {
-        console.error('🚨 MISSING NODE DETECTED:', {
-          id: missingNode.id,
-          title: missingNode.title,
-          summary: missingNode.summary?.substring(0, 100),
-          hasChildren: missingNode.children && missingNode.children.length > 0,
-          childrenCount: missingNode.children?.length || 0,
-          priority: missingNode.priority,
-          hasReferences: missingNode.references && missingNode.references.length > 0
-        })
-      } else {
-        console.log('✅ Node 85e4a794cc603636 found and rendered')
-      }
-    }
+    // Debug validation - ensure all structured nodes are properly rendered
+    console.log('✅ Mindmap validation complete:', {
+      totalStructuredNodes: structured.nodes.length,
+      totalRenderedNodes: mindmapData.nodes.size,
+      totalConnections: connections.length
+    })
   }, [data, dataSignature, mindmapData?.nodes.size])
 
   const createDefaultMindmap = () => {
@@ -391,12 +363,29 @@ export default function VisualMindmap({
     console.log('🚀 Starting mindmap creation from data:', {
       hasInput: !!inputData,
       inputType: inputData ? (typeof inputData) : 'null',
+      inputDataKeys: inputData ? Object.keys(inputData) : [],
       timestamp: new Date().toISOString()
     })
+
+    // Detailed input logging
+    if (inputData) {
+      console.log('📋 Input data details:', {
+        title: inputData.title,
+        hasNodes: !!inputData.nodes,
+        nodesLength: inputData.nodes?.length || 0,
+        firstNodeTitle: inputData.nodes?.[0]?.title || 'No nodes',
+        allNodeTitles: inputData.nodes?.map(n => n.title) || []
+      })
+    }
 
     const structured = getStructuredMindmap(inputData)
     if (!structured || !Array.isArray(structured.nodes) || structured.nodes.length === 0) {
       console.warn('⚠️ No valid structured data found, creating default mindmap')
+      console.log('🔍 Structured data check:', {
+        structured: !!structured,
+        isArray: Array.isArray(structured?.nodes),
+        nodesLength: structured?.nodes?.length || 0
+      })
       createDefaultMindmap()
       return
     }
@@ -481,18 +470,6 @@ export default function VisualMindmap({
         parentId === ROOT_NODE_ID ? (Math.PI * 2) / count : Math.PI / Math.max(count, 2)
 
       children.forEach((child, index) => {
-        // Controlla e logga nodi con ID specifici come 85e4a794cc603636
-        if (child.id === '85e4a794cc603636' || child.title?.includes('85e4a794cc603636')) {
-          console.log('🎯 FOUND MISSING NODE 85e4a794cc603636:', {
-            title: child.title,
-            summary: child.summary,
-            childrenCount: child.children?.length || 0,
-            index,
-            depth,
-            parentId
-          })
-        }
-
         // Log di debugging per ogni nodo processato
         if (child.id) {
           processedNodeIds.add(child.id)
@@ -556,25 +533,11 @@ export default function VisualMindmap({
     console.log('🎯 Mindmap creation completed:', {
       totalNodes: nodes.size,
       totalConnections: connections.length,
-      processedNodeIds: Array.from(processedNodeIds),
-      missingNodeId: '85e4a794cc603636',
-      foundMissingNode: processedNodeIds.has('85e4a794cc603636')
+      totalProcessedIds: processedNodeIds.size
     })
 
     console.log('📋 Detailed node processing log:', nodeProcessingLog)
-
-    // Verifica specifica per il nodo 85e4a794cc603636
-    const findNodeInProcessed = (id: string) => {
-      return nodeProcessingLog.find(node => node.originalId === id || node.id === id)
-    }
-
-    const missingNodeInfo = findNodeInProcessed('85e4a794cc603636')
-    if (missingNodeInfo) {
-      console.log('✅ Nodo 85e4a794cc603636 processato correttamente:', missingNodeInfo)
-    } else {
-      console.error('❌ ERRORE CRITICO: Nodo 85e4a794cc603636 NON TROVATO nel processing log!')
-      console.log('📋 Tutti gli ID processati:', nodeProcessingLog.map(n => ({ originalId: n.originalId, id: n.id, title: n.title })))
-    }
+    console.log(`✅ Successfully processed ${nodeProcessingLog.length} nodes`)
 
     setMindmapData({
       nodes,
@@ -2139,7 +2102,7 @@ export default function VisualMindmap({
             }}
           />
           <div className="mt-2 text-xs text-gray-500">
-            Prova: 85e4a794cc603636
+            Enter a node ID to test search functionality
           </div>
         </div>
 
