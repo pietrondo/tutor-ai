@@ -3,7 +3,7 @@
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play } from 'lucide-react'
+import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play, Eye, Highlighter, BookOpen as StudyIcon } from 'lucide-react'
 import SlideGenerator from '@/components/SlideGenerator'
 import { fetchFromBackend } from '@/lib/api'
 
@@ -396,21 +396,50 @@ export default function BookPage() {
               </div>
 
               {book.materials && book.materials.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Materiali Disponibili</h3>
                   {book.materials.map((material, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                      className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="font-medium text-gray-900">{material.filename}</p>
-                          <p className="text-sm text-gray-500">
-                            {(material.size / 1024 / 1024).toFixed(2)} MB •
-                            {new Date(material.uploaded_at).toLocaleDateString()}
-                          </p>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <FileText className="h-6 w-6 text-blue-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{material.filename}</p>
+                            <p className="text-sm text-gray-500">
+                              {(material.size / 1024 / 1024).toFixed(2)} MB •
+                              {new Date(material.uploaded_at).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/courses/${courseId}/materials/${encodeURIComponent(material.filename)}`}
+                          className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-md hover:bg-blue-200 transition-colors"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Leggi PDF
+                        </Link>
+
+                        <Link
+                          href={`/courses/${courseId}/study?book=${bookId}&pdf=${encodeURIComponent(material.filename)}`}
+                          className="inline-flex items-center px-3 py-2 bg-green-100 text-green-700 text-sm rounded-md hover:bg-green-200 transition-colors"
+                        >
+                          <StudyIcon className="h-4 w-4 mr-1" />
+                          Studio Integrato
+                        </Link>
+
+                        <Link
+                          href={`/chat?course=${courseId}&book=${bookId}&pdf=${encodeURIComponent(material.filename)}`}
+                          className="inline-flex items-center px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-md hover:bg-purple-200 transition-colors"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Chat con Tutor
+                        </Link>
                       </div>
                     </div>
                   ))}
@@ -449,6 +478,16 @@ export default function BookPage() {
                   <Play className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
                   Inizia Sessione di Studio
                 </button>
+
+                {book.materials && book.materials.length > 0 && (
+                  <Link
+                    href={`/courses/${courseId}/study?book=${bookId}&pdf=${encodeURIComponent(book.materials[0].filename)}`}
+                    className="w-full btn btn-secondary group flex justify-center"
+                  >
+                    <StudyIcon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" />
+                    Studio Integrato
+                  </Link>
+                )}
 
                 <Link
                   href={`/chat?course=${courseId}&book=${bookId}`}

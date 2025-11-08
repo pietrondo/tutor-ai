@@ -1,0 +1,315 @@
+{
+  "concept_maps": {
+    "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9": {
+      "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+      "course_name": "Geografia storica",
+      "generated_at": "2025-11-08T17:25:44.374441",
+      "source_count": 46,
+      "total_materials": 46,
+      "extraction_method": "api_filename_analysis",
+      "is_comprehensive": true,
+      "concepts": [
+        {
+          "id": "concetti-geografici-fondamentali",
+          "name": "Concetti Geografici Fondamentali",
+          "summary": "Principi base della geografia: spazio, territorio, paesaggio e scala geografica",
+          "chapter": {
+            "title": "Fondamenti di Geografia",
+            "index": 1
+          },
+          "related_topics": [
+            "spazio geografico",
+            "territorio",
+            "paesaggio",
+            "scala",
+            "ambiente",
+            "luogo"
+          ],
+          "learning_objectives": [
+            "Comprendere i concetti fondamentali di spazio e territorio",
+            "Distinguere tra diverse scale geografiche (locale, regionale, globale)",
+            "Analizzare le relazioni tra società e ambiente",
+            "Interpretare il concetto di paesaggio geografico"
+          ],
+          "suggested_reading": [
+            "docsity manuale di geografia de vecchis g e boria e 2022",
+            "docsity manuale di geografia di g de vecchis e e boria riassunto completo",
+            "manuale geo storica nuovo"
+          ],
+          "recommended_minutes": 60,
+          "quiz_outline": [
+            "Definire spazio geografico e territory con esempi concreti",
+            "Spiegare l'importanza della scala geografica nell'analisi",
+            "Analizzare le relazioni tra attività umane e ambiente",
+            "Interpretare diversi tipi di paesaggio"
+          ],
+          "source_materials_count": 5,
+          "material_sources": [
+            {
+              "filename": "docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf",
+              "relative_path": "books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf",
+              "size": 445398,
+              "uploaded_at": "2025-11-08T15:32:28.788639",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf"
+            },
+            {
+              "filename": "docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf",
+              "relative_path": "books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf",
+              "size": 881819,
+              "uploaded_at": "2025-11-08T15:32:42.803168",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf"
+            },
+            {
+              "filename": "manuale-geo-storica-nuovo.pdf",
+              "relative_path": "books/e92ed79d-b92b-44d7-9627-172298a6ca0c/manuale-geo-storica-nuovo.pdf",
+              "size": 7544859,
+              "uploaded_at": "2025-11-08T15:33:31.763165",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/e92ed79d-b92b-44d7-9627-172298a6ca0c/manuale-geo-storica-nuovo.pdf"
+            }
+          ]
+        },
+        {
+          "id": "geografia-storica-evoluzione",
+          "name": "Geografia Storica e Sviluppo Territoriale",
+          "summary": "Evoluzione storica dei territori, processi di sviluppo e trasformazioni nel tempo",
+          "chapter": {
+            "title": "Evoluzione Storica dei Territori",
+            "index": 2
+          },
+          "related_topics": [
+            "evoluzione territoriale",
+            "storia geografica",
+            "cambiamento ambientale",
+            "sviluppo sostenibile",
+            "globalizzazione"
+          ],
+          "learning_objectives": [
+            "Comprendere l'evoluzione dei territori nel tempo",
+            "Analizzare i fattori storici del cambiamento geografico",
+            "Valutare l'impatto delle attività umane sull'ambiente",
+            "Spiegare i processi di globalizzazione territoriale"
+          ],
+          "suggested_reading": [
+            "Caboto   Enciclopedia   Treccani",
+            "Davide   Sebastiano caboto",
+            "docsity sebastiano caboto libro"
+          ],
+          "recommended_minutes": 75,
+          "quiz_outline": [
+            "Spiegare l'evoluzione storica dei territori",
+            "Analizzare i fattori di cambiamento geografico",
+            "Valutare le relazioni tra storia e geografia",
+            "Interpretare gli impatti della globalizzazione"
+          ],
+          "source_materials_count": 11,
+          "material_sources": [
+            {
+              "filename": "Caboto - Enciclopedia - Treccani.pdf",
+              "relative_path": "books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/Caboto - Enciclopedia - Treccani.pdf",
+              "size": 1418137,
+              "uploaded_at": "2025-11-08T08:38:35.295298",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/Caboto - Enciclopedia - Treccani.pdf"
+            },
+            {
+              "filename": "Davide - Sebastiano caboto.pdf",
+              "relative_path": "books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/Davide - Sebastiano caboto.pdf",
+              "size": 482762,
+              "uploaded_at": "2025-11-08T08:10:25.956678",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/Davide - Sebastiano caboto.pdf"
+            },
+            {
+              "filename": "docsity-sebastiano-caboto-libro.pdf",
+              "relative_path": "books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/docsity-sebastiano-caboto-libro.pdf",
+              "size": 422118,
+              "uploaded_at": "2025-11-08T08:10:36.737060",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/7a8b3b91-46c0-4b47-9e2b-083f79dc9f29/docsity-sebastiano-caboto-libro.pdf"
+            }
+          ]
+        },
+        {
+          "id": "metodi-strumenti-geografici",
+          "name": "Metodi e Strumenti della Geografia",
+          "summary": "Cartografia, GIS, sistemi di riferimento e tecniche di analisi territoriale",
+          "chapter": {
+            "title": "Strumenti di Analisi Geografica",
+            "index": 3
+          },
+          "related_topics": [
+            "cartografia",
+            "mappe tematiche",
+            "GIS",
+            "coordinate geografiche",
+            "rilevamento",
+            "analisi spaziale"
+          ],
+          "learning_objectives": [
+            "Utilizzare sistemi di riferimento geografico",
+            "Interpretare diverse tipologie di carte e mappe",
+            "Applicare strumenti di analisi spaziale",
+            "Comprendere i principi della cartografia digitale"
+          ],
+          "suggested_reading": [
+            "docsity manuale di geografia de vecchis g e boria e 2022",
+            "docsity manuale di geografia di g de vecchis e e boria riassunto completo",
+            "manuale geo storica nuovo"
+          ],
+          "recommended_minutes": 65,
+          "quiz_outline": [
+            "Spiegare i sistemi di coordinate geografiche",
+            "Interpretare carte topografiche e tematiche",
+            "Applicare metodi di analisi spaziale",
+            "Utilizzare strumenti cartografici digitali"
+          ],
+          "source_materials_count": 5,
+          "material_sources": [
+            {
+              "filename": "docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf",
+              "relative_path": "books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf",
+              "size": 445398,
+              "uploaded_at": "2025-11-08T15:32:28.788639",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-de-vecchis-g-e-boria-e-2022.pdf"
+            },
+            {
+              "filename": "docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf",
+              "relative_path": "books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf",
+              "size": 881819,
+              "uploaded_at": "2025-11-08T15:32:42.803168",
+              "file_path": "data/courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/books/e92ed79d-b92b-44d7-9627-172298a6ca0c/docsity-manuale-di-geografia-di-g-de-vecchis-e-e-boria-riassunto-completo.pdf"
+            }
+          ]
+        },
+        {
+          "id": "lezioni-tematiche-geografiche",
+          "name": "Lezioni Tematiche di Geografia",
+          "summary": "Approfondimenti su 14 temi specifici: Lezione 10, Lezione 11, Lezione 12, Lezione 13, Lezione 2",
+          "chapter": {
+            "title": "Lezioni Tematiche",
+            "index": 4
+          },
+          "related_topics": [
+            "Lezione 10",
+            "Lezione 11",
+            "Lezione 12",
+            "Lezione 13",
+            "Lezione 2",
+            "Lezione 4",
+            "Lezione 5",
+            "Lezione 7",
+            "Lezione 9"
+          ],
+          "learning_objectives": [
+            "Approfondire temi specifici di geografia",
+            "Applicare concetti a casi studio concreti",
+            "Sviluppare competenze di analisi territoriale",
+            "Integrare conoscenze teoriche e pratiche"
+          ],
+          "suggested_reading": [
+            "Lezioni numerate (14 files)"
+          ],
+          "recommended_minutes": 280,
+          "quiz_outline": [
+            "Analizzare i temi trattati nelle lezioni",
+            "Applicare i concetti geografici agli esempi specifici",
+            "Sviluppare analisi tematiche dettagliate",
+            "Collegare i diversi argomenti tra loro"
+          ],
+          "source_materials_count": 14,
+          "lesson_files": [
+            "Geografia #10.pdf",
+            "Geografia #11.pdf",
+            "Geografia #12.pdf",
+            "Geografia #13.pdf",
+            "Geografia #2.pdf",
+            "Geografia #4.pdf",
+            "Geografia #5.pdf",
+            "Geografia #7.pdf"
+          ]
+        },
+        {
+          "id": "special-topic-1",
+          "name": "Conferenza Geo Apr",
+          "summary": "Studio approfondito del tema: Conferenza Geo Apr",
+          "chapter": {
+            "title": "Tema Speciale: Conferenza Geo Apr",
+            "index": 5
+          },
+          "related_topics": [
+            "conferenza"
+          ],
+          "learning_objectives": [
+            "Comprendere approfonditamente il tema Conferenza Geo Apr",
+            "Analizzare gli aspetti chiave del tema",
+            "Collegare il tema con i concetti geografici generali"
+          ],
+          "suggested_reading": [
+            "conferenza geo 9 apr.pdf"
+          ],
+          "recommended_minutes": 50,
+          "quiz_outline": [
+            "Spiegare i concetti principali di Conferenza Geo Apr",
+            "Analizzare le implicazioni geografiche del tema",
+            "Applicare il tema a esempi concreti"
+          ],
+          "source_materials_count": 1,
+          "source_file": "conferenza geo 9 apr.pdf"
+        },
+        {
+          "id": "special-topic-2",
+          "name": "Registrazione",
+          "summary": "Studio approfondito del tema: Registrazione",
+          "chapter": {
+            "title": "Tema Speciale: Registrazione",
+            "index": 6
+          },
+          "related_topics": [
+            "registrazione"
+          ],
+          "learning_objectives": [
+            "Comprendere approfonditamente il tema Registrazione",
+            "Analizzare gli aspetti chiave del tema",
+            "Collegare il tema con i concetti geografici generali"
+          ],
+          "suggested_reading": [
+            "Registrazione #19.pdf"
+          ],
+          "recommended_minutes": 50,
+          "quiz_outline": [
+            "Spiegare i concetti principali di Registrazione",
+            "Analizzare le implicazioni geografiche del tema",
+            "Applicare il tema a esempi concreti"
+          ],
+          "source_materials_count": 1,
+          "source_file": "Registrazione #19.pdf"
+        },
+        {
+          "id": "special-topic-3",
+          "name": "Registrazione",
+          "summary": "Studio approfondito del tema: Registrazione",
+          "chapter": {
+            "title": "Tema Speciale: Registrazione",
+            "index": 7
+          },
+          "related_topics": [
+            "registrazione"
+          ],
+          "learning_objectives": [
+            "Comprendere approfonditamente il tema Registrazione",
+            "Analizzare gli aspetti chiave del tema",
+            "Collegare il tema con i concetti geografici generali"
+          ],
+          "suggested_reading": [
+            "Registrazione 21.pdf"
+          ],
+          "recommended_minutes": 50,
+          "quiz_outline": [
+            "Spiegare i concetti principali di Registrazione",
+            "Analizzare le implicazioni geografiche del tema",
+            "Applicare il tema a esempi concreti"
+          ],
+          "source_materials_count": 1,
+          "source_file": "Registrazione 21.pdf"
+        }
+      ]
+    }
+  }
+}

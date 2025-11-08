@@ -761,3 +761,598 @@ class RAGService:
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
             return {"success": False, "error": str(e)}
+
+
+class BookContentAnalyzer:
+    """
+    Servizio specializzato per analizzare i contenuti dei libri usando RAG
+    e generare contesto per concept maps book-specific
+    """
+
+    def __init__(self, rag_service: RAGService):
+        self.rag_service = rag_service
+        self.llm_service = None  # Lazy loading
+
+    def _get_llm_service(self):
+        """Lazy loading del LLM service"""
+        if self.llm_service is None:
+            from services.llm_service import LLMService
+            self.llm_service = LLMService()
+        return self.llm_service
+
+    async def analyze_book_content(self, course_id: str, book_id: str) -> Dict[str, Any]:
+        """
+        Analisi completa dei contenuti di un libro usando RAG
+        """
+        try:
+            logger.info(f"Starting RAG analysis for book {book_id} in course {course_id}")
+
+            # 1. Estrai contenuti RAG specifici del libro
+            book_content = await self._extract_book_rag_content(course_id, book_id)
+
+            if not book_content.get("documents", []):
+                logger.warning(f"No RAG content found for book {book_id}")
+                return self._create_fallback_analysis(course_id, book_id)
+
+            # 2. Analizza temi principali con AI
+            themes_analysis = await self._analyze_main_themes(book_content, book_id)
+
+            # 3. Estrai concetti chiave
+            key_concepts = await self._extract_key_concepts(book_content, themes_analysis)
+
+            # 4. Identifica struttura del libro
+            book_structure = await self._identify_book_structure(book_content)
+
+            # 5. Genera contesto per concept map generation
+            concept_context = await self._generate_concept_map_context(
+                book_content, themes_analysis, key_concepts, book_structure, book_id
+            )
+
+            result = {
+                "success": True,
+                "book_id": book_id,
+                "course_id": course_id,
+                "analysis": {
+                    "content_summary": book_content["summary"],
+                    "main_themes": themes_analysis["themes"],
+                    "key_concepts": key_concepts,
+                    "structure": book_structure,
+                    "concept_context": concept_context,
+                    "source_count": len(book_content["documents"]),
+                    "analysis_quality": self._assess_analysis_quality(book_content, themes_analysis, key_concepts)
+                },
+                "rag_data": {
+                    "documents_used": len(book_content["documents"]),
+                    "total_chunks": sum(len(doc.get("chunks", [])) for doc in book_content["documents"]),
+                    "coverage_score": book_content.get("coverage_score", 0.0)
+                }
+            }
+
+            logger.info(f"Book analysis completed for {book_id}: {len(key_concepts)} concepts found")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing book {book_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "book_id": book_id,
+                "course_id": course_id
+            }
+
+    async def _extract_book_rag_content(self, course_id: str, book_id: str) -> Dict[str, Any]:
+        """
+        Estrai contenuti RAG specifici del libro con query mirate
+        """
+        try:
+            # Query strategiche per estrarre contenuti completi del libro
+            analysis_queries = [
+                "concetti principali e temi fondamentali",
+                "struttura e organizzazione dei contenuti",
+                "argomenti chiave e argomentazioni principali",
+                "definizioni e terminologia specifica",
+                "esempi pratici e applicazioni"
+            ]
+
+            all_documents = []
+            total_sources = set()
+
+            for query in analysis_queries:
+                # RAG search con filtro libro-specifico
+                search_result = await self.rag_service.search_documents(
+                    course_id=course_id,
+                    search_query=query,
+                    max_results=8,
+                    book_filter=book_id  # Filtra solo per questo libro
+                )
+
+                if search_result.get("success"):
+                    for doc in search_result.get("documents", []):
+                        # Evita duplicati
+                        doc_id = doc.get("id", "")
+                        if doc_id not in total_sources:
+                            all_documents.append(doc)
+                            total_sources.add(doc_id)
+
+            # Organizza i contenuti per analisi
+            organized_content = self._organize_book_content(all_documents, book_id)
+
+            return {
+                "success": True,
+                "documents": organized_content["documents"],
+                "summary": organized_content["summary"],
+                "coverage_score": self._calculate_coverage_score(all_documents, book_id),
+                "total_sources": len(all_documents)
+            }
+
+        except Exception as e:
+            logger.error(f"Error extracting RAG content for book {book_id}: {e}")
+            return {"success": False, "documents": [], "summary": "", "coverage_score": 0.0}
+
+    def _organize_book_content(self, documents: List[Dict], book_id: str) -> Dict[str, Any]:
+        """
+        Organizza i contenuti RAG del libro per struttura e rilevanza
+        """
+        try:
+            # Raggruppa per tipo di contenuto
+            organized = {
+                "definitions": [],
+                "concepts": [],
+                "examples": [],
+                "structure": [],
+                "other": []
+            }
+
+            all_text = []
+            for doc in documents:
+                content = doc.get("content", "")
+                all_text.append(content)
+
+                # Classifica il contenuto
+                if any(keyword in content.lower() for keyword in ["definizione", "significato", "è", "consiste in"]):
+                    organized["definitions"].append(doc)
+                elif any(keyword in content.lower() for keyword in ["concetto", "principio", "teoria", "idea"]):
+                    organized["concepts"].append(doc)
+                elif any(keyword in content.lower() for keyword in ["esempio", "caso", "applicazione"]):
+                    organized["examples"].append(doc)
+                elif any(keyword in content.lower() for keyword in ["capitolo", "sezione", "parte", "struttura"]):
+                    organized["structure"].append(doc)
+                else:
+                    organized["other"].append(doc)
+
+            # Crea summary dei contenuti
+            summary = self._create_content_summary(organized, all_text)
+
+            return {
+                "documents": documents,
+                "organized": organized,
+                "summary": summary
+            }
+
+        except Exception as e:
+            logger.error(f"Error organizing content: {e}")
+            return {
+                "documents": documents,
+                "organized": {},
+                "summary": "Errore nell'organizzazione dei contenuti"
+            }
+
+    def _create_content_summary(self, organized: Dict[str, List], all_text: List[str]) -> str:
+        """
+        Crea un riassunto dei contenuti organizzati
+        """
+        summary_parts = []
+
+        if organized.get("definitions"):
+            summary_parts.append(f"{len(organized['definitions'])} definizioni")
+
+        if organized.get("concepts"):
+            summary_parts.append(f"{len(organized['concepts'])} concetti principali")
+
+        if organized.get("examples"):
+            summary_parts.append(f"{len(organized['examples'])} esempi pratici")
+
+        if organized.get("structure"):
+            summary_parts.append("informazioni sulla struttura")
+
+        total_content = len(all_text)
+        if total_content > 0:
+            summary_parts.append(f"{total_content} segmenti di contenuto")
+
+        return "Contenuti rilevanti: " + ", ".join(summary_parts)
+
+    async def _analyze_main_themes(self, book_content: Dict[str, Any], book_id: str) -> Dict[str, Any]:
+        """
+        Analizza i temi principali usando AI reasoning sui contenuti RAG
+        """
+        try:
+            if not book_content.get("documents"):
+                return {"themes": [], "analysis": "No content available"}
+
+            # Prepara il testo per l'analisi AI
+            content_text = self._prepare_content_for_ai(book_content["documents"][:15])  # Limita per performance
+
+            # Prompt specializzato per analisi temi
+            analysis_prompt = f"""
+            Analizza i seguenti contenuti di un libro e identifica i temi principali:
+
+            CONTENUTI DEL LIBRO:
+            {content_text}
+
+            Compito:
+            1. Identifica 3-5 temi principali del libro
+            2. Per ogni tema, descrivine l'importanza e come si collega agli altri
+            3. Evidenzia concetti trasversali che collegano i temi
+            4. Valuta la complessità e profondità di ogni tema
+
+            Rispondi in formato JSON con questa struttura:
+            {{
+                "themes": [
+                    {{
+                        "name": "Nome del tema",
+                        "description": "Descrizione dettagliata",
+                        "importance": "alta/media/bassa",
+                        "connections": ["tema1", "tema2"],
+                        "concepts": ["concetto1", "concetto2"]
+                    }}
+                ],
+                "cross_cutting_concepts": ["concetto1", "concetto2"],
+                "complexity_assessment": "bassa/media/alta"
+            }}
+            """
+
+            llm_service = self._get_llm_service()
+            response = await llm_service.generate_response(analysis_prompt)
+
+            # Parsing della risposta
+            try:
+                themes_data = json.loads(response.get("content", "{}"))
+                return themes_data
+            except json.JSONDecodeError:
+                # Fallback se JSON parsing fallisce
+                return {
+                    "themes": [
+                        {
+                            "name": "Temi Principali",
+                            "description": response.get("content", "Analisi non disponibile")[:200],
+                            "importance": "media",
+                            "connections": [],
+                            "concepts": []
+                        }
+                    ],
+                    "cross_cutting_concepts": [],
+                    "complexity_assessment": "media"
+                }
+
+        except Exception as e:
+            logger.error(f"Error analyzing themes: {e}")
+            return {"themes": [], "analysis": f"Error: {str(e)}"}
+
+    async def _extract_key_concepts(self, book_content: Dict[str, Any], themes_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Estrai concetti chiave dai contenuti RAG e dall'analisi dei temi
+        """
+        try:
+            key_concepts = []
+
+            # 1. Concetti dai temi identificati
+            for theme in themes_analysis.get("themes", []):
+                for concept_name in theme.get("concepts", []):
+                    if concept_name and concept_name not in [c.get("name") for c in key_concepts]:
+                        key_concepts.append({
+                            "name": concept_name,
+                            "source": "theme_analysis",
+                            "theme": theme.get("name"),
+                            "importance": theme.get("importance", "media")
+                        })
+
+            # 2. Concetti cross-cutting
+            for concept in themes_analysis.get("cross_cutting_concepts", []):
+                if concept and concept not in [c.get("name") for c in key_concepts]:
+                    key_concepts.append({
+                        "name": concept,
+                        "source": "cross_cutting",
+                        "importance": "alta"
+                    })
+
+            # 3. Concetti estratti direttamente dai documenti RAG
+            document_concepts = self._extract_concepts_from_documents(book_content.get("documents", []))
+            for concept in document_concepts:
+                if concept["name"] not in [c.get("name") for c in key_concepts]:
+                    key_concepts.append(concept)
+
+            # 4. Limita e ordina per importanza
+            key_concepts = sorted(key_concepts, key=lambda x: self._concept_importance_score(x), reverse=True)
+            return key_concepts[:15]  # Max 15 concetti chiave
+
+        except Exception as e:
+            logger.error(f"Error extracting key concepts: {e}")
+            return []
+
+    def _extract_concepts_from_documents(self, documents: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        Estrai concetti dai documenti RAG usando pattern matching
+        """
+        concepts = []
+        import re
+
+        # Pattern per identificare concetti
+        concept_patterns = [
+            r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b',  # Termini in maiuscolo
+            r'\bconcetto\s+di\s+([^\s,\.]+(?:\s+[^\s,\.]+)*)',  # "concetto di X"
+            r'\bprincipio\s+([^\s,\.]+(?:\s+[^\s,\.]+)*)',  # "principio X"
+            r'\bteoria\s+([^\s,\.]+(?:\s+[^\s,\.]+)*)',  # "teoria X"
+            r'\bdefinizione\s+di\s+([^\s,\.]+(?:\s+[^\s,\.]+)*)',  # "definizione di X"
+        ]
+
+        concept_frequency = {}
+
+        for doc in documents:
+            content = doc.get("content", "")
+            for pattern in concept_patterns:
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                for match in matches:
+                    concept_name = match.strip()
+                    if len(concept_name) > 2:  # Ignora termini troppo corti
+                        concept_frequency[concept_name] = concept_frequency.get(concept_name, 0) + 1
+
+        # Converti in lista e filtra per frequenza
+        for concept_name, frequency in concept_frequency.items():
+            if frequency >= 2:  # Appare almeno 2 volte
+                concepts.append({
+                    "name": concept_name,
+                    "source": "document_extraction",
+                    "frequency": frequency,
+                    "importance": "alta" if frequency >= 4 else "media"
+                })
+
+        return concepts
+
+    def _concept_importance_score(self, concept: Dict[str, Any]) -> float:
+        """
+        Calcola punteggio di importanza per un concetto
+        """
+        score = 0.0
+
+        # Fonte del concetto
+        if concept.get("source") == "cross_cutting":
+            score += 10.0
+        elif concept.get("source") == "theme_analysis":
+            score += 8.0
+        elif concept.get("source") == "document_extraction":
+            score += 5.0
+
+        # Importanza esplicita
+        importance = concept.get("importance", "media")
+        if importance == "alta":
+            score += 5.0
+        elif importance == "media":
+            score += 3.0
+
+        # Frequenza (se disponibile)
+        frequency = concept.get("frequency", 1)
+        score += min(frequency, 5)  # Max 5 punti per frequenza
+
+        return score
+
+    async def _identify_book_structure(self, book_content: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Identifica la struttura del libro dai contenuti RAG
+        """
+        try:
+            documents = book_content.get("documents", [])
+
+            # Cerca pattern strutturali nei documenti
+            structure_info = {
+                "has_chapters": False,
+                "estimated_chapters": 0,
+                "sections": [],
+                "complexity": "media"
+            }
+
+            chapter_keywords = ["capitolo", "chapter", "parte", "section", "sezione"]
+            chapter_count = 0
+            sections_found = set()
+
+            for doc in documents:
+                content = doc.get("content", "").lower()
+
+                # Conta capitoli
+                for keyword in chapter_keywords:
+                    if keyword in content:
+                        structure_info["has_chapters"] = True
+                        chapter_count += content.count(keyword)
+
+                # Estrai sezioni
+                section_pattern = r'\b(capitolo\s+\d+|parte\s+\d+|sezione\s+[a-z0-9]+)\b'
+                import re
+                sections = re.findall(section_pattern, content, re.IGNORECASE)
+                sections_found.update(sections)
+
+            structure_info["estimated_chapters"] = min(chapter_count, 20)  # Max 20 per realismo
+            structure_info["sections"] = list(sections_found)[:10]  # Max 10 sezioni
+
+            # Valuta complessità
+            if structure_info["estimated_chapters"] > 10:
+                structure_info["complexity"] = "alta"
+            elif structure_info["estimated_chapters"] < 5:
+                structure_info["complexity"] = "bassa"
+
+            return structure_info
+
+        except Exception as e:
+            logger.error(f"Error identifying book structure: {e}")
+            return {"has_chapters": False, "estimated_chapters": 0, "sections": [], "complexity": "media"}
+
+    async def _generate_concept_map_context(self, book_content: Dict[str, Any],
+                                          themes_analysis: Dict[str, Any],
+                                          key_concepts: List[Dict[str, Any]],
+                                          book_structure: Dict[str, Any],
+                                          book_id: str) -> str:
+        """
+        Genera il contesto completo per la generazione di concept maps
+        """
+        try:
+            # Informazioni sul libro
+            book_title = self._get_book_title(book_id)
+
+            # Contesto tematico
+            themes_context = ""
+            if themes_analysis.get("themes"):
+                themes_context = "\n".join([
+                    f"- {theme.get('name', 'Tema')}: {theme.get('description', '')[:100]}..."
+                    for theme in themes_analysis["themes"][:5]
+                ])
+
+            # Contesto concettuale
+            concepts_context = ""
+            if key_concepts:
+                concepts_context = "\n".join([
+                    f"- {concept.get('name', 'Concetto')} (importanza: {concept.get('importance', 'media')})"
+                    for concept in key_concepts[:10]
+                ])
+
+            # Contesto strutturale
+            structure_context = f"Struttura: {book_structure.get('estimated_chapters', 0)} capitoli stimati"
+
+            # Assembla il contesto completo
+            full_context = f"""
+            CONTESTO PER CONCEPT MAP - Libro: {book_title}
+
+            TEMI PRINCIPALI:
+            {themes_context}
+
+            CONCETTI CHIAVE IDENTIFICATI:
+            {concepts_context}
+
+            {structure_context}
+
+            Questo contesto deve essere usato per generare concept maps che:
+            1. Riflettano i temi e concetti effettivamente presenti nel libro
+            2. Rispettino la struttura e l'organizzazione dei contenuti
+            3. Siano gerarchicamente organizzate per importanza
+            4. Includano obiettivi di apprendimento realistici
+            """
+
+            return full_context
+
+        except Exception as e:
+            logger.error(f"Error generating concept map context: {e}")
+            return f"Contesto base per generazione concept map del libro {book_id}"
+
+    def _get_book_title(self, book_id: str) -> str:
+        """
+        Recupera il titolo del libro dall'ID
+        """
+        try:
+            courses_path = Path("data/courses/courses.json")
+            if courses_path.exists():
+                with open(courses_path, 'r', encoding='utf-8') as f:
+                    courses_data = json.load(f)
+
+                for course in courses_data.get("courses", []):
+                    for book in course.get("books", []):
+                        if book.get("id") == book_id:
+                            return book.get("title", f"Libro {book_id}")
+        except Exception:
+            pass
+        return f"Libro {book_id}"
+
+    def _calculate_coverage_score(self, documents: List[Dict], book_id: str) -> float:
+        """
+        Calcola uno score di copertura dei contenuti RAG
+        """
+        if not documents:
+            return 0.0
+
+        # Score basato su numero e qualità dei documenti
+        doc_count_score = min(len(documents) / 10.0, 1.0)  # Normalizza a max 10 doc
+        content_score = sum(len(doc.get("content", "")) for doc in documents) / 10000.0  # Normalizza per 10k caratteri
+
+        return min((doc_count_score + content_score) / 2.0, 1.0)
+
+    def _assess_analysis_quality(self, book_content: Dict[str, Any],
+                               themes_analysis: Dict[str, Any],
+                               key_concepts: List[Dict[str, Any]]) -> str:
+        """
+        Valuta la qualità dell'analisi
+        """
+        try:
+            quality_score = 0.0
+
+            # Copertura contenuti
+            coverage = book_content.get("coverage_score", 0.0)
+            quality_score += coverage * 0.4
+
+            # Qualità temi
+            themes_count = len(themes_analysis.get("themes", []))
+            if themes_count >= 3:
+                quality_score += 0.3
+            elif themes_count >= 1:
+                quality_score += 0.15
+
+            # Qualità concetti
+            concepts_count = len(key_concepts)
+            if concepts_count >= 8:
+                quality_score += 0.3
+            elif concepts_count >= 4:
+                quality_score += 0.15
+
+            # Valutazione finale
+            if quality_score >= 0.8:
+                return "eccellente"
+            elif quality_score >= 0.6:
+                return "buona"
+            elif quality_score >= 0.4:
+                return "sufficiente"
+            else:
+                return "migliorabile"
+
+        except Exception:
+            return "sconosciuta"
+
+    def _create_fallback_analysis(self, course_id: str, book_id: str) -> Dict[str, Any]:
+        """
+        Crea un'analisi di fallback quando non ci sono contenuti RAG
+        """
+        book_title = self._get_book_title(book_id)
+
+        return {
+            "success": True,
+            "book_id": book_id,
+            "course_id": course_id,
+            "analysis": {
+                "content_summary": f"Nessun contenuto RAG disponibile per {book_title}",
+                "main_themes": {"themes": [], "cross_cutting_concepts": [], "complexity_assessment": "bassa"},
+                "key_concepts": [],
+                "structure": {"has_chapters": False, "estimated_chapters": 0, "sections": [], "complexity": "bassa"},
+                "concept_context": f"Contesto minimale per il libro {book_title}. È necessaria analisi manuale.",
+                "analysis_quality": "migliorabile"
+            },
+            "rag_data": {
+                "documents_used": 0,
+                "total_chunks": 0,
+                "coverage_score": 0.0
+            }
+        }
+
+    def _prepare_content_for_ai(self, documents: List[Dict], max_chars: int = 8000) -> str:
+        """
+        Prepara i contenuti per l'analisi AI, limitando la lunghezza
+        """
+        content_parts = []
+        total_chars = 0
+
+        for doc in documents:
+            content = doc.get("content", "")
+            if total_chars + len(content) > max_chars:
+                # Tronca l'ultimo contenuto se necessario
+                remaining = max_chars - total_chars
+                if remaining > 100:  # Include solo se è abbastanza lungo
+                    content_parts.append(content[:remaining] + "...")
+                break
+
+            content_parts.append(content)
+            total_chars += len(content)
+
+        return "\n\n---\n\n".join(content_parts)

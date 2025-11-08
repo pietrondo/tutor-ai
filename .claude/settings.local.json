@@ -42,7 +42,8 @@
       "Bash(python3:*)",
       "Bash(lsof:*)",
       "WebFetch(domain:docs.z.ai)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "mcp__serena__think_about_collected_information"
     ],
     "deny": [],
     "ask": []

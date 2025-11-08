@@ -120,7 +120,7 @@ export function ConceptVisualMap({
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
       case 'up': return TrendingUp
-      case 'down': return TrendingUp
+      case 'down': return TrendingUp // TODO: Consider using a different icon for down trend
       default: return Circle
     }
   }
@@ -232,7 +232,7 @@ export function ConceptVisualMap({
         ) : (
           <div className="p-4 space-y-3">
             {chaptersGrouped.map((chapter) => (
-              <div key={chapter.title} className="border border-gray-200 rounded-lg">
+              <div key={`chapter-${chapter.title}-${chapter.index}`} className="border border-gray-200 rounded-lg">
                 <button
                   onClick={() => toggleChapter(chapter.title)}
                   className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors rounded-t-lg"

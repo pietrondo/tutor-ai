@@ -18,6 +18,16 @@ import asyncio
 from services.rag_service import RAGService
 from services.llm_service import LLMService
 from services.course_service import CourseService
+from services.concept_map_service import concept_map_service
+
+# Import fast book concepts API
+from fast_book_concepts import BookConceptRequest, get_book_concepts_fast
+from hybrid_concept_service import HybridConceptRequest, get_hybrid_concepts
+from models.book_concept_maps import (
+    BookConceptMapRequest, BookConceptMapResponse, BookConceptMapSummary,
+    BookConceptAnalysisRequest, BookCacheStatsResponse,
+    BookConceptValidationRequest, BookConceptValidationResponse
+)
 from services.book_service import BookService
 from services.study_tracker import StudyTracker
 from services.study_planner_service import StudyPlannerService
@@ -2940,6 +2950,352 @@ async def reindex_rag_with_model(request: ReindexRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/book-concepts")
+async def get_book_concepts(request: BookConceptRequest):
+    """Get book concepts directly from stored data - fast API"""
+    return get_book_concepts_fast(request)
+
+@app.post("/hybrid-concepts")
+async def get_hybrid_concepts_endpoint(request: HybridConceptRequest):
+    """
+    Sistema ibrido: concept maps pre-generate + RAG analysis on-demand
+    Opzioni depth_level: "basic", "detailed", "comprehensive"
+    include_rag_analysis: true per approfondimenti con RAG
+    """
+    return await get_hybrid_concepts(request)
+
+@app.post("/api/book-concept-maps/{course_id}/{book_id}", response_model=BookConceptMapResponse)
+async def generate_book_concept_map(course_id: str, book_id: str, request: BookConceptMapRequest):
+    """
+    Genera concept map book-specific usando RAG + AI reasoning
+
+    Questo endpoint:
+    - Usa BookContentAnalyzer per analisi RAG dei contenuti del libro
+    - Applica AI reasoning per generare concept maps di alta qualità
+    - Implementa caching intelligente per performance
+    - Supporta fallback graduali se RAG quality è bassa
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        # Validate request
+        if request.course_id != course_id or request.book_id != book_id:
+            raise HTTPException(status_code=400, detail="Path and request IDs must match")
+
+        # Generate RAG-based concept map
+        concept_map = await concept_map_service.generate_rag_based_book_concept_map(
+            course_id=course_id,
+            book_id=book_id,
+            force=request.force_regeneration,
+            quality_threshold=request.quality_threshold
+        )
+
+        if not concept_map or "error" in concept_map:
+            raise HTTPException(status_code=500, detail=concept_map.get("error", "Unknown error"))
+
+        # Prepare response metadata
+        generation_time = time.time() - start_time
+        cache_hit = getattr(concept_map_service.book_cache, '_last_hit', False) if concept_map_service.book_cache else False
+
+        response = BookConceptMapResponse(
+            success=True,
+            course_id=course_id,
+            book_id=book_id,
+            book_title=concept_map.get("book_title", f"Libro {book_id}"),
+            concept_map=concept_map,
+            generation_metadata={
+                "generation_method": concept_map.get("extraction_method", "unknown"),
+                "rag_enhanced": concept_map.get("rag_enhanced", False),
+                "rag_quality_score": concept_map.get("rag_analysis_quality_score", 0.0),
+                "concepts_count": len(concept_map.get("concepts", [])),
+                "source_count": concept_map.get("source_count", 0),
+                "cache_hit": cache_hit,
+                "force_regeneration": request.force_regeneration
+            },
+            performance_metrics={
+                "generation_time_seconds": round(generation_time, 3),
+                "cache_enabled": request.use_cache,
+                "quality_threshold_met": concept_map.get("rag_analysis_quality_score", 0.0) >= request.quality_threshold
+            }
+        )
+
+        logger.info(f"Book concept map generated for {book_id} in {generation_time:.3f}s, cache_hit: {cache_hit}")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating book concept map for {book_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/book-concept-maps/{course_id}/{book_id}", response_model=BookConceptMapSummary)
+async def get_book_concept_map_summary(course_id: str, book_id: str):
+    """
+    Recupera summary della concept map per un libro specifico
+
+    Restituisce informazioni base senza caricare l'intera concept map
+    """
+    try:
+        # Try cache first for summary
+        cache_summary = None
+        if concept_map_service.book_cache:
+            cached_map = concept_map_service.book_cache.get_concept_map(course_id, book_id, 0.1)  # Very low threshold
+            if cached_map:
+                cache_summary = BookConceptMapSummary(
+                    book_id=book_id,
+                    book_title=cached_map.get("book_title", f"Libro {book_id}"),
+                    concepts_count=len(cached_map.get("concepts", [])),
+                    rag_enhanced=cached_map.get("rag_enhanced", False),
+                    quality_score=cached_map.get("rag_analysis_quality_score", 0.0),
+                    generated_at=cached_map.get("generated_at", ""),
+                    cache_hit=True
+                )
+                return cache_summary
+
+        # Fallback to database
+        existing_map = concept_map_service._get_book_concept_map(course_id, book_id)
+        if not existing_map:
+            raise HTTPException(status_code=404, detail="Concept map not found")
+
+        summary = BookConceptMapSummary(
+            book_id=book_id,
+            book_title=existing_map.get("book_title", f"Libro {book_id}"),
+            concepts_count=len(existing_map.get("concepts", [])),
+            rag_enhanced=existing_map.get("rag_enhanced", False),
+            quality_score=existing_map.get("rag_analysis_quality_score", 0.0),
+            generated_at=existing_map.get("generated_at", ""),
+            cache_hit=False
+        )
+
+        return summary
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting book concept map summary for {book_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/book-concept-maps/{course_id}/{book_id}/analyze", response_model=Dict[str, Any])
+async def analyze_book_content(course_id: str, book_id: str, request: BookConceptAnalysisRequest):
+    """
+    Analisi RAG dei contenuti di un libro senza generare concept map
+
+    Utile per:
+    - Valutare la qualità dei contenuti RAG disponibili
+    - Comprendere i temi principali prima della generazione
+    - Diagnostica problemi di content extraction
+    """
+    try:
+        from services.rag_service import BookContentAnalyzer
+
+        rag_service = RAGService()
+        book_analyzer = BookContentAnalyzer(rag_service)
+
+        analysis = await book_analyzer.analyze_book_content(course_id, book_id)
+
+        if not analysis.get("success"):
+            raise HTTPException(status_code=404, detail=analysis.get("error", "Analysis failed"))
+
+        # Return full or partial analysis based on request
+        if request.include_full_analysis:
+            return analysis
+        else:
+            # Return summary only
+            return {
+                "success": True,
+                "book_id": book_id,
+                "course_id": course_id,
+                "summary": {
+                    "content_summary": analysis["analysis"]["content_summary"],
+                    "main_themes_count": len(analysis["analysis"]["main_themes"].get("themes", [])),
+                    "key_concepts_count": len(analysis["analysis"]["key_concepts"]),
+                    "structure_detected": analysis["analysis"]["structure"]["has_chapters"],
+                    "analysis_quality": analysis["analysis"]["analysis_quality"],
+                    "rag_coverage_score": analysis["rag_data"]["coverage_score"],
+                    "documents_used": analysis["rag_data"]["documents_used"]
+                }
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing book content for {book_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/book-concept-maps/cache/stats", response_model=BookCacheStatsResponse)
+async def get_book_concept_cache_stats():
+    """
+    Recupera statistiche della cache book concept maps
+    """
+    try:
+        if not concept_map_service.book_cache:
+            return BookCacheStatsResponse(
+                cache_performance={"error": "Cache service not available"},
+                cache_content={"error": "Cache service not available"},
+                cache_health={"error": "Cache service not available"}
+            )
+
+        stats = concept_map_service.book_cache.get_cache_stats()
+        return BookCacheStatsResponse(**stats)
+
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/book-concept-maps/{course_id}/{book_id}/cache")
+async def invalidate_book_concept_cache(course_id: str, book_id: str):
+    """
+    Invalida la cache per un libro specifico
+
+    Utile quando:
+    - I contenuti del libro sono stati aggiornati
+    - Si vuole forzare una rigenerazione pulita
+    - Si diagnosticano problemi di cache
+    """
+    try:
+        if not concept_map_service.book_cache:
+            raise HTTPException(status_code=501, detail="Cache service not available")
+
+        success = concept_map_service.book_cache.invalidate_book_cache(course_id, book_id)
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Cache invalidated for book {book_id}",
+                "course_id": course_id,
+                "book_id": book_id
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"No cache entries found for book {book_id}",
+                "course_id": course_id,
+                "book_id": book_id
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error invalidating cache for book {book_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/book-concept-maps/validate", response_model=BookConceptValidationResponse)
+async def validate_book_concept_map(request: BookConceptValidationRequest):
+    """
+    Valida una concept map book-specific
+
+    Controlla:
+    - Allineamento con RAG analysis
+    - Qualità educativa
+    - Completezza strutturale
+    - Consistenza dei contenuti
+    """
+    try:
+        concept_map = request.concept_map
+        validation_score = 0.0
+        issues_found = []
+        suggestions = []
+
+        # 1. Struttura base validation
+        required_fields = ["book_id", "concepts", "generated_at"]
+        missing_fields = [field for field in required_fields if field not in concept_map]
+
+        if missing_fields:
+            issues_found.append(f"Missing required fields: {', '.join(missing_fields)}")
+            validation_score -= 0.3
+
+        # 2. Concetti validation
+        concepts = concept_map.get("concepts", [])
+        if not concepts:
+            issues_found.append("No concepts found in concept map")
+            validation_score -= 0.4
+        else:
+            # Check each concept
+            valid_concepts = 0
+            for i, concept in enumerate(concepts):
+                concept_score = 0.0
+                concept_issues = []
+
+                # Required concept fields
+                if "name" in concept and concept["name"]:
+                    concept_score += 0.2
+                else:
+                    concept_issues.append(f"Concept {i+1}: Missing or empty name")
+
+                if "summary" in concept and concept["summary"]:
+                    concept_score += 0.2
+                else:
+                    concept_issues.append(f"Concept {i+1}: Missing or empty summary")
+
+                if "learning_objectives" in concept and concept["learning_objectives"]:
+                    concept_score += 0.3
+                else:
+                    concept_issues.append(f"Concept {i+1}: Missing learning objectives")
+
+                if "quiz_outline" in concept and concept["quiz_outline"]:
+                    concept_score += 0.3
+                else:
+                    concept_issues.append(f"Concept {i+1}: Missing quiz outline")
+
+                if concept_score >= 0.7:
+                    valid_concepts += 1
+                elif concept_issues:
+                    issues_found.extend(concept_issues)
+
+            concept_quality_score = valid_concepts / len(concepts) if concepts else 0.0
+            validation_score += concept_quality_score * 0.5
+
+            if concept_quality_score < 0.7:
+                suggestions.append("Improve concept structure and completeness")
+
+        # 3. RAG alignment validation (se disponibile)
+        rag_score = concept_map.get("rag_analysis_quality_score", 0.0)
+        if rag_score > 0.0:
+            validation_score += rag_score * 0.3
+            if rag_score < 0.5:
+                suggestions.append("Consider regenerating with better RAG content")
+
+        # 4. Educational quality validation
+        educational_score = 0.0
+        if concepts:
+            # Check for educational elements
+            has_objectives = any("learning_objectives" in c for c in concepts)
+            has_quizzes = any("quiz_outline" in c for c in concepts)
+            has_reading = any("suggested_reading" in c for c in concepts)
+
+            if has_objectives:
+                educational_score += 0.4
+            if has_quizzes:
+                educational_score += 0.3
+            if has_reading:
+                educational_score += 0.3
+
+            validation_score += educational_score * 0.2
+
+        # Normalize score
+        validation_score = max(0.0, min(1.0, validation_score))
+
+        # Generate suggestions based on issues
+        if not issues_found and validation_score < 0.8:
+            suggestions.append("Concept map is valid but could be enhanced")
+
+        if validation_score < 0.5:
+            suggestions.append("Consider regenerating the concept map")
+
+        return BookConceptValidationResponse(
+            is_valid=validation_score >= 0.6,
+            validation_score=validation_score,
+            issues_found=issues_found,
+            suggestions=suggestions,
+            rag_alignment_score=rag_score,
+            educational_quality_score=educational_score
+        )
+
+    except Exception as e:
+        logger.error(f"Error validating concept map: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/mindmap")
 async def generate_mindmap(request: MindmapRequest):
     """Generate a mindmap using RAG system"""
@@ -5399,4 +5755,4 @@ async def update_concept_progress(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

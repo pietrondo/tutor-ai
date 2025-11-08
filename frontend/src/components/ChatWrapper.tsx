@@ -16,7 +16,8 @@ import {
   AlertCircle,
   RefreshCw,
   Filter,
-  Target
+  Target,
+  Map as MapIcon
 } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
 import { CourseSelector } from '@/components/CourseSelector'
@@ -24,6 +25,12 @@ import BookSelector from '@/components/BookSelector'
 import { ConceptVisualMap } from '@/components/ConceptVisualMap'
 import { llmManager, LLMRequest, LLMResponse } from '@/lib/llm-manager'
 import type { CourseConcept, ConceptMetrics, CourseConceptMap } from '@/types/concept'
+import { useConceptMapStore } from '@/stores/conceptMapStore'
+import { AnimatedConceptNode } from './concept-map/AnimatedConceptNode'
+import { BreadcrumbNavigation } from './concept-map/BreadcrumbNavigation'
+import { NavigationControls } from './concept-map/NavigationControls'
+import { useAIExpansion } from './concept-map/AIExpansionService'
+import { mindmapService } from '@/services/mindmapService'
 
 interface Message {
   id: string
@@ -116,6 +123,26 @@ export function ChatWrapper() {
   const [showConceptMap, setShowConceptMap] = useState(true)
   const [mentionedConcepts, setMentionedConcepts] = useState<string[]>([])
 
+  // Enhanced concept map state
+  const {
+    rootNode,
+    selectedNodeId,
+    expandedNodes,
+    breadcrumb,
+    viewMode,
+    zoom,
+    isLoading: conceptMapLoading,
+    setRootNode,
+    selectNode,
+    toggleNodeExpansion,
+    expandAll,
+    collapseAll,
+    setCurrentContext,
+    expandNodeWithAI
+  } = useConceptMapStore()
+
+  const { quickExpand, getPrompts } = useAIExpansion()
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -125,7 +152,7 @@ export function ChatWrapper() {
   useEffect(() => {
     if (selectedCourse) {
       loadBooks(selectedCourse)
-      loadConceptContext(selectedCourse)
+      loadConceptContext(selectedCourse, selectedBook || undefined)
     } else {
       setBooks([])
       setSelectedBook('')
@@ -133,7 +160,7 @@ export function ChatWrapper() {
       setConceptMetrics({})
       setSelectedConceptIds([])
     }
-  }, [selectedCourse])
+  }, [selectedCourse, selectedBook])
 
   const initializeChat = async () => {
     await loadCourses()
@@ -146,11 +173,13 @@ export function ChatWrapper() {
     if (courseId) {
       setSelectedCourse(courseId)
       await loadBooks(courseId)
-      await loadConceptContext(courseId)
     }
 
     if (bookId) {
       setSelectedBook(bookId)
+      await loadConceptContext(courseId, bookId)
+    } else {
+      await loadConceptContext(courseId)
     }
   }
 
@@ -210,18 +239,110 @@ export function ChatWrapper() {
     }
   }
 
-  const loadConceptContext = async (courseId: string) => {
+  const loadConceptContext = async (courseId: string, bookId?: string) => {
     setConceptsLoading(true)
     setConceptError(null)
     try {
-      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/concepts`)
+      const url = bookId
+        ? `${API_BASE_URL}/courses/${courseId}/concepts?book_id=${bookId}`
+        : `${API_BASE_URL}/courses/${courseId}/concepts`
+      const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
         setConceptMap(data.concept_map)
+
+        // Update concept map store with new hierarchical data
+        if (data.concept_map && data.concept_map.concepts) {
+          // Handle hierarchical structure
+          const concepts = data.concept_map.concepts || []
+
+          // Validate concepts before processing
+          const validConcepts = concepts.filter(concept => concept && concept.id && concept.name)
+
+          if (validConcepts.length === 0) {
+            console.warn('No valid concepts found in concept map')
+            setConceptError('Nessun concetto valido trovato nella mappa.')
+            return
+          }
+
+          // Transform concepts to our store format
+          const rootNode: any = {
+            id: 'root',
+            title: data.concept_map.course_name || 'Concept Map',
+            summary: `Mappa concettuale gerarchica per ${data.concept_map.course_name || 'il corso'}`,
+            children: validConcepts.map((concept: any, index: number) => ({
+              id: concept.id,
+              title: concept.name,
+              summary: concept.summary,
+              description: concept.summary,
+              study_actions: concept.learning_objectives || [],
+              priority: concept.importance_score ? Math.ceil(concept.importance_score * 5) : null,
+              references: concept.suggested_reading || [],
+              children: (concept.children || [])
+                .filter((child: any) => child && child.id && child.name)
+                .map((child: any) => ({
+                id: child.id,
+                title: child.name,
+                summary: child.summary,
+                description: child.summary,
+                study_actions: child.learning_objectives || [],
+                priority: child.importance_score ? Math.ceil(child.importance_score * 5) : null,
+                references: child.suggested_reading || [],
+                children: [], // Can be expanded further with AI
+                depth: (concept.level || 1) + 1,
+                tags: child.related_topics?.slice(0, 3) || [],
+                sourceType: bookId ? 'book' : 'course',
+                masteryLevel: 0,
+                visited: false,
+                bookmarked: false,
+                metadata: {
+                  conceptType: child.concept_type || 'sub',
+                  canExpand: child.metadata?.depth_available || false,
+                  originalConceptId: child.metadata?.original_concept_id
+                }
+              })),
+              depth: concept.level || 1,
+              tags: concept.related_topics?.slice(0, 3) || [],
+              sourceType: bookId ? 'book' : 'course',
+              masteryLevel: 0,
+              visited: false,
+              bookmarked: false,
+              metadata: {
+                conceptType: concept.concept_type || 'macro',
+                subConceptsCount: concept.sub_concepts_count || 0,
+                chapterInfo: concept.chapter_info,
+                canExpand: concept.level ? concept.level < 3 : false
+              }
+            })),
+            depth: 0,
+            sourceType: 'course',
+            masteryLevel: 0,
+            visited: false,
+            bookmarked: false,
+            metadata: {
+              structureType: data.concept_map.structure_type || 'hierarchical',
+              macroConceptsCount: data.concept_map.macro_concepts_count || concepts.length,
+              hierarchyLevels: data.concept_map.metadata?.hierarchy_levels || 2
+            }
+          }
+
+          // Validate rootNode before setting it
+          if (rootNode && rootNode.id && rootNode.children && Array.isArray(rootNode.children) && rootNode.children.length > 0) {
+            setRootNode(rootNode)
+            setCurrentContext(courseId, bookId || null)
+          } else {
+            console.warn('Invalid rootNode created, skipping setRootNode:', rootNode)
+            setConceptError('Dati concettuali non validi o mappa vuota. Riprova a generare la mappa.')
+            setConceptMap(null)
+            setConceptMetrics({})
+          }
+        }
+
         await loadConceptMetrics(courseId)
       } else if (response.status === 404) {
         setConceptMap(null)
         setConceptMetrics({})
+        // Don't set rootNode to null here to avoid buildNodesMap error
       } else {
         throw new Error('Impossibile caricare la mappa concettuale')
       }
@@ -230,6 +351,7 @@ export function ChatWrapper() {
       setConceptError('Nessuna mappa concettuale disponibile. Generala per iniziare.')
       setConceptMap(null)
       setConceptMetrics({})
+      // Don't set rootNode to null here to avoid buildNodesMap error
     } finally {
       setConceptsLoading(false)
     }
@@ -254,40 +376,36 @@ export function ChatWrapper() {
     setConceptError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/courses/${selectedCourse}/concepts/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(90000),
-        body: JSON.stringify({ book_id: selectedBook || undefined, force: true })
+      // Usa il servizio unificato per generare/ottenere la mappa
+      const result = await mindmapService.getMindmap({
+        courseId: selectedCourse,
+        bookId: selectedBook || undefined,
+        forceRegenerate: false // Non forzare, usa cache se disponibile
       })
 
-      if (!response.ok) {
-        let detail = 'Errore generazione concept map'
-        try {
-          const errorData = await response.json()
-          if (typeof errorData?.detail === 'string') {
-            detail = errorData.detail
-          }
-        } catch {
-          // Ignore JSON parsing errors for non-JSON responses
+      if (result.mindmap) {
+        // Converti StudyMindmap in CourseConceptMap per compatibilità
+        const conceptMap = mindmapService.convertToConceptMap(result.mindmap)
+        setConceptMap(conceptMap)
+        setSelectedConceptIds([])
+        await loadConceptMetrics(selectedCourse)
+        setConceptProgress(100)
+
+        // Mostra messaggio informativo se dalla cache
+        if (result.fromCache) {
+          console.log('📦 Mappa caricata dalla cache condivisa')
         }
-        throw new Error(detail)
+      } else {
+        throw new Error(result.error || 'Generazione mappa fallita')
       }
 
-      const data = await response.json()
-      setConceptMap(data.concept_map)
-      setSelectedConceptIds([])
-      await loadConceptMetrics(selectedCourse)
-      setConceptProgress(100)
     } catch (error) {
-      console.error('Errore generazione concept map:', error)
+      console.error('Errore generazione mappa unificata:', error)
 
       const fallbackMessage = 'Impossibile generare la mappa concettuale. Riprova più tardi.'
       let message = fallbackMessage
 
-      if (error instanceof DOMException && error.name === 'TimeoutError') {
-        message = 'La generazione sta impiegando troppo tempo. Controlla che il backend sia attivo e riprova.'
-      } else if (error instanceof Error) {
+      if (error instanceof Error) {
         message = error.message || fallbackMessage
       }
 
@@ -975,18 +1093,136 @@ Caratteristiche chiave:
           {/* Concept Focus - Ora nella sidebar */}
         </div>
 
-        {/* Sidebar with Concept Map */}
-        <div className="lg:col-span-1 space-y-6">
-          <ConceptVisualMap
-            conceptMap={conceptMap}
-            conceptMetrics={conceptMetrics}
-            conceptsLoading={conceptsLoading}
-            conceptsGenerating={conceptsGenerating}
-            onConceptToggle={toggleConcept}
-            selectedConceptIds={selectedConceptIds}
-            onConceptQuiz={handleStartQuiz}
-            expandedByDefault={showConceptMap}
-          />
+        {/* Sidebar with Enhanced Concept Map */}
+        <div className="lg:col-span-1 space-y-6 overflow-hidden">
+          {/* Concept Map Header */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <MapIcon className="h-5 w-5 text-blue-600" />
+                <h3 className="font-semibold text-gray-900">Mappa Concettuale</h3>
+              </div>
+              <button
+                onClick={() => setShowConceptMap(!showConceptMap)}
+                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <Target className="h-4 w-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Breadcrumb Navigation */}
+            {rootNode && (
+              <BreadcrumbNavigation
+                maxItems={3}
+                showNavigationButtons={false}
+                className="mb-3"
+              />
+            )}
+
+            {/* Navigation Controls */}
+            {rootNode && (
+              <NavigationControls
+                showShortcuts={false}
+                onExport={() => console.log('Export concept map')}
+                onShare={() => console.log('Share concept map')}
+                className="mb-3"
+              />
+            )}
+          </div>
+
+          {/* Enhanced Concept Map */}
+          {showConceptMap && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4 overflow-visible relative">
+              {conceptsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin text-blue-600 mr-2" />
+                  <span className="text-gray-600">Caricamento mappa concettuale...</span>
+                </div>
+              ) : conceptError ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-3">{conceptError}</p>
+                  <button
+                    onClick={() => loadConceptContext(selectedCourse, selectedBook || undefined)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Genera Mappa
+                  </button>
+                </div>
+              ) : rootNode ? (
+                <div className="space-y-3">
+                  {/* Root Node */}
+                  <AnimatedConceptNode
+                    node={rootNode}
+                    isRoot={true}
+                    depth={0}
+                    onNodeClick={(node) => selectNode(node.id)}
+                    onExpandRequest={async (nodeId, useAI) => {
+                      if (useAI) {
+                        await expandNodeWithAI(nodeId)
+                      } else {
+                        // Add manual node creation logic here
+                      }
+                    }}
+                  />
+
+                  {/* Quick Actions */}
+                  <div className="flex gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={expandAll}
+                      className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors text-sm"
+                    >
+                      Espandi Tutti
+                    </button>
+                    <button
+                      onClick={collapseAll}
+                      className="flex-1 px-3 py-2 bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors text-sm"
+                    >
+                      Comprimi Tutti
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <MapIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-3">Seleziona un corso per vedere la mappa concettuale</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Concept Info */}
+          {rootNode && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Informazioni</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Nodi totali:</span>
+                  <span className="font-medium">{rootNode.children.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Nodi espansi:</span>
+                  <span className="font-medium">{expandedNodes.size}</span>
+                </div>
+                {selectedCourse && (
+                  <div className="flex justify-between">
+                    <span>Corso:</span>
+                    <span className="font-medium truncate max-w-24">
+                      {courses.find(c => c.id === selectedCourse)?.name || 'Sconosciuto'}
+                    </span>
+                  </div>
+                )}
+                {selectedBook && (
+                  <div className="flex justify-between">
+                    <span>Libro:</span>
+                    <span className="font-medium truncate max-w-24">
+                      {books.find(b => b.id === selectedBook)?.title || 'Sconosciuto'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Legacy concept focus info - ridotto */}
           {selectedConcepts.length > 0 && (

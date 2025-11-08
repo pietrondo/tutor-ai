@@ -335,9 +335,70 @@ Materiali di riferimento (estratti):
             "concepts": normalized_concepts
         }
 
-    def get_concept_map(self, course_id: str) -> Optional[Dict[str, Any]]:
-        data = self._load_concept_maps()
-        return data["concept_maps"].get(course_id)
+    def get_concept_map(self, course_id: str, book_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get concept map for a course, optionally filtered by book"""
+        try:
+            concept_maps = self._load_concept_maps()
+
+            if book_id:
+                # Return book-specific concept map
+                if course_id in concept_maps["concept_maps"]:
+                    course_data = concept_maps["concept_maps"][course_id]
+                    if "books" in course_data and book_id in course_data["books"]:
+                        book_map = course_data["books"][book_id]
+
+                        # Check if it's already hierarchical, if not, create hierarchical structure
+                        if book_map.get("structure_type") != "hierarchical":
+                            logger.info(f"Creating hierarchical structure for book {book_id}")
+                            from .hierarchical_concept_service import hierarchical_concept_service
+
+                            # Create hierarchical structure
+                            hierarchical_structure = hierarchical_concept_service.create_hierarchical_structure(
+                                course_id=course_id,
+                                course_name=course_data.get("course_name", "Course"),
+                                flat_concepts=book_map.get("concepts", []),
+                                book_id=book_id
+                            )
+
+                            # Save the new hierarchical structure
+                            if "books" not in course_data:
+                                course_data["books"] = {}
+                            course_data["books"][book_id] = hierarchical_structure
+                            self._save_concept_maps(concept_maps)
+
+                            return hierarchical_structure
+                        else:
+                            return book_map
+
+            else:
+                # Return course-wide concept map (all books)
+                if course_id in concept_maps["concept_maps"]:
+                    course_map = concept_maps["concept_maps"][course_id]
+
+                    # Check if it's already hierarchical, if not, create hierarchical structure
+                    if course_map.get("structure_type") != "hierarchical":
+                        logger.info(f"Creating hierarchical structure for course {course_id}")
+                        from .hierarchical_concept_service import hierarchical_concept_service
+
+                        # Create hierarchical structure
+                        hierarchical_structure = hierarchical_concept_service.create_hierarchical_structure(
+                            course_id=course_id,
+                            course_name=course_map.get("course_name", "Course"),
+                            flat_concepts=course_map.get("concepts", []),
+                            book_id=None
+                        )
+
+                        # Save the new hierarchical structure
+                        concept_maps["concept_maps"][course_id] = hierarchical_structure
+                        self._save_concept_maps(concept_maps)
+
+                        return hierarchical_structure
+                    else:
+                        return course_map
+
+        except Exception as e:
+            logger.error(f"Error getting concept map: {e}")
+        return None
 
     def get_concept_metrics(self, course_id: str) -> Dict[str, Any]:
         metrics = self._load_metrics()

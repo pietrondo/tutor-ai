@@ -139,7 +139,7 @@ describe('HomePage', () => {
 
     render(<HomePage />)
 
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8000/courses')
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8001/courses')
   })
 
   it('shows new course buttons in both hero and main section', async () => {

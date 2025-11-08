@@ -36,10 +36,10 @@ async def generate_concept_map(course_id: str, payload: ConceptMapGenerateReques
 
 
 @router.get("")
-async def get_concept_map(course_id: str):
-    concept_map = concept_map_service.get_concept_map(course_id)
+async def get_concept_map(course_id: str, book_id: Optional[str] = None):
+    concept_map = concept_map_service.get_concept_map(course_id, book_id=book_id)
     if not concept_map:
-        raise HTTPException(status_code=404, detail="Concept map non disponibile per questo corso")
+        raise HTTPException(status_code=404, detail="Concept map non disponibile per questo corso/libro")
     return {"concept_map": concept_map}
 
 

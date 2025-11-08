@@ -41,6 +41,7 @@ interface SessionMessage {
   content: string
   sources: Array<{
     source: string
+    chunk_index: number
     content: string
     relevance_score: number
     source_type: string

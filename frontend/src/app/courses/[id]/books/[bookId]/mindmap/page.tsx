@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { MindmapExplorer } from '@/components/MindmapExplorer'
 import { StudyMindmap, StudyMindmapNode, ExpandedStudyNode } from '@/types/mindmap'
 import VisualMindmap, { type MindmapData } from '@/components/VisualMindmap'
+import { mindmapService, type MindmapStorage } from '@/services/mindmapService'
 
 const normalizeApiBaseUrl = (value: string) => {
   if (value === '/') return '/'
@@ -159,20 +160,13 @@ export default function MindmapPage() {
   const [error, setError] = useState('')
   const [viewMode, setViewMode] = useState<'explorer' | 'visual'>('visual')
   const [savedMindmaps, setSavedMindmaps] = useState<SavedMindmapEntry[]>([])
+  const [fromCache, setFromCache] = useState(false)
 
-  // Load saved mindmaps from localStorage on mount
+  // Load saved mindmaps from unified service on mount
   useEffect(() => {
-    const stored = localStorage.getItem(`mindmaps_${courseIdFromParams}_${bookIdFromParams}`)
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as SavedMindmapEntry[]
-        if (Array.isArray(parsed)) {
-          setSavedMindmaps(parsed)
-        }
-      } catch (e) {
-        console.error('Error loading saved mindmaps:', e)
-      }
-    }
+    const savedMaps = mindmapService.getSavedMindmaps(courseIdFromParams, bookIdFromParams)
+    setSavedMindmaps(savedMaps)
+    console.log(`📚 Loaded ${savedMaps.length} saved mindmaps for course ${courseIdFromParams}, book ${bookIdFromParams}`)
   }, [courseIdFromParams, bookIdFromParams])
 
   const normalizeMindmapForStorage = (input: MindmapSaveInput): MindmapStoragePayload => {
@@ -308,39 +302,37 @@ export default function MindmapPage() {
     setError('')
 
     try {
-      const response = await fetch(buildApiUrl('/mindmap'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          course_id: courseIdFromParams,
-          book_id: bookIdFromParams,
-          topic: book.title || 'Contenuti del libro',
-          focus_areas: ['capitoli principali', 'concetti chiave', 'temi centrali']
-        }),
+      // Usa il servizio unificato per generare/ottenere la mappa
+      const result = await mindmapService.getMindmap({
+        courseId: courseIdFromParams,
+        bookId: bookIdFromParams,
+        topic: book.title || 'Contenuti del libro',
+        focusAreas: ['capitoli principali', 'concetti chiave', 'temi centrali'],
+        forceRegenerate: false // Usa cache se disponibile
       })
 
-      const { payload, rawText } = await parseJsonSafely<MindmapGenerationResponse>(response)
-
-      if (response.ok && isMindmapGenerationResponse(payload) && payload.success && payload.mindmap) {
-        setMindmap(payload.mindmap)
-        setMarkdown(payload.markdown ?? '')
-        const combinedReferences = toStringArray(payload.references ?? payload.mindmap.references)
+      if (result.mindmap) {
+        setMindmap(result.mindmap)
+        setMarkdown('') // Il servizio gestisce il markdown internamente
+        const combinedReferences = toStringArray(result.mindmap.references || [])
         setReferences(combinedReferences)
-        setSources(toMindmapSources(payload.sources))
+        setSources([]) // Il servizio gestisce le fonti internamente
         setLastSavedAt(null)
-        toast.success('Mappa concettuale generata con successo')
+        setFromCache(result.fromCache)
+
+        const cacheMessage = result.fromCache ?
+          'Mappa concettuale caricata dalla cache condivisa' :
+          'Mappa concettuale generata con successo'
+        toast.success(cacheMessage)
+
+        console.log(`🎯 Mindmap ${result.fromCache ? 'from cache' : 'generated'} for course ${courseIdFromParams}, book ${bookIdFromParams}`)
       } else {
-        const message =
-          (isObject(payload) && typeof payload.detail === 'string'
-            ? payload.detail
-            : rawText || 'Errore durante la generazione della mappa concettuale')
+        const message = result.error || 'Errore durante la generazione della mappa concettuale'
         setError(message)
         toast.error(message)
       }
     } catch (error) {
-      console.error('Errore generazione mappa', error)
+      console.error('Errore generazione mappa unificata', error)
       const message = 'Errore durante la generazione della mappa concettuale'
       setError(message)
       toast.error(message)
@@ -421,49 +413,20 @@ export default function MindmapPage() {
     console.log('🎪 Expanding node:', targetNode.title, 'ID:', targetNode.id)
 
     try {
-      const requestBody = {
-        course_id: courseIdFromParams,
-        book_id: bookIdFromParams,
-        node_text: targetNode.title,
-        node_context: path
-          .slice(0, -1)
-          .map((node) => node.title)
-          .join(' > '),
-        max_children: 4,
-        expansion_prompt: sanitizedPrompt || undefined
-      }
+      // Usa il servizio unificato per espandere il nodo
+      const nodeContext = path.slice(0, -1).map((node) => node.title)
+      const result = await mindmapService.expandNode(
+        courseIdFromParams,
+        bookIdFromParams,
+        targetNode.title,
+        nodeContext,
+        sanitizedPrompt
+      )
 
-      console.log('📤 Sending expansion request:', requestBody)
+      if (result) {
+        console.log('🌱 Expanded nodes created:', result.expandedNodes.length, result.expandedNodes.map(n => n.title))
 
-      const response = await fetch(buildApiUrl('/mindmap/expand'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      console.log('📥 Expansion response status:', response.status)
-
-      const { payload, rawText } = await parseJsonSafely<MindmapExpandApiResponse>(response)
-
-      console.log('📊 Parsed response:', { payload, rawText })
-
-      if (response.ok && isMindmapExpandResponse(payload) && payload.success) {
-        const expandedNodes: StudyMindmapNode[] = (payload.expanded_nodes ?? []).map((child) => ({
-          id: child.id,
-          title: child.title,
-          summary: child.summary ?? '',
-          ai_hint: child.ai_hint ?? '',
-          study_actions: child.study_actions ?? [],
-          priority: child.priority ?? null,
-          references: child.references ?? [],
-          children: []
-        }))
-
-        console.log('🌱 Expanded nodes created:', expandedNodes.length, expandedNodes.map(n => n.title))
-
-        if (expandedNodes.length === 0) {
+        if (result.expandedNodes.length === 0) {
           console.log('📭 No new concepts generated')
           toast('Nessun nuovo sotto-concetto generato')
           return
@@ -471,23 +434,20 @@ export default function MindmapPage() {
 
         console.log('🔄 Updating mindmap with children...')
         setMindmap((prev) => {
-          const updated = prev ? updateMindmapWithChildren(prev, targetNode.id, expandedNodes) : prev
-          console.log('✅ Mindmap updated with', expandedNodes.length, 'new nodes')
+          const updated = prev ? updateMindmapWithChildren(prev, targetNode.id, result.expandedNodes) : prev
+          console.log('✅ Mindmap updated with', result.expandedNodes.length, 'new nodes')
           return updated
         })
 
-        const newReferences = toStringArray(payload.sources_used)
-        if (newReferences.length) {
-          setReferences((prev) => Array.from(new Set([...prev, ...newReferences])))
+        // Aggiorna referenze
+        if (result.sources.length) {
+          setReferences((prev) => Array.from(new Set([...prev, ...result.sources])))
         }
 
-        toast.success(`Aggiunti ${expandedNodes.length} nuovi sotto-concetti`)
+        toast.success(`Aggiunti ${result.expandedNodes.length} nuovi sotto-concetti`)
+        console.log(`🎯 Node expanded via unified service for course ${courseIdFromParams}, book ${bookIdFromParams}`)
       } else {
-        const message =
-          (isObject(payload) && typeof payload.detail === 'string'
-            ? payload.detail
-            : rawText || 'Impossibile espandere il nodo con l\'AI')
-        toast.error(message)
+        toast.error('Impossibile espandere il nodo con l\'AI')
       }
     } catch (error) {
       console.error('Errore durante l\'espansione del nodo', error)

@@ -85,7 +85,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="it" className="scroll-smooth">
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning={true}>
         <ThemeProvider>
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900">
           {/* Animated background elements */}

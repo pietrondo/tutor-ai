@@ -207,7 +207,10 @@ PORT=3000
 - **docker-compose.yml**: Backend service uses `8001:8001`
 - **docker-compose.dev.yml**: Backend service uses `8001:8001`
 - **backend/Dockerfile**: EXPOSE and CMD use port `8001`
-- **frontend/.env**: `NEXT_PUBLIC_API_URL=http://localhost:8001`
+- **backend/main.py**: `uvicorn.run(app, host="0.0.0.0", port=8001)`
+- **frontend/.env.local**: `NEXT_PUBLIC_API_URL=http://localhost:8001`
+- **frontend/next.config.js**: Backend URL points to port `8001`
+- **.env.example**: `NEXT_PUBLIC_API_URL=http://localhost:8001`
 
 ### URL Endpoints
 - **Backend Health**: `http://localhost:8001/health`
@@ -216,7 +219,72 @@ PORT=3000
 
 ## 🐳 Docker Commands
 
-### Development Environment
+### 🚀 Unified Docker Management Script
+
+**IMPORTANT**: Use the single unified Docker script for all operations:
+
+```bash
+# Single script for all Docker operations
+./docker.sh [COMMAND]
+```
+
+**Available Commands:**
+- `./docker.sh` or `./docker.sh restart` - Quick restart with cache preservation
+- `./docker.sh start` - Start services
+- `./docker.sh full` - Full restart with cleanup (preserves PyTorch cache)
+- `./docker.sh rebuild` - Rebuild dependencies (re-downloads 2GB+ PyTorch)
+- `./docker.sh stop` - Stop all services cleanly
+- `./docker.sh status` - Check service status and show logs
+- `./docker.sh logs` - Show service logs
+- `./docker.sh emergency` - Emergency reset (complete cleanup)
+- `./docker.sh help` - Show help message
+
+**🚀 Cache Optimization Strategy (CRITICAL for Performance):**
+
+The unified script is optimized to **avoid re-downloading PyTorch CUDA libraries (~2GB)**:
+
+- **`./docker.sh restart`** - **NEVER re-downloads** PyTorch unless `requirements.txt` changed
+  - Rebuilds only code changes (seconds vs minutes)
+  - Preserves pip cache where PyTorch is stored
+  - Uses BuildKit for intelligent layer caching
+
+- **`./docker.sh full`** - **PRESERVES** PyTorch cache during cleanup
+  - Cleans containers but keeps pip cache
+  - Does NOT use `--no-cache` flag
+  - Only rebuilds if dependencies actually changed
+
+- **`./docker.sh rebuild`** - **ONLY** when dependencies change
+  - Re-downloads PyTorch and all libraries
+  - Takes 5-10 minutes due to 2GB+ downloads
+  - Interactive confirmation before proceeding
+
+**🔥 Performance Impact:**
+- **Code changes only**: ~10-30 seconds (cache preserved)
+- **Dependency changes**: ~5-10 minutes (2GB+ download)
+- **Without cache optimization**: Every rebuild = 5-10 minutes ❌
+
+**Examples:**
+```bash
+# Development workflow
+./docker.sh                    # Quick restart (most common)
+./docker.sh status             # Check if services are running
+./docker.sh logs               # View logs
+./docker.sh stop               # Stop when done
+
+# Maintenance workflow
+./docker.sh full               # When services act weird
+./docker.sh rebuild            # Only when requirements.txt changes
+./docker.sh emergency          # Last resort cleanup
+```
+
+**📁 Script Organization:**
+- **Old scripts**: Moved to `scripts/backup/` for reference
+- **New unified script**: `./docker.sh` in project root
+- **All functionality**: Consolidated into single script with subcommands
+
+### Manual Docker Commands
+
+#### Development Environment
 ```bash
 # Start with hot reload
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
@@ -234,7 +302,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-### Complete Reset (When Issues Occur)
+#### Complete Reset (When Issues Occur)
 ```bash
 docker-compose down --volumes --remove-orphans
 docker system prune -f
@@ -242,6 +310,47 @@ pkill -9 -f "python.*main" && pkill -9 -f "next.*dev"
 rm -rf frontend/.next data/vector_db/*
 docker-compose up --build
 ```
+
+**⚠️ Avoid Manual Commands - Use Unified Script Instead**
+Manual commands don't preserve cache optimization. Always prefer the unified `./docker.sh` script.
+
+### 🎯 Docker Cache Best Practices
+
+**When to Use Each Command:**
+
+| Situation | Command to Use | Time | Why |
+|-----------|---------------|------|-----|
+| **Code changes only** | `./docker.sh restart` | 10-30s | Preserves PyTorch cache |
+| **Minor issues** | `./docker.sh full` | 1-2min | Cleans containers, keeps cache |
+| **requirements.txt changed** | `./docker.sh rebuild` | 5-10min | Re-downloads dependencies |
+| **Major issues** | `./docker.sh emergency` | 10-15min | Complete reset |
+| **Checking status** | `./docker.sh status` | 5s | Health monitoring |
+
+**🔥 Cache Optimization Technical Details:**
+
+1. **Dockerfile Optimization**: The backend Dockerfile uses multi-stage builds with cache mounts:
+   ```dockerfile
+   RUN --mount=type=cache,target=/root/.cache/pip \
+       pip install -r requirements.txt
+   ```
+
+2. **BuildKit Integration**: All scripts use `DOCKER_BUILDKIT=1` for:
+   - Better layer caching
+   - Parallel builds
+   - Cache export/import capabilities
+
+3. **Pip Cache Preservation**: PyTorch (~2GB) is cached in `/root/.cache/pip` and preserved across restarts
+
+4. **Layer Ordering**: Dockerfile layers are optimized to rebuild only when necessary:
+   - System packages (rarely change)
+   - Python dependencies (only when requirements.txt changes)
+   - Application code (changes frequently)
+
+**💡 Pro Tips:**
+- **Never** use `--no-cache` unless updating dependencies
+- **Always** use `./docker.sh restart` for development
+- **Check** if `requirements.txt` changed before using `./docker.sh rebuild`
+- **Monitor** cache usage with `docker system df`
 
 ## 🛠️ Development Guidelines
 
@@ -287,7 +396,7 @@ docker-compose up --build
 1. Check if ports are consistent: Backend must use port 8001 in ALL files
 2. Verify `backend/Dockerfile` EXPOSE and CMD use port 8001
 3. Verify `docker-compose.yml` and `docker-compose.dev.yml` map 8001:8001
-4. Restart containers: `docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart backend`
+4. Restart containers: `./docker.sh restart`
 
 **Problem**: Frontend shows 404 errors or can't connect to backend
 **Solution**:
@@ -298,6 +407,124 @@ docker-compose up --build
 ### Document Processing Issues
 **Problem**: PDF upload fails
 **Solution**: Check file size (< 50MB), ensure PDF is not password protected
+
+## 🔧 Troubleshooting Avanzato
+
+### Problemi Ricorrenti e Soluzioni Uniformate
+
+#### 1. Errori di Connessione Frontend-Backend
+**Sintomi**:
+- `GET http://localhost:8000/courses net::ERR_CONNECTION_REFUSED`
+- `WebSocket connection to 'ws://localhost:3001/_next/webpack-hmr' failed`
+
+**Causa Comune**: Il frontend ha cached configurazioni di porte errate (8000 invece di 8001, 3001 invece di 3000)
+
+**Soluzione Standardizzata**:
+```bash
+# 1. Pulisci cache Docker e Next.js
+docker-compose down frontend
+rm -rf frontend/.next frontend/node_modules/.cache
+docker system prune -f --volumes
+
+# 2. Ricostruisci completamente
+./docker.sh rebuild  # SOLO se necessario, altrimenti ./docker.sh restart
+
+# 3. Verifica configurazione porte
+grep -r "8000" frontend/src/  # Dovrebbe trovare solo riferimenti non-URL
+grep -r "NEXT_PUBLIC_API_URL" frontend/  # Dovrebbe puntare a :8001
+```
+
+#### 2. Errori di Sintassi JavaScript/TypeScript
+**Sintomi**:
+- `Parsing ecmascript source code failed`
+- `Expected ';', '}' or <eof>`
+
+**Causa Comune**: Errori di sintassi in componenti React (es. dimenticare parentesi nelle arrow functions)
+
+**Soluzione Standardizzata**:
+```bash
+# 1. Identifica file problematico dall'errore
+# 2. Correggi sintassi (es: map(() => { invece di map(() => ({
+# 3. Riavvia frontend solo
+docker-compose restart frontend
+```
+
+#### 3. Problemi di Permessi Directory Backend
+**Sintomi**:
+- `PermissionError: [Errno 13] Permission denied: '/data'`
+- Backend in restart loop
+
+**Causa Comune**: Directory `./data` non esiste o permessi errati
+
+**Soluzione Standardizzata**:
+```bash
+# 1. Crea directory con permessi corretti
+mkdir -p ./data
+chmod -R 777 ./data
+
+# 2. Riavvia backend
+docker-compose restart backend
+```
+
+#### 4. Container Backend Unhealthy
+**Sintomi**:
+- Backend shows "health: starting" ma non diventa mai healthy
+- `curl http://localhost:8001/health` non risponde
+
+**Soluzione Standardizzata**:
+```bash
+# 1. Controlla logs backend
+docker-compose logs backend --tail 20
+
+# 2. Se ci sono errori di avvio, risolvi e riavvia
+./docker.sh restart
+
+# 3. Se persiste, pulisci e ricostruisci
+./docker.sh full
+```
+
+### Flusso di Troubleshooting Standard
+
+**Step 1: Diagnosi Rapida**
+```bash
+./docker.sh status  # Verifica stato servizi
+curl -s http://localhost:8001/health  # Test backend
+curl -s -I http://localhost:3000 | head -1  # Test frontend
+```
+
+**Step 2: Identifica Problema**
+- Se backend non risponde: `docker-compose logs backend`
+- Se frontend non si connette: Controlla configurazione porte
+- Se entrambi down: `./docker.sh restart`
+
+**Step 3: Soluzione Mirata**
+- Usa la soluzione specifica per il tipo di problema
+- Evita sempre `./docker.sh rebuild` se non strettamente necessario
+
+**Step 4: Verifica Finale**
+```bash
+./docker.sh status
+curl -s http://localhost:8001/courses | jq '.courses | length'  # Test API
+```
+
+### Comandi di Emergenza
+```bash
+# Reset completo (ultima risorsa)
+./docker.sh emergency
+
+# Forza rebuild dependencies (solo se requirements.txt changes)
+./docker.sh rebuild
+
+# Pulizia cache mantenendo dati
+./docker.sh full
+```
+
+### Checklist Pre-Avvio
+✅ Directory `./data` esiste con permessi 777
+✅ File `.env` configurato correttamente
+✅ Niente processi su porte 8000/3001
+✅ porte 8001/3000 libere
+✅ `./docker.sh status` mostra tutti healthy
 
 ## 📖 Additional Resources
 

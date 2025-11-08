@@ -5,7 +5,7 @@ const nextConfig = {
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '8000',
+        port: '8001',
         pathname: '/**',
       },
     ],
@@ -15,7 +15,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://backend:8000/:path*',
+        destination: 'http://backend:8001/:path*',
       },
     ]
   },
