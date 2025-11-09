@@ -5,9 +5,22 @@
 
 'use client';
 
+// Ensure Promise.withResolvers polyfill is loaded before PDF.js
+if (typeof Promise !== 'undefined' && !Promise.withResolvers) {
+  Promise.withResolvers = function <T>() {
+    let resolve: (value: T | PromiseLike<T>) => void;
+    let reject: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve: resolve!, reject: reject! };
+  };
+}
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Highlight, Popup } from 'react-pdf-highlighter';
+import { CustomHighlight, type HighlightPosition } from './CustomHighlight';
 import {
   HighlighterIcon,
   UnderlineIcon,
@@ -20,27 +33,41 @@ import {
   DownloadIcon
 } from 'lucide-react';
 
-// Configura PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configura PDF.js - Use local worker for Next.js compatibility
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+}
 
-interface Annotation {
+type AnnotationMode = 'highlight' | 'underline' | 'note';
+
+interface ViewerAnnotation {
   id: string;
-  type: 'highlight' | 'underline' | 'note';
-  content: { text: string; image?: string };
-  position: {
-    boundingRect: any;
-    rects: any[];
-  };
-  comment: string;
-  color: string;
+  type: AnnotationMode;
+  selectedText: string;
+  note: string;
+  position: HighlightPosition;
   pageNumber: number;
-  isSharedWithChat: boolean;
+  color: string;
+  shareWithAI: boolean;
   tags: string[];
-  createdAt: Date;
+  createdAt?: string;
+}
+
+interface AnnotationDraft {
+  id?: string;
+  type: AnnotationMode;
+  selectedText: string;
+  position: HighlightPosition;
+  color: string;
+  shareWithAI: boolean;
+  tags?: string[];
+  isExisting?: boolean;
 }
 
 interface EnhancedPDFReaderProps {
   pdfUrl: string;
+  pdfFilename: string;
+  pdfPath?: string;
   bookId: string;
   courseId: string;
   userId: string;
@@ -58,8 +85,66 @@ const COLORS = [
   { name: 'Viola', value: '#9C27B0' }
 ];
 
+// PDF Error Display Component
+const PDFErrorDisplay: React.FC<{
+  pdfUrl: string;
+  onRetry: () => void;
+}> = ({ pdfUrl, onRetry }) => {
+  const [errorDetails, setErrorDetails] = useState<string>('');
+
+  useEffect(() => {
+    // Try to identify common PDF errors
+    if (pdfUrl.includes('.pdf')) {
+      if (pdfUrl.startsWith('http')) {
+        setErrorDetails('Possibile problema di rete o file PDF corrotto.');
+      } else {
+        setErrorDetails('File PDF non trovato o percorso non valido.');
+      }
+    } else {
+      setErrorDetails('Il file specificato non sembra essere un PDF valido.');
+    }
+  }, [pdfUrl]);
+
+  return (
+    <div className="flex items-center justify-center h-96">
+      <div className="text-center max-w-md mx-auto p-6">
+        <div className="text-red-500 mb-4">
+          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Errore nel caricamento del PDF
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          {errorDetails}
+        </p>
+        <div className="space-y-3">
+          <button
+            onClick={onRetry}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Riprova
+          </button>
+          <button
+            onClick={() => window.open(pdfUrl, '_blank')}
+            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Apri in nuova scheda
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-4">
+          Se il problema persiste, contatta l'amministratore del sistema.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   pdfUrl,
+  pdfFilename,
+  pdfPath,
   bookId,
   courseId,
   userId,
@@ -67,21 +152,20 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   onAnnotationUpdate,
   onChatWithContext
 }) => {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
   // Stati PDF
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
-  const [pdfLoaded, setPdfLoaded] = useState<boolean>(false);
 
   // Stati annotazioni
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [currentAnnotation, setCurrentAnnotation] = useState<Annotation | null>(null);
+  const [annotations, setAnnotations] = useState<ViewerAnnotation[]>([]);
+  const [panelAnnotation, setPanelAnnotation] = useState<AnnotationDraft | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>('#FFEB3B');
-  const [annotationMode, setAnnotationMode] = useState<'highlight' | 'underline' | 'note'>('highlight');
+  const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('highlight');
   const [showColorPicker, setShowColorPicker] = useState<boolean>(false);
 
   // Stati UI
-  const [isSelecting, setIsSelecting] = useState<boolean>(false);
   const [showNotePanel, setShowNotePanel] = useState<boolean>(false);
   const [noteText, setNoteText] = useState<string>('');
   const [shareWithChat, setShareWithChat] = useState<boolean>(true);
@@ -91,37 +175,66 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
 
+  
   // Carica annotazioni esistenti
   useEffect(() => {
     loadAnnotations();
-  }, [bookId, userId]);
+  }, [loadAnnotations]);
 
-  const loadAnnotations = async () => {
+  const mapAnnotationFromBackend = useCallback((annotation: any): ViewerAnnotation => {
+    const position = annotation?.position || {};
+    const page = position.pageNumber || annotation?.page_number || 1;
+
+    return {
+      id: annotation.id,
+      type: (annotation.type || 'highlight') as AnnotationMode,
+      selectedText: annotation.selected_text || annotation.text || '',
+      note: annotation.content || '',
+      position: {
+        x: position.x ?? 0,
+        y: position.y ?? 0,
+        width: position.width ?? 0,
+        height: position.height ?? 0,
+        pageNumber: page
+      },
+      pageNumber: page,
+      color: annotation.style?.color || '#FFEB3B',
+      shareWithAI: annotation.share_with_ai ?? annotation.is_public ?? false,
+      tags: annotation.tags || [],
+      createdAt: annotation.created_at
+    };
+  }, []);
+
+  const loadAnnotations = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/books/${bookId}/annotations?user_id=${userId}`);
+      if (!pdfFilename) {
+        setAnnotations([]);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/annotations/${userId}/${encodeURIComponent(pdfFilename)}?course_id=${courseId}&book_id=${bookId}`);
       if (response.ok) {
         const data = await response.json();
-        setAnnotations(data.annotations || []);
+        const normalized = (data.annotations || []).map(mapAnnotationFromBackend);
+        setAnnotations(normalized);
       }
     } catch (error) {
       console.error('Errore caricamento annotazioni:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [API_BASE_URL, bookId, courseId, pdfFilename, userId, mapAnnotationFromBackend]);
 
   // Gestione caricamento PDF
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setPdfLoaded(true);
   };
 
   // Gestione selezione testo
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
     if (selection && selection.toString().trim().length > 0) {
-      setIsSelecting(true);
       createAnnotationFromSelection(selection);
     }
   }, []);
@@ -134,93 +247,118 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
     if (rects.length === 0) return;
 
     // Calcola posizione relativa alla pagina
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    if (!containerRect) return;
+    const pageContainer = selection.anchorNode?.parentElement?.closest('.react-pdf__Page');
+    if (!pageContainer) return;
 
-    const boundingRect = {
-      x1: rects[0].left - containerRect.left,
-      y1: rects[0].top - containerRect.top,
-      x2: rects[rects.length - 1].right - containerRect.left,
-      y2: rects[rects.length - 1].bottom - containerRect.top,
-      width: rects[rects.length - 1].right - rects[0].left,
-      height: rects[rects.length - 1].bottom - rects[0].top
-    };
+    const pageRect = pageContainer.getBoundingClientRect();
+    const firstRect = rects[0];
+    const lastRect = rects[rects.length - 1];
 
-    const newAnnotation: Annotation = {
-      id: Date.now().toString(),
+    const draft: AnnotationDraft = {
       type: annotationMode,
-      content: { text: selectedText },
+      selectedText,
       position: {
-        boundingRect,
-        rects: Array.from(rects).map(rect => ({
-          x: rect.left - containerRect.left,
-          y: rect.top - containerRect.top,
-          width: rect.width,
-          height: rect.height
-        }))
+        x: firstRect.left - pageRect.left,
+        y: firstRect.top - pageRect.top,
+        width: lastRect.right - firstRect.left,
+        height: lastRect.bottom - firstRect.top,
+        pageNumber
       },
-      comment: '',
       color: selectedColor,
-      pageNumber,
-      isSharedWithChat: shareWithChat,
-      tags: [],
-      createdAt: new Date()
+      shareWithAI: true
     };
 
-    setCurrentAnnotation(newAnnotation);
+    setPanelAnnotation(draft);
+    setShareWithChat(true);
     setShowNotePanel(true);
     setNoteText('');
   };
 
   // Salvataggio annotazione
   const saveAnnotation = async () => {
-    if (!currentAnnotation) return;
+    if (!panelAnnotation || !pdfFilename) return;
 
     try {
       setIsLoading(true);
 
-      // Genera tag automatici con AI
-      const tags = await generateTagsForAnnotation(currentAnnotation.content.text);
-      const annotationToSave = {
-        ...currentAnnotation,
-        comment: noteText,
-        tags,
-        isSharedWithChat: shareWithChat
+      const baseStyle = {
+        color: panelAnnotation.color,
+        opacity: panelAnnotation.type === 'underline' ? 0 : 0.3,
+        stroke_color: panelAnnotation.color,
+        stroke_width: panelAnnotation.type === 'underline' ? 2 : 1
       };
 
-      // Salva sul backend
-      const response = await fetch(`/api/books/${bookId}/annotations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          course_id: courseId,
-          ...annotationToSave
-        })
-      });
+      const baseTags = panelAnnotation.isExisting
+        ? panelAnnotation.tags || []
+        : await generateTagsForAnnotation(panelAnnotation.selectedText);
 
-      if (response.ok) {
-        const savedAnnotation = await response.json();
-        setAnnotations(prev => [...prev, savedAnnotation]);
+      if (panelAnnotation.isExisting && panelAnnotation.id) {
+        const response = await fetch(
+          `${API_BASE_URL}/annotations/${userId}/${panelAnnotation.id}?pdf_filename=${encodeURIComponent(pdfFilename)}&course_id=${courseId}&book_id=${bookId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: panelAnnotation.type,
+              content: noteText,
+              style: baseStyle,
+              tags: baseTags,
+              is_public: shareWithChat,
+              share_with_ai: shareWithChat
+            })
+          }
+        );
 
-        // Condividi con chat se richiesto
-        if (shareWithChat && onChatWithContext) {
-          onChatWithContext({
-            type: 'pdf_annotation',
-            bookId,
-            pageNumber,
-            text: currentAnnotation.content.text,
-            note: noteText,
-            tags,
-            color: selectedColor
-          });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.annotation) {
+            const updated = mapAnnotationFromBackend(data.annotation);
+            setAnnotations(prev => prev.map(ann => ann.id === updated.id ? updated : ann));
+            onAnnotationUpdate?.(data.annotation);
+          }
         }
+      } else {
+        const response = await fetch(`${API_BASE_URL}/annotations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            course_id: courseId,
+            book_id: bookId,
+            pdf_filename: pdfFilename,
+            pdf_path: pdfPath || pdfUrl,
+            page_number: panelAnnotation.position.pageNumber,
+            type: panelAnnotation.type,
+            text: panelAnnotation.selectedText,
+            selected_text: panelAnnotation.selectedText,
+            content: noteText,
+            position: panelAnnotation.position,
+            style: baseStyle,
+            tags: baseTags,
+            is_public: shareWithChat,
+            share_with_ai: shareWithChat
+          })
+        });
 
-        // Notifica parent
-        if (onAnnotationCreate) {
-          onAnnotationCreate(savedAnnotation);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.annotation) {
+            const normalized = mapAnnotationFromBackend(data.annotation);
+            setAnnotations(prev => [normalized, ...prev]);
+            onAnnotationCreate?.(data.annotation);
+
+            if (shareWithChat && onChatWithContext) {
+              onChatWithContext({
+                type: 'pdf_annotation',
+                bookId,
+                pageNumber: panelAnnotation.position.pageNumber,
+                text: panelAnnotation.selectedText,
+                note: noteText,
+                tags: baseTags,
+                color: panelAnnotation.color
+              });
+            }
+          }
         }
       }
 
@@ -261,12 +399,16 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
     try {
       setIsLoading(true);
 
-      const response = await fetch(`/api/books/${bookId}/annotations/${annotationId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/annotations/${userId}/${annotationId}?pdf_filename=${encodeURIComponent(pdfFilename)}&course_id=${courseId}&book_id=${bookId}`,
+        { method: 'DELETE' }
+      );
 
       if (response.ok) {
         setAnnotations(prev => prev.filter(ann => ann.id !== annotationId));
+        if (panelAnnotation?.id === annotationId) {
+          resetAnnotationState();
+        }
       }
     } catch (error) {
       console.error('Errore eliminazione annotazione:', error);
@@ -278,7 +420,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   // Esporta annotazioni
   const exportAnnotations = async () => {
     try {
-      const response = await fetch(`/api/books/${bookId}/annotations/export?user_id=${userId}&format=markdown`);
+      const response = await fetch(`${API_BASE_URL}/annotations/${userId}/export?format=markdown&course_id=${courseId}&book_id=${bookId}`);
       if (response.ok) {
         const data = await response.json();
 
@@ -300,10 +442,10 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
 
   // Reset stato annotazione
   const resetAnnotationState = () => {
-    setCurrentAnnotation(null);
+    setPanelAnnotation(null);
     setShowNotePanel(false);
     setNoteText('');
-    setIsSelecting(false);
+    setShareWithChat(true);
   };
 
   // Navigazione PDF
@@ -318,37 +460,36 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5));
 
   // Render annotazioni
-  const renderAnnotation = (annotation: Annotation) => {
+  const renderAnnotation = (annotation: ViewerAnnotation) => {
+    if (!annotation.position) {
+      return null;
+    }
+
     return (
-      <Highlight
+      <CustomHighlight
         key={annotation.id}
+        id={annotation.id}
         position={annotation.position}
+        content={{ text: annotation.selectedText }}
+        comment={{ emoji: '📝', text: annotation.note || '' }}
+        color={annotation.color}
+        type={annotation.type}
+        isScrolledTo={false}
         onClick={() => {
-          setCurrentAnnotation(annotation);
+          setAnnotationMode(annotation.type);
+          setPanelAnnotation({
+            id: annotation.id,
+            type: annotation.type,
+            selectedText: annotation.selectedText,
+            position: annotation.position,
+            color: annotation.color,
+            shareWithAI: annotation.shareWithAI,
+            tags: annotation.tags,
+            isExisting: true
+          });
+          setShareWithChat(annotation.shareWithAI);
+          setNoteText(annotation.note);
           setShowNotePanel(true);
-          setNoteText(annotation.comment);
-        }}
-        onMouseOver={(popup) => (
-          <div
-            className="annotation-popup"
-            style={{
-              position: 'absolute',
-              left: popup.boundingRect.x1 + 'px',
-              top: popup.boundingRect.y2 + 2 + 'px',
-              backgroundColor: '#333',
-              color: 'white',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              zIndex: 1000
-            }}
-          >
-            {annotation.comment || 'Clicca per aggiungere nota...'}
-          </div>
-        )}
-        style={{
-          backgroundColor: annotation.color,
-          opacity: annotation.type === 'underline' ? 0.3 : 0.5
         }}
       />
     );
@@ -505,43 +646,43 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
           )}
 
           <div className="flex justify-center p-8">
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="mt-2 text-sm text-gray-600">Caricamento PDF...</p>
+            <div className="relative">
+              <Document
+                file={pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={
+                  <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-600">Caricamento PDF...</p>
+                    </div>
                   </div>
-                </div>
-              }
-              error={
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center text-red-600">
-                    <p>Errore caricamento PDF</p>
-                  </div>
-                </div>
-              }
-            >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                className="shadow-lg"
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-              />
-            </Document>
+                }
+                error={
+                  <PDFErrorDisplay
+                    pdfUrl={pdfUrl}
+                    onRetry={() => window.location.reload()}
+                  />
+                }
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  className="shadow-lg"
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                />
+                {/* Render annotazioni */}
+                {annotations
+                  .filter(ann => ann.pageNumber === pageNumber)
+                  .map(renderAnnotation)}
+              </Document>
+            </div>
           </div>
-
-          {/* Render annotazioni */}
-          {annotations
-            .filter(ann => ann.pageNumber === pageNumber)
-            .map(renderAnnotation)}
         </div>
 
         {/* Pannello note */}
-        {showNotePanel && currentAnnotation && (
+        {showNotePanel && panelAnnotation && (
           <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">
@@ -563,7 +704,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
                 </label>
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-sm text-gray-900 italic">
-                    "{currentAnnotation.content.text}"
+                    "{panelAnnotation.selectedText}"
                   </p>
                 </div>
               </div>
@@ -604,15 +745,15 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
               <div className="flex space-x-2 pt-4">
                 <button
                   onClick={saveAnnotation}
-                  disabled={isLoading || !noteText.trim()}
+                  disabled={isLoading || (panelAnnotation.type === 'note' && !noteText.trim())}
                   className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   <SaveIcon className="h-4 w-4" />
                   <span>Salva</span>
                 </button>
-                {currentAnnotation.id && (
+                {panelAnnotation.id && (
                   <button
-                    onClick={() => deleteAnnotation(currentAnnotation.id)}
+                    onClick={() => deleteAnnotation(panelAnnotation.id!)}
                     disabled={isLoading}
                     className="p-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50"
                   >

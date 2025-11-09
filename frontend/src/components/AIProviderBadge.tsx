@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Chip, Sparkles, Cpu, Zap, Cloud, Server } from 'lucide-react'
+import { Cpu, Sparkles, Zap, Cloud, Server, HardDrive } from 'lucide-react'
 
 interface AIProvider {
   provider: string

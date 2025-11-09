@@ -111,8 +111,8 @@ class SecurityHeaders:
     def add_security_headers(response: Response) -> Response:
         """Add security headers to response"""
         headers = {
-            # Clickjacking protection
-            "X-Frame-Options": "DENY",
+            # Clickjacking protection - disabled for development convenience
+            "X-Frame-Options": "ALLOWALL",
 
             # XSS Protection
             "X-XSS-Protection": "1; mode=block",

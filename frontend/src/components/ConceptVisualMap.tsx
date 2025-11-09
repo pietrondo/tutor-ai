@@ -63,7 +63,7 @@ export function ConceptVisualMap({
         mastery: metrics ? metrics.stats.average_score * 100 : 0,
         attempts: metrics ? metrics.stats.attempts_count : 0,
         avgTime: metrics ? metrics.stats.average_time_seconds : 0,
-        lastAttempt: metrics ? metrics.last_attempt : undefined,
+        lastAttempt: metrics ? metrics.stats.latest_attempt_at : undefined,
         trend: metrics ? getTrendFromMetrics(metrics.stats) : 'stable'
       }
       return { concept, progress }

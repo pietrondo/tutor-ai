@@ -88,7 +88,7 @@ REDIS_URL=redis://redis:6379
 DATABASE_URL=sqlite:///./data/app.db
 
 # CORS
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 # File Storage
 UPLOAD_DIR=./data/uploads
@@ -96,7 +96,7 @@ VECTOR_DB_PATH=./data/vector_db
 
 # API Configuration
 API_HOST=0.0.0.0
-API_PORT=8000
+API_PORT=8001
 EOF
         print_warning "Configura le tue API keys in backend/.env"
     fi
@@ -110,7 +110,7 @@ select_mode() {
         "dev"|"development")
             print_info "Modalità SVILUPPO con hot reload"
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
-            FRONTEND_PORT=3001
+            FRONTEND_PORT=3000
             ;;
         "simple")
             print_info "Modalità SEMPLIFICATA"
@@ -146,9 +146,9 @@ select_mode() {
             $DOCKER_COMPOSE ps
             echo
             echo "URL di accesso:"
-            echo "  • Frontend: http://localhost:3000 o http://localhost:5000"
-            echo "  • Backend:  http://localhost:8000"
-            echo "  • API Docs: http://localhost:8000/docs"
+            echo "  • Frontend: http://localhost:3000"
+            echo "  • Backend:  http://localhost:8001"
+            echo "  • API Docs: http://localhost:8001/docs"
             exit 0
             ;;
         *)
@@ -196,7 +196,7 @@ health_check() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+        if curl -s http://localhost:8001/health > /dev/null 2>&1; then
             print_success "Backend pronto!"
             break
         fi
@@ -222,8 +222,8 @@ show_info() {
     echo "║                     🌐 ACCESS URLS                          ║"
     echo "╠═══════════════════════════════════════════════════════════════╣"
     echo "║  • Frontend:      http://localhost:$FRONTEND_PORT              ║"
-    echo "║  • Backend API:   http://localhost:8000                       ║"
-    echo "║  • API Docs:      http://localhost:8000/docs                  ║"
+    echo "║  • Backend API:   http://localhost:8001                       ║"
+    echo "║  • API Docs:      http://localhost:8001/docs                  ║"
     echo "║  • Redis:         localhost:6379                             ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo

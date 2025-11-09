@@ -43,7 +43,12 @@
       "Bash(lsof:*)",
       "WebFetch(domain:docs.z.ai)",
       "Bash(find:*)",
-      "mcp__serena__think_about_collected_information"
+      "mcp__serena__think_about_collected_information",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(./start.sh:*)",
+      "mcp__serena__list_dir"
     ],
     "deny": [],
     "ask": []

@@ -7,7 +7,7 @@ services:
     image: tutor-ai-backend:simple
     container_name: tutor-ai-backend
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - ./data:/app/data
       - ./backend/.env:/app/.env

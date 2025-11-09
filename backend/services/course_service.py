@@ -2,13 +2,98 @@ import os
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 class CourseService:
     def __init__(self):
         self.courses_dir = "data/courses"
         self.courses_file = os.path.join(self.courses_dir, "courses.json")
         self.ensure_courses_directory()
+
+    def _collect_course_materials(self, course_id: str) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+        """Collect PDF materials for a course and map them to books when possible."""
+        course_dir = os.path.join(self.courses_dir, course_id)
+        materials: List[Dict[str, Any]] = []
+        book_materials_map: Dict[str, List[Dict[str, Any]]] = {}
+
+        if not os.path.exists(course_dir):
+            return materials, book_materials_map
+
+        for root, _, files in os.walk(course_dir):
+            for filename in files:
+                if not filename.lower().endswith('.pdf'):
+                    continue
+
+                file_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(file_path, course_dir)
+                normalized_rel_path = rel_path.replace(os.sep, '/')
+                stat = os.stat(file_path)
+                pdf_url = f"http://localhost:8001/course-files/{course_id}/{normalized_rel_path}"
+
+                material = {
+                    "filename": filename,
+                    "relative_path": normalized_rel_path,
+                    "size": stat.st_size,
+                    "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "file_path": file_path,
+                    "pdf_url": pdf_url
+                }
+
+                path_parts = normalized_rel_path.split('/')
+                if len(path_parts) >= 3 and path_parts[0] == 'books':
+                    book_id = path_parts[1]
+                    material["book_id"] = book_id
+                    book_materials_map.setdefault(book_id, []).append(material)
+                else:
+                    material["book_id"] = None
+
+                materials.append(material)
+
+        return materials, book_materials_map
+
+    def _enrich_books_with_materials(
+        self,
+        course: Dict[str, Any],
+        course_id: str,
+        materials: List[Dict[str, Any]],
+        book_materials_map: Dict[str, List[Dict[str, Any]]]
+    ) -> List[Dict[str, Any]]:
+        """Attach discovered PDF materials to existing book metadata."""
+        existing_books = course.get("books", []) or []
+        enriched_books: List[Dict[str, Any]] = []
+
+        if existing_books:
+            for book in existing_books:
+                book_copy = dict(book)
+                book_id = book_copy.get("id")
+                associated_materials = book_materials_map.get(book_id, [])
+                book_copy["materials"] = associated_materials
+                book_copy["materials_count"] = len(associated_materials)
+
+                if associated_materials:
+                    book_copy.setdefault("pdf_url", associated_materials[0]["pdf_url"])
+                else:
+                    # Legacy fallback to preserve existing pdf_url if present
+                    book_copy.setdefault("pdf_url", None)
+
+                enriched_books.append(book_copy)
+        else:
+            # Legacy mode: treat standalone PDFs as books so the UI still works
+            for index, material in enumerate(materials):
+                if material.get("book_id"):
+                    continue
+
+                enriched_books.append({
+                    "id": material["filename"] or f"book-{index}",
+                    "title": material["filename"].replace('.pdf', '') or f"Book {index + 1}",
+                    "pdf_url": material["pdf_url"],
+                    "total_pages": 0,
+                    "description": f"PDF file: {material['filename']}",
+                    "materials": [material],
+                    "materials_count": 1
+                })
+
+        return enriched_books
 
     def ensure_courses_directory(self):
         """Ensure the courses directory and file exist"""
@@ -56,19 +141,10 @@ class CourseService:
             courses = self.get_all_courses_raw()
 
             for course in courses:
-                # Add materials count - search recursively for PDFs
-                course_dir = os.path.join(self.courses_dir, course["id"])
-                materials = []
-                if os.path.exists(course_dir):
-                    for root, dirs, files in os.walk(course_dir):
-                        for f in files:
-                            if f.endswith('.pdf'):
-                                # Get relative path from course directory
-                                rel_path = os.path.relpath(os.path.join(root, f), course_dir)
-                                materials.append(rel_path)
-
+                materials, book_materials_map = self._collect_course_materials(course["id"])
                 course["materials_count"] = len(materials)
                 course["materials"] = materials
+                course["books"] = self._enrich_books_with_materials(course, course["id"], materials, book_materials_map)
 
             return courses
 
@@ -90,25 +166,9 @@ class CourseService:
             course = next((c for c in courses if c["id"] == course_id), None)
 
             if course:
-                # Get detailed materials info - search recursively for PDFs
-                course_dir = os.path.join(self.courses_dir, course_id)
-                materials = []
-                if os.path.exists(course_dir):
-                    for root, dirs, files in os.walk(course_dir):
-                        for filename in files:
-                            if filename.endswith('.pdf'):
-                                file_path = os.path.join(root, filename)
-                                stat = os.stat(file_path)
-                                # Get relative path from course directory
-                                rel_path = os.path.relpath(file_path, course_dir)
-                                materials.append({
-                                    "filename": filename,
-                                    "relative_path": rel_path,
-                                    "size": stat.st_size,
-                                    "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                                    "file_path": file_path
-                                })
+                materials, book_materials_map = self._collect_course_materials(course_id)
                 course["materials"] = materials
+                course["books"] = self._enrich_books_with_materials(course, course_id, materials, book_materials_map)
 
             return course
 

@@ -1,10 +1,9 @@
 import './globals.css'
 import type { ReactNode } from 'react'
-import { Inter } from 'next/font/google'
 import { Navigation } from '@/components/Navigation'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = { className: '' }
 
 export const metadata = {
   title: {

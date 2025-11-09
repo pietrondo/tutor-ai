@@ -6,8 +6,13 @@ import ConceptVisualization from '@/components/ConceptVisualization';
 interface Concept {
   concept_id: string;
   name: string;
-  description: string;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
   mastery_level: number;
+  has_sub_concepts: boolean;
+  parent_id?: string;
 }
 
 export default function ConceptsPage() {

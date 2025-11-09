@@ -1302,6 +1302,17 @@ class LLMService:
         context_text = context.get("text", "")
         sources = context.get("sources", [])
         context_size = len(context_text)
+        scope = context.get("scope", {}) or {}
+        scope_lines = []
+        if scope.get("course_name"):
+            scope_lines.append(f"Corso: {scope['course_name']}")
+        if scope.get("book_title"):
+            scope_lines.append(f"Libro in uso: {scope['book_title']}")
+        if scope.get("materials_used"):
+            joined_sources = ", ".join(scope.get("materials_used"))
+            if joined_sources:
+                scope_lines.append(f"Estratti da: {joined_sources}")
+        scope_hint = "\n".join(scope_lines)
 
         # Seleziona il modello migliore in base al contesto
         if self.model_type == "openai":
@@ -1365,10 +1376,13 @@ class LLMService:
         - Rispondi in italiano
         - Sii chiaro, paziente ed incoraggiante
         - Usa il contesto fornito per basare le tue risposte
+        - Se il contesto proviene da un libro specifico, mantieni coerenza con il testo indicato
         - Se non conosci la risposta, ammettilo onestamente
         - Fai domande di follow-up per stimolare il pensiero critico
         - Adatta il linguaggio al livello universitario
         - Fornisci esempi pratici quando possibile
+
+        {scope_hint if scope_hint else ''}
 
         Contesto rilevante:
         {context_text}

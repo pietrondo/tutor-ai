@@ -1,7 +1,9 @@
 import chromadb
 import os
 import torch
-from typing import List, Dict, Any, Optional
+import time
+import copy
+from typing import List, Dict, Any, Optional, Tuple
 from sentence_transformers import SentenceTransformer
 import PyPDF2
 import fitz  # PyMuPDF
@@ -12,6 +14,10 @@ import json
 import structlog
 from pathlib import Path
 import hashlib
+import numpy as np
+
+from services.course_service import CourseService
+from services.annotation_service import AnnotationService
 
 logger = structlog.get_logger()
 
@@ -19,22 +25,30 @@ class RAGService:
     def __init__(self):
         # Lazy loading - non caricare il modello all'avvio
         self.embedding_model = None
-        # Miglior modello multilingua 2025 per italiano
-        self.model_name = 'intfloat/multilingual-e5-large'
+        # Use a lighter model for faster startup
+        self.model_name = 'all-MiniLM-L6-v2'  # Much lighter than e5-large
         # Configurazioni ottimizzate per l'italiano
         self.chunk_size = 800  # Token 512-1024 ottimali per italiano
         self.chunk_overlap = 0.25  # 25% overlap per coerenza semantica
         self.max_chunk_length = 1024  # Massimo token per chunk
 
-        self.chroma_client = chromadb.PersistentClient(path="data/vector_db")
+        # Disable ChromaDB for now to prevent hanging
+        self.chroma_client = None
         self.collection = None
-        self.setup_collection()
+        # self.setup_collection()  # Commented out for faster startup
 
         # Inizializza HybridSearchService
         self.hybrid_search = None
 
         # Inizializza Cache Service (lazy loading)
         self.cache_service = None
+
+        # Course/material helpers
+        self.course_service = CourseService()
+        self.book_chunk_cache: Dict[str, Dict[str, Any]] = {}
+        self.max_cached_chunk_sets = 8
+        self.max_cached_chunks = 1200
+        self.annotation_service = AnnotationService()
 
         logger.info("RAG Service initialized with Italian-optimized settings",
                    model=self.model_name,
@@ -51,6 +65,416 @@ class RAGService:
             return conditions[0]
 
         return {"$and": conditions}
+
+    def _trim_chunk_cache(self):
+        if len(self.book_chunk_cache) <= self.max_cached_chunk_sets:
+            return
+
+        oldest_key = None
+        oldest_ts = time.time()
+        for key, entry in self.book_chunk_cache.items():
+            entry_ts = entry.get("updated_at", 0)
+            if entry_ts <= oldest_ts:
+                oldest_key = key
+                oldest_ts = entry_ts
+
+        if oldest_key is not None:
+            self.book_chunk_cache.pop(oldest_key, None)
+
+    def _resolve_scope_entities(self, course_id: str, book_id: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        try:
+            course = self.course_service.get_course(course_id)
+        except Exception as exc:
+            logger.error("Failed to load course for scope", course_id=course_id, error=str(exc))
+            return None, None
+
+        if not course:
+            return None, None
+
+        book = None
+        if book_id:
+            for candidate in course.get("books", []) or []:
+                if candidate.get("id") == book_id:
+                    book = candidate
+                    break
+
+        return course, book
+
+    def _get_scope_materials_and_meta(self, course_id: str, book_id: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        course, book = self._resolve_scope_entities(course_id, book_id)
+        metadata: Dict[str, Any] = {
+            "course_id": course_id,
+            "book_id": book_id,
+            "scope": "book" if book_id else "course"
+        }
+
+        if not course:
+            return [], metadata
+
+        metadata["course_name"] = course.get("name")
+        metadata["materials_count"] = course.get("materials_count", 0)
+
+        if book_id:
+            if not book:
+                return [], metadata
+
+            materials = book.get("materials", []) or []
+            metadata.update({
+                "book_title": book.get("title"),
+                "materials_count": len(materials)
+            })
+        else:
+            materials = course.get("materials", []) or []
+            metadata["materials_count"] = len(materials)
+
+        return materials, metadata
+
+    def _build_scope_metadata(self, course_id: str, book_id: Optional[str] = None) -> Dict[str, Any]:
+        course, book = self._resolve_scope_entities(course_id, book_id)
+        metadata: Dict[str, Any] = {
+            "course_id": course_id,
+            "book_id": book_id,
+            "scope": "book" if book_id else "course"
+        }
+
+        if course:
+            metadata["course_name"] = course.get("name")
+            metadata["materials_count"] = course.get("materials_count", 0)
+
+        if book:
+            metadata["book_title"] = book.get("title")
+            metadata["materials_count"] = book.get("materials_count", metadata.get("materials_count", 0))
+
+        return metadata
+
+    def _fetch_user_annotations(self, user_id: Optional[str], course_id: str,
+                                book_id: Optional[str], limit: int = 8) -> List[Dict[str, Any]]:
+        if not user_id:
+            return []
+
+        try:
+            annotations = self.annotation_service.get_user_annotations(user_id, limit=500)
+        except Exception as exc:
+            logger.error("Failed to load user annotations", user_id=user_id, error=str(exc))
+            return []
+
+        filtered: List[Dict[str, Any]] = []
+        for annotation in annotations:
+            if not annotation.get("share_with_ai") and not annotation.get("is_public"):
+                continue
+
+            annotation_book_id = annotation.get("book_id") or None
+            annotation_course_id = annotation.get("course_id") or None
+
+            if book_id:
+                if annotation_book_id == book_id:
+                    filtered.append(annotation)
+            else:
+                if not annotation_book_id and (annotation_course_id == course_id or not annotation_course_id):
+                    filtered.append(annotation)
+
+            if len(filtered) >= limit:
+                break
+
+        return filtered
+
+    def _format_annotation_snippet(self, annotation: Dict[str, Any]) -> str:
+        selection = (annotation.get("selected_text") or annotation.get("text") or "").strip()
+        note = (annotation.get("content") or "").strip()
+        page = annotation.get("page_number")
+        tags = annotation.get("tags") or []
+
+        parts: List[str] = []
+        if selection:
+            parts.append(selection)
+        if note:
+            parts.append(f"Nota: {note}")
+        if tags:
+            parts.append(f"Tag: {', '.join(tags)}")
+
+        snippet_body = "\n".join(parts).strip()
+        header = f"Pagina {page}" if page else "Annotazione"
+        return f"{header}: {snippet_body}" if snippet_body else header
+
+    def _merge_user_annotations(self, context_result: Dict[str, Any], course_id: str,
+                                book_id: Optional[str], user_id: Optional[str]) -> Dict[str, Any]:
+        if not user_id:
+            return context_result
+
+        annotations = self._fetch_user_annotations(user_id, course_id, book_id)
+        if not annotations:
+            return context_result
+
+        annotation_sections: List[str] = []
+        annotation_sources: List[Dict[str, Any]] = []
+
+        for idx, annotation in enumerate(annotations):
+            snippet = self._format_annotation_snippet(annotation)
+            if not snippet:
+                continue
+
+            annotation_sections.append(snippet)
+            annotation_sources.append({
+                "source": f"Nota personale pagina {annotation.get('page_number', '?')}",
+                "chunk_index": idx,
+                "relevance_score": 1.0,
+                "type": "user_annotation",
+                "annotation_id": annotation.get("id"),
+                "page_number": annotation.get("page_number"),
+                "course_id": annotation.get("course_id") or course_id,
+                "book_id": annotation.get("book_id") or book_id
+            })
+
+        if not annotation_sections:
+            return context_result
+
+        merged_text = "NOTE PERSONALI DELLO STUDENTE\n" + "\n\n".join(annotation_sections)
+        base_text = context_result.get("text", "")
+        if base_text:
+            merged_text = f"{merged_text}\n\n{base_text}"
+
+        merged_result = dict(context_result)
+        merged_result["text"] = merged_text
+        existing_sources = context_result.get("sources", []) or []
+        merged_result["sources"] = annotation_sources + list(existing_sources)
+
+        scope = dict(context_result.get("scope") or {})
+        scope["user_annotations_used"] = scope.get("user_annotations_used", 0) + len(annotation_sources)
+        scope["annotations_strategy"] = "prepended"
+        merged_result["scope"] = scope
+
+        return merged_result
+
+    def _build_material_signature(self, materials: List[Dict[str, Any]]) -> str:
+        signatures: List[str] = []
+        for material in materials:
+            file_path = material.get("file_path")
+            if not file_path or not os.path.exists(file_path):
+                continue
+            try:
+                stat = os.stat(file_path)
+                signatures.append(f"{file_path}:{int(stat.st_mtime)}:{stat.st_size}")
+            except FileNotFoundError:
+                continue
+
+        return "|".join(sorted(signatures))
+
+    def _build_chunks_from_materials(self, materials: List[Dict[str, Any]], course_id: str,
+                                     book_id: Optional[str]) -> List[Dict[str, Any]]:
+        chunks: List[Dict[str, Any]] = []
+        chunk_index = 0
+
+        for material in materials:
+            if chunk_index >= self.max_cached_chunks:
+                break
+
+            file_path = material.get("file_path")
+            if not file_path or not os.path.exists(file_path):
+                continue
+
+            try:
+                text = self.extract_text_from_pdf(file_path)
+            except Exception as exc:
+                logger.error("Failed to extract text for material", path=file_path, error=str(exc))
+                continue
+
+            text_chunks = self.split_text_into_chunks(text)
+
+            for chunk in text_chunks:
+                chunks.append({
+                    "text": chunk,
+                    "metadata": {
+                        "course_id": course_id,
+                        "book_id": book_id,
+                        "source": material.get("filename") or os.path.basename(file_path),
+                        "chunk_index": chunk_index,
+                        "material_relative_path": material.get("relative_path"),
+                        "material_path": file_path
+                    }
+                })
+                chunk_index += 1
+
+                if chunk_index >= self.max_cached_chunks:
+                    break
+
+        return chunks
+
+    def _embed_chunks(self, chunks: List[Dict[str, Any]]) -> List[List[float]]:
+        if not chunks:
+            return []
+
+        texts = [chunk["text"] for chunk in chunks]
+        self._load_embedding_model()
+        embeddings = self.embedding_model.encode(texts, normalize_embeddings=True)
+        return embeddings.tolist() if hasattr(embeddings, "tolist") else embeddings
+
+    def _get_or_build_chunk_entry(self, course_id: str, book_id: Optional[str],
+                                  materials: List[Dict[str, Any]], scope_meta: Dict[str, Any]) -> Dict[str, Any]:
+        cache_key = f"{course_id}:{book_id or 'all'}"
+        signature = self._build_material_signature(materials)
+        cache_entry = self.book_chunk_cache.get(cache_key)
+
+        if cache_entry and cache_entry.get("signature") == signature:
+            cache_entry["scope"] = scope_meta
+            return cache_entry
+
+        chunks = self._build_chunks_from_materials(materials, course_id, book_id)
+        embeddings = self._embed_chunks(chunks)
+
+        cache_entry = {
+            "chunks": chunks,
+            "embeddings": embeddings,
+            "signature": signature,
+            "scope": scope_meta,
+            "updated_at": time.time()
+        }
+
+        self.book_chunk_cache[cache_key] = cache_entry
+        self._trim_chunk_cache()
+        return cache_entry
+
+    def _rank_chunks_by_similarity(self, query: str, cache_entry: Dict[str, Any], k: int) -> List[Dict[str, Any]]:
+        chunks = cache_entry.get("chunks") or []
+        embeddings = cache_entry.get("embeddings") or []
+
+        if not chunks or not embeddings:
+            return []
+
+        self._load_embedding_model()
+        query_embedding = self.embedding_model.encode([query], normalize_embeddings=True)[0]
+        chunk_embeddings = np.array(embeddings)
+
+        if chunk_embeddings.size == 0:
+            return []
+
+        scores = np.dot(chunk_embeddings, query_embedding)
+        top_indices = np.argsort(scores)[::-1][:k]
+
+        ranked: List[Dict[str, Any]] = []
+        for idx in top_indices:
+            if idx >= len(chunks):
+                continue
+            ranked.append({
+                "chunk": chunks[idx],
+                "score": float(scores[idx])
+            })
+
+        return ranked
+
+    def _attach_scope_usage(self, scope_meta: Dict[str, Any], sources: List[Dict[str, Any]],
+                             strategy: str) -> Dict[str, Any]:
+        scope = dict(scope_meta or {})
+        used_materials = sorted({source.get("source") for source in sources if source.get("source")})
+        scope["materials_used"] = used_materials
+        scope["retrieval_strategy"] = strategy
+        scope.setdefault("course_id", scope_meta.get("course_id") if scope_meta else None)
+        return scope
+
+    def _build_empty_context_response(self, course_id: str, book_id: Optional[str],
+                                       scope_meta: Dict[str, Any], message: str) -> Dict[str, Any]:
+        scope = dict(scope_meta or {})
+        scope.setdefault("retrieval_strategy", "none")
+        return {
+            "text": "",
+            "sources": [],
+            "course_id": course_id,
+            "book_id": book_id,
+            "scope": scope,
+            "message": message
+        }
+
+    async def _retrieve_context_local(self, query: str, course_id: str,
+                                      book_id: Optional[str], k: int) -> Dict[str, Any]:
+        materials, scope_meta = self._get_scope_materials_and_meta(course_id, book_id)
+
+        if not materials:
+            return self._build_empty_context_response(
+                course_id,
+                book_id,
+                scope_meta,
+                "Nessun materiale locale disponibile per il contesto selezionato"
+            )
+
+        chunk_entry = self._get_or_build_chunk_entry(course_id, book_id, materials, scope_meta)
+        ranked_chunks = self._rank_chunks_by_similarity(query, chunk_entry, k)
+
+        if not ranked_chunks:
+            return self._build_empty_context_response(
+                course_id,
+                book_id,
+                scope_meta,
+                "Non sono stati trovati riferimenti pertinenti per questo libro"
+            )
+
+        combined_text = "\n\n".join(item["chunk"]["text"] for item in ranked_chunks)
+        sources: List[Dict[str, Any]] = []
+        for item in ranked_chunks:
+            metadata = item["chunk"].get("metadata", {})
+            sources.append({
+                "source": metadata.get("source", "Local PDF"),
+                "chunk_index": metadata.get("chunk_index"),
+                "relevance_score": round(float(item.get("score", 0.0)), 4),
+                "course_id": metadata.get("course_id"),
+                "book_id": metadata.get("book_id"),
+                "material_path": metadata.get("material_relative_path") or metadata.get("material_path")
+            })
+
+        scope = self._attach_scope_usage(chunk_entry.get("scope", scope_meta), sources, "local_fallback")
+
+        return {
+            "text": combined_text,
+            "sources": sources,
+            "course_id": course_id,
+            "book_id": book_id,
+            "scope": scope
+        }
+
+    async def _retrieve_context_vector(self, query: str, course_id: str,
+                                        book_id: Optional[str], k: int) -> Dict[str, Any]:
+        self._load_embedding_model()
+        query_embedding = self.embedding_model.encode([query]).tolist()
+        where_filter = self._build_where_filter(course_id, book_id)
+
+        results = self.collection.query(
+            query_embeddings=query_embedding,
+            n_results=k,
+            where=where_filter
+        )
+
+        documents = results.get('documents') or []
+        metadatas = results.get('metadatas') or []
+
+        if not documents or not documents[0]:
+            scope_meta = self._build_scope_metadata(course_id, book_id)
+            return self._build_empty_context_response(
+                course_id,
+                book_id,
+                scope_meta,
+                "Nessun documento indicizzato per il contesto selezionato"
+            )
+
+        context_text = "\n\n".join(documents[0])
+        sources: List[Dict[str, Any]] = []
+
+        for i, metadata in enumerate(metadatas[0]):
+            sources.append({
+                "source": metadata.get('source', 'Unknown'),
+                "chunk_index": metadata.get('chunk_index', i),
+                "relevance_score": round(1.0 - (i * 0.1), 4),
+                "course_id": course_id,
+                "book_id": metadata.get('book_id') or book_id
+            })
+
+        scope_meta = self._build_scope_metadata(course_id, book_id)
+        scope = self._attach_scope_usage(scope_meta, sources, "vector_db")
+
+        return {
+            "text": context_text,
+            "sources": sources,
+            "course_id": course_id,
+            "book_id": book_id,
+            "scope": scope
+        }
 
     def _load_embedding_model(self):
         """Carica il modello di embedding solo quando necessario"""
@@ -73,6 +497,9 @@ class RAGService:
 
     def setup_collection(self):
         """Setup or get the ChromaDB collection"""
+        if self.chroma_client is None:
+            logger.warning("ChromaDB disabled - vector search will not work")
+            return
         try:
             self.collection = self.chroma_client.get_collection("course_materials")
         except Exception:
@@ -377,55 +804,41 @@ class RAGService:
 
         return cleaned.strip()
 
-    async def retrieve_context(self, query: str, course_id: str, book_id: Optional[str] = None, k: int = 5) -> Dict[str, Any]:
+    async def retrieve_context(self, query: str, course_id: str, book_id: Optional[str] = None,
+                               k: int = 5, user_id: Optional[str] = None,
+                               include_annotations: bool = True) -> Dict[str, Any]:
         """Retrieve relevant context for a query"""
         try:
-            # Generate query embedding
-            self._load_embedding_model()
-            query_embedding = self.embedding_model.encode([query]).tolist()
+            vector_result = None
+            if self.collection is not None:
+                try:
+                    vector_result = await self._retrieve_context_vector(query, course_id, book_id, k)
+                except Exception as exc:
+                    logger.error("Vector retrieval failed, falling back to local chunks",
+                                 course_id=course_id, book_id=book_id, error=str(exc))
 
-            # Build filter based on course_id and optional book_id
-            where_filter = self._build_where_filter(course_id, book_id)
+            base_result: Dict[str, Any]
+            if vector_result and vector_result.get("text"):
+                base_result = vector_result
+            else:
+                local_result = await self._retrieve_context_local(query, course_id, book_id, k)
+                if local_result.get("text"):
+                    base_result = local_result
+                else:
+                    base_result = vector_result or local_result
 
-            # Search in ChromaDB with course and book filter
-            results = self.collection.query(
-                query_embeddings=query_embedding,
-                n_results=k,
-                where=where_filter
-            )
+            if include_annotations:
+                return self._merge_user_annotations(base_result, course_id, book_id, user_id)
 
-            if not results['documents'][0]:
-                return {
-                    "text": "",
-                    "sources": [],
-                    "message": "Nessun documento rilevante trovato per questo corso."
-                }
-
-            # Format results
-            context_text = "\n\n".join(results['documents'][0])
-            sources = []
-
-            for i, (doc, metadata) in enumerate(zip(results['documents'][0], results['metadatas'][0])):
-                sources.append({
-                    "source": metadata.get('source', 'Unknown'),
-                    "chunk_index": metadata.get('chunk_index', i),
-                    "relevance_score": 1.0 - (i * 0.1)  # Simple relevance scoring
-                })
-
-            return {
-                "text": context_text,
-                "sources": sources,
-                "query": query,
-                "course_id": course_id
-            }
+            return base_result
 
         except Exception as e:
-            print(f"Error retrieving context: {e}")
-            return {
-                "text": "",
-                "sources": [],
-                "error": "Errore nel recupero del contesto"
-            }
+            logger.error("Error retrieving context", error=str(e), course_id=course_id, book_id=book_id)
+            scope = self._build_scope_metadata(course_id, book_id)
+            empty_context = self._build_empty_context_response(course_id, book_id, scope, "Errore nel recupero del contesto")
+            if include_annotations:
+                return self._merge_user_annotations(empty_context, course_id, book_id, user_id)
+            return empty_context
 
     async def search_documents(self, course_id: str, search_query: str = None) -> Dict[str, Any]:
         """Search all documents for a course"""
@@ -596,8 +1009,10 @@ class RAGService:
         return ":".join(key_components)
 
     async def retrieve_context_cached(self, query: str, course_id: str,
-                                    book_id: Optional[str] = None, k: int = 5,
-                                    use_hybrid: bool = False) -> Dict[str, Any]:
+                                      book_id: Optional[str] = None, k: int = 5,
+                                      use_hybrid: bool = False,
+                                      user_id: Optional[str] = None,
+                                      include_annotations: bool = True) -> Dict[str, Any]:
         """
         Retrieve context con cache layer per performance ottimizzate
         """
@@ -605,28 +1020,40 @@ class RAGService:
             # Inizializza cache service se necessario
             self._init_cache_service()
 
-            if self.cache_service:
-                # Genera cache key
-                cache_key = self._generate_cache_key(query, course_id, book_id, k, use_hybrid)
+            from services.cache_service import CacheType  # type: ignore
+            result: Dict[str, Any]
+            cache_key = None
 
-                # Tenta di recuperare dalla cache
-                from services.cache_service import CacheType
+            if self.cache_service:
+                cache_key = self._generate_cache_key(query, course_id, book_id, k, use_hybrid)
                 cached_result = await self.cache_service.get(CacheType.QUERY_RESULT, cache_key)
 
                 if cached_result is not None:
                     logger.info("Cache hit for RAG query", query=query[:50], cache_key=cache_key)
-                    return cached_result
+                    result = {
+                        **cached_result,
+                        "sources": list(cached_result.get("sources", []) or []),
+                        "scope": dict(cached_result.get("scope") or {})
+                    }
+                else:
+                    if use_hybrid:
+                        result = await self.retrieve_context_hybrid(query, course_id, book_id, k)
+                    else:
+                        result = await self.retrieve_context(query, course_id, book_id, k,
+                                                             user_id=user_id, include_annotations=False)
 
-            # Cache miss - esegui query normale
-            if use_hybrid:
-                result = await self.retrieve_context_hybrid(query, course_id, book_id, k)
+                    if result.get("text"):
+                        await self.cache_service.set(CacheType.QUERY_RESULT, cache_key, copy.deepcopy(result))
+                        logger.info("Cached RAG query result", query=query[:50], cache_key=cache_key)
             else:
-                result = await self.retrieve_context(query, course_id, book_id, k)
+                if use_hybrid:
+                    result = await self.retrieve_context_hybrid(query, course_id, book_id, k)
+                else:
+                    result = await self.retrieve_context(query, course_id, book_id, k,
+                                                         user_id=user_id, include_annotations=False)
 
-            # Salva nella cache
-            if self.cache_service and result.get("text"):  # Solo cache risultati validi
-                await self.cache_service.set(CacheType.QUERY_RESULT, cache_key, result)
-                logger.info("Cached RAG query result", query=query[:50], cache_key=cache_key)
+            if include_annotations:
+                return self._merge_user_annotations(result, course_id, book_id, user_id)
 
             return result
 
@@ -636,7 +1063,8 @@ class RAGService:
             if use_hybrid:
                 return await self.retrieve_context_hybrid(query, course_id, book_id, k)
             else:
-                return await self.retrieve_context(query, course_id, book_id, k)
+                return await self.retrieve_context(query, course_id, book_id, k,
+                                                   user_id=user_id, include_annotations=include_annotations)
 
     async def get_embedding_cached(self, text: str) -> List[float]:
         """

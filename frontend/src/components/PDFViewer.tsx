@@ -15,9 +15,9 @@ import {
   Search
 } from 'lucide-react'
 
-// Configure PDF.js worker
+// Configure PDF.js worker - use local worker to avoid CORS issues
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+  pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
 }
 
 interface PDFAnnotation {
@@ -351,8 +351,32 @@ export function PDFViewer({ pdfUrl, title, onBack, onSave }: PDFViewerProps) {
                 </div>
               }
               error={
-                <div className="text-center p-8 text-red-600">
-                  Errore nel caricamento del PDF
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center max-w-md mx-auto p-6">
+                    <div className="text-red-500 mb-4">
+                      <FileText className="w-16 h-16 mx-auto" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Errore nel caricamento del PDF
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Impossibile caricare il file PDF. Verifica che il file sia valido e accessibile.
+                    </p>
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      >
+                        Riprova
+                      </button>
+                      <button
+                        onClick={() => window.open(pdfUrl, '_blank')}
+                        className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Apri in nuova scheda
+                      </button>
+                    </div>
+                  </div>
                 </div>
               }
             >

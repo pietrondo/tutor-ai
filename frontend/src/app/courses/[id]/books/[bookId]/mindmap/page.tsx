@@ -165,8 +165,37 @@ export default function MindmapPage() {
   // Load saved mindmaps from unified service on mount
   useEffect(() => {
     const savedMaps = mindmapService.getSavedMindmaps(courseIdFromParams, bookIdFromParams)
-    setSavedMindmaps(savedMaps)
-    console.log(`📚 Loaded ${savedMaps.length} saved mindmaps for course ${courseIdFromParams}, book ${bookIdFromParams}`)
+    // Transform MindmapStorage[] to SavedMindmapEntry[]
+    const transformedMaps: SavedMindmapEntry[] = savedMaps.map(map => ({
+      id: map.id,
+      title: map.title,
+      data: {
+        title: map.title,
+        description: map.mindmap.overview || '',
+        central_topic: map.mindmap.title,
+        main_branches: map.mindmap.nodes.map(node => ({
+          text: node.title,
+          children: node.children?.map(child => ({
+            text: child.title,
+            children: child.children?.map(grandchild => ({
+              text: grandchild.title
+            })) || []
+          })) || []
+        })),
+        generated_at: map.createdAt,
+        version: '1.0',
+        context: {
+          course_id: map.courseId,
+          book_id: map.bookId,
+          sources: map.sources || []
+        }
+      },
+      createdAt: map.createdAt,
+      courseId: map.courseId,
+      bookId: map.bookId || ''
+    }))
+    setSavedMindmaps(transformedMaps)
+    console.log(`📚 Loaded ${transformedMaps.length} saved mindmaps for course ${courseIdFromParams}, book ${bookIdFromParams}`)
   }, [courseIdFromParams, bookIdFromParams])
 
   const normalizeMindmapForStorage = (input: MindmapSaveInput): MindmapStoragePayload => {

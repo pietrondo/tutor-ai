@@ -43,7 +43,7 @@ const nodeVariants = {
     scale: 1,
     y: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 300,
       damping: 20,
       mass: 0.5
@@ -53,14 +53,14 @@ const nodeVariants = {
     scale: 1.02,
     transition: {
       duration: 0.2,
-      ease: "easeOut"
+      ease: "easeOut" as const
     }
   },
   collapsed: {
     scale: 1,
     transition: {
       duration: 0.2,
-      ease: "easeOut"
+      ease: "easeOut" as const
     }
   }
 }
@@ -76,7 +76,7 @@ const childrenVariants = {
     height: "auto",
     x: 0,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 200,
       damping: 15,
       staggerChildren: 0.1,
@@ -96,7 +96,7 @@ const childItemVariants = {
     x: 0,
     scale: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 300,
       damping: 20
     }
@@ -231,7 +231,7 @@ export function AnimatedConceptNode({
     return 'bg-white border-2 border-gray-200 text-gray-700 shadow-sm hover:border-gray-300'
   }
 
-  const nodeStyle = getDepthStyles(depth, node.metadata?.conceptType)
+  const nodeStyle = getDepthStyles(depth, (node as any).metadata?.conceptType)
 
   const masteryIndicator = node.masteryLevel !== undefined ? (
     <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 ${
@@ -334,17 +334,17 @@ export function AnimatedConceptNode({
         <div className="flex items-center gap-3 mt-2 text-xs opacity-70">
           {/* Concept Type Badge */}
           <div className="flex items-center gap-1">
-            {node.metadata?.conceptType === 'macro' && (
+            {(node as any).metadata?.conceptType === 'macro' && (
               <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
                 📖 Macro
               </span>
             )}
-            {node.metadata?.conceptType === 'sub' && (
+            {(node as any).metadata?.conceptType === 'sub' && (
               <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
                 🔍 Dettaglio
               </span>
             )}
-            {node.metadata?.canExpand && (
+            {(node as any).metadata?.canExpand && (
               <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
                 ✨ Espandibile
               </span>
@@ -352,15 +352,15 @@ export function AnimatedConceptNode({
           </div>
 
           {/* Chapter Info */}
-          {node.metadata?.chapterInfo && node.metadata.chapterInfo.type === 'chapter' && (
+          {(node as any).metadata?.chapterInfo && (node as any).metadata.chapterInfo.type === 'chapter' && (
             <span className="flex items-center gap-1">
-              📚 Cap. {node.metadata.chapterInfo.index}
+              📚 Cap. {(node as any).metadata.chapterInfo.index}
             </span>
           )}
 
           {/* Sub-concepts count */}
-          {node.metadata?.subConceptsCount && node.metadata.subConceptsCount > 0 && (
-            <span>{node.metadata.subConceptsCount} sotto-concett{i => i.length === 1 ? 'o' : 'i'}</span>
+          {(node as any).metadata?.subConceptsCount && (node as any).metadata.subConceptsCount > 0 && (
+            <span>{(node as any).metadata.subConceptsCount} sotto-concett{(node as any).metadata.subConceptsCount === 1 ? 'o' : 'i'}</span>
           )}
 
           {/* Level indicator */}

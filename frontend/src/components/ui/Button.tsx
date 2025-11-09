@@ -38,44 +38,44 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary: [
-        'bg-primary-600 text-white hover:bg-primary-700',
-        'focus:ring-primary-500',
-        'shadow-medium hover:shadow-large',
-        gradient && 'bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800'
+        'bg-blue-600 text-white hover:bg-blue-700',
+        'focus:ring-blue-500',
+        'shadow-md hover:shadow-lg',
+        gradient && 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
       ],
       secondary: [
-        'bg-neutral-100 text-neutral-900 hover:bg-neutral-200',
-        'focus:ring-neutral-500',
-        'border border-neutral-300',
+        'bg-gray-100 text-gray-900 hover:bg-gray-200',
+        'focus:ring-gray-500',
+        'border border-gray-300',
       ],
       accent: [
-        'bg-accent-600 text-white hover:bg-accent-700',
-        'focus:ring-accent-500',
-        'shadow-glow hover:shadow-glow-lg',
-        gradient && 'bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700'
+        'bg-purple-600 text-white hover:bg-purple-700',
+        'focus:ring-purple-500',
+        'shadow-lg hover:shadow-xl',
+        gradient && 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700'
       ],
       success: [
-        'bg-success-600 text-white hover:bg-success-700',
-        'focus:ring-success-500',
-        gradient && 'bg-gradient-to-r from-success-500 to-success-600 hover:from-success-600 hover:to-success-700'
+        'bg-green-600 text-white hover:bg-green-700',
+        'focus:ring-green-500',
+        gradient && 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
       ],
       warning: [
-        'bg-warning-600 text-white hover:bg-warning-700',
-        'focus:ring-warning-500',
-        gradient && 'bg-gradient-to-r from-warning-500 to-warning-600 hover:from-warning-600 hover:to-warning-700'
+        'bg-yellow-600 text-white hover:bg-yellow-700',
+        'focus:ring-yellow-500',
+        gradient && 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700'
       ],
       danger: [
-        'bg-danger-600 text-white hover:bg-danger-700',
-        'focus:ring-danger-500',
-        gradient && 'bg-gradient-to-r from-danger-500 to-danger-600 hover:from-danger-600 hover:to-danger-700'
+        'bg-red-600 text-white hover:bg-red-700',
+        'focus:ring-red-500',
+        gradient && 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
       ],
       ghost: [
-        'text-neutral-700 hover:bg-neutral-100',
-        'focus:ring-neutral-500',
+        'text-gray-700 hover:bg-gray-100',
+        'focus:ring-gray-500',
       ],
       outline: [
-        'border-2 border-primary-600 text-primary-600 hover:bg-primary-600 hover:text-white',
-        'focus:ring-primary-500',
+        'border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white',
+        'focus:ring-blue-500',
       ],
     }
 

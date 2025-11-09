@@ -114,7 +114,6 @@ export interface BookUpdate {
   tags?: string[]
 }
 
-export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 // ===== STUDY SESSION TYPES =====
 
@@ -503,5 +502,5 @@ export interface ModalProps extends BaseComponentProps {
 export type EntityType = 'course' | 'book' | 'session' | 'quiz' | 'mindmap'
 
 // Export commonly used type unions
-export type ProcessingStatus = Book['processing_status']
+export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type QuizDifficulty = Quiz['difficulty']

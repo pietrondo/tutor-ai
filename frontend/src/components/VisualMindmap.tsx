@@ -297,7 +297,7 @@ export default function VisualMindmap({
     console.log('✅ Mindmap validation complete:', {
       totalStructuredNodes: structured.nodes.length,
       totalRenderedNodes: mindmapData.nodes.size,
-      totalConnections: connections.length
+      totalConnections: mindmapData.connections.length
     })
   }, [data, dataSignature, mindmapData?.nodes.size])
 
@@ -372,9 +372,9 @@ export default function VisualMindmap({
       console.log('📋 Input data details:', {
         title: inputData.title,
         hasNodes: !!inputData.nodes,
-        nodesLength: inputData.nodes?.length || 0,
-        firstNodeTitle: inputData.nodes?.[0]?.title || 'No nodes',
-        allNodeTitles: inputData.nodes?.map(n => n.title) || []
+        nodesLength: (inputData.nodes as any[])?.length || 0,
+        firstNodeTitle: (inputData.nodes as any[])?.[0]?.title || 'No nodes',
+        allNodeTitles: (inputData.nodes as any[])?.map((n: any) => n.title) || []
       })
     }
 

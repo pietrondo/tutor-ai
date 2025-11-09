@@ -1,9 +1,9 @@
 {
-  "6099f371-470b-44c8-a95e-befe70d23f7e": {
-    "id": "6099f371-470b-44c8-a95e-befe70d23f7e",
-    "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
-    "created_at": "2025-11-08T08:51:45.072482+00:00",
-    "last_activity": "2025-11-08T08:51:45.072485+00:00",
+  "8dbb83f2-9920-478e-8ce9-959a8e60f89a": {
+    "id": "8dbb83f2-9920-478e-8ce9-959a8e60f89a",
+    "course_id": "test",
+    "created_at": "2025-11-09T08:27:26.702992+00:00",
+    "last_activity": "2025-11-09T08:27:26.702996+00:00",
     "messages": [],
     "context": {
       "topic_history": {

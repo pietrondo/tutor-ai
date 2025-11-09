@@ -192,7 +192,7 @@ export function ConceptTooltip({
             {node.children && node.children.length > 0 && (
               <div className="flex items-center gap-1 text-xs text-gray-500">
                 <BookOpen className="h-3 w-3" />
-                {node.children.length} sotto-concett{i => i.length === 1 ? 'o' : 'i'}
+                {node.children.length} sotto-concett{node.children.length === 1 ? 'o' : 'i'}
               </div>
             )}
 

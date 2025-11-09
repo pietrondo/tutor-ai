@@ -21,8 +21,39 @@ from services.course_service import CourseService
 from services.concept_map_service import concept_map_service
 
 # Import fast book concepts API
-from fast_book_concepts import BookConceptRequest, get_book_concepts_fast
-from hybrid_concept_service import HybridConceptRequest, get_hybrid_concepts
+# from fast_book_concepts import BookConceptRequest, get_book_concepts_fast
+# Import fixed with relative path
+try:
+    from .fast_book_concepts import BookConceptRequest, get_book_concepts_fast
+except ImportError:
+    # Fallback for different Python path configurations
+    try:
+        from fast_book_concepts import BookConceptRequest, get_book_concepts_fast
+    except ImportError:
+        # If still can't import, define dummy classes to prevent startup errors
+        from pydantic import BaseModel
+        class BookConceptRequest(BaseModel):
+            course_id: str
+            book_id: str = None
+
+        def get_book_concepts_fast(request):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Book concepts service temporarily unavailable")
+try:
+    from .hybrid_concept_service import HybridConceptRequest, get_hybrid_concepts
+except ImportError:
+    try:
+        from hybrid_concept_service import HybridConceptRequest, get_hybrid_concepts
+    except ImportError:
+        from pydantic import BaseModel
+        class HybridConceptRequest(BaseModel):
+            course_id: str
+            book_id: str = None
+            query: str = ""
+
+        def get_hybrid_concepts(request):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Hybrid concepts service temporarily unavailable")
 from models.book_concept_maps import (
     BookConceptMapRequest, BookConceptMapResponse, BookConceptMapSummary,
     BookConceptAnalysisRequest, BookCacheStatsResponse,
@@ -112,6 +143,43 @@ class KnowledgeAreaResponse(BaseModel):
     success: bool
     areas: List[KnowledgeArea]
     message: Optional[str] = None
+
+# API Models for IntegratedChatTutor endpoints
+class ChatInitializeRequest(BaseModel):
+    course_id: str
+    user_id: str
+    book_id: Optional[str] = None
+
+class ChatInitializeResponse(BaseModel):
+    session_id: str
+    welcome_message: Optional[str] = None
+
+class UserNoteResponse(BaseModel):
+    id: str
+    title: str
+    content: str
+    type: str
+    created_at: str
+    tags: List[str]
+
+class NotesRecentResponse(BaseModel):
+    notes: List[UserNoteResponse]
+
+class AnnotationResponse(BaseModel):
+    id: str
+    user_id: str
+    pdf_filename: str
+    content: str
+    page: int
+    type: str
+    created_at: str
+    share_with_ai: Optional[bool] = False
+
+class AnnotationsRecentResponse(BaseModel):
+    annotations: List[AnnotationResponse]
+
+class LearningProfileResponse(BaseModel):
+    profile: dict
 
 class QuizRecommendation(BaseModel):
     area_id: str
@@ -314,7 +382,11 @@ app.add_middleware(
 
 # Serve static files
 app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
+app.mount("/uploads/courses", StaticFiles(directory="data/courses"), name="courses")
 app.mount("/slides/static", StaticFiles(directory="data/slides"), name="slides_static")
+
+# Alternative mount for course files
+app.mount("/course-files", StaticFiles(directory="data/courses"), name="course_files")
 
 # Include API routers
 app.include_router(slides_router)
@@ -359,7 +431,7 @@ async def security_middleware(request: Request, call_next):
 
         # Add security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Frame-Options"] = "ALLOWALL"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
@@ -455,6 +527,7 @@ class BookUpdate(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     course_id: str
+    user_id: Optional[str] = None
     book_id: Optional[str] = None
     session_id: Optional[str] = None
     use_hybrid_search: Optional[bool] = False  # Enable hybrid search
@@ -465,6 +538,7 @@ class EnhancedChatMessage(BaseModel):
     message: str
     course_id: str
     session_id: Optional[str] = None  # Will auto-generate if not provided
+    user_id: Optional[str] = None
     book_id: Optional[str] = None
     use_enhanced_rag: Optional[bool] = True  # Use enhanced RAG with personalization
     search_k: Optional[int] = 7  # Increased for better context
@@ -1570,6 +1644,7 @@ class AnnotationCreate(BaseModel):
     tags: Optional[List[str]] = []
     is_public: Optional[bool] = False
     is_favorite: Optional[bool] = False
+    share_with_ai: Optional[bool] = False
 
 class AnnotationUpdate(BaseModel):
     type: Optional[str] = None
@@ -1578,6 +1653,7 @@ class AnnotationUpdate(BaseModel):
     tags: Optional[List[str]] = None
     is_public: Optional[bool] = None
     is_favorite: Optional[bool] = None
+    share_with_ai: Optional[bool] = None
 
 class AnnotationSearch(BaseModel):
     query: str
@@ -1919,7 +1995,8 @@ async def chat(chat_message: ChatMessage):
                 chat_message.course_id,
                 chat_message.book_id,
                 chat_message.search_k,
-                use_hybrid=True
+                use_hybrid=True,
+                user_id=chat_message.user_id
             )
         else:
             # Use traditional semantic search with caching
@@ -1928,7 +2005,8 @@ async def chat(chat_message: ChatMessage):
                 chat_message.course_id,
                 chat_message.book_id,
                 chat_message.search_k,
-                use_hybrid=False
+                use_hybrid=False,
+                user_id=chat_message.user_id
             )
 
         # Generate response (potentially cached)
@@ -5751,6 +5829,119 @@ async def update_concept_progress(
         }
     except Exception as e:
         logger.error(f"Error updating concept progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# API Endpoints for IntegratedChatTutor component
+@app.post("/api/chat/initialize", response_model=ChatInitializeResponse)
+async def initialize_chat(request: ChatInitializeRequest):
+    """Initialize chat session for IntegratedChatTutor"""
+    try:
+        # Generate a unique session ID
+        import uuid
+        session_id = str(uuid.uuid4())
+
+        # Create welcome message
+        welcome_message = f"Ciao! Sono il tuo tutor AI per il corso. Posso aiutarti a studiare i materiali, rispondere a domande e creare note personalizzate. Come posso aiutarti oggi?"
+
+        return ChatInitializeResponse(
+            session_id=session_id,
+            welcome_message=welcome_message
+        )
+
+    except Exception as e:
+        logger.error(f"Error initializing chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/notes/recent", response_model=NotesRecentResponse)
+async def get_recent_notes(user_id: str, course_id: str, limit: int = 5):
+    """Get recent notes for a user in a course"""
+    try:
+        # For now, return mock data since notes service is not fully implemented
+        # In the future, this would integrate with a real notes service
+        mock_notes = [
+            UserNoteResponse(
+                id="note-1",
+                title="Appunti sul Capitolo 1",
+                content="I concetti principali del primo capitolo includono...",
+                type="study_note",
+                created_at=datetime.now().isoformat(),
+                tags=["matematica", "algebra"]
+            ),
+            UserNoteResponse(
+                id="note-2",
+                title="Formula importante",
+                content="La formula quadratica è essenziale per risolvere...",
+                type="formula",
+                created_at=datetime.now().isoformat(),
+                tags=["formule", "importante"]
+            )
+        ]
+
+        return NotesRecentResponse(notes=mock_notes[:limit])
+
+    except Exception as e:
+        logger.error(f"Error getting recent notes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/books/{book_id}/annotations/recent", response_model=AnnotationsRecentResponse)
+async def get_recent_annotations(book_id: str, user_id: str, limit: int = 3):
+    """Get recent annotations for a book and user"""
+    try:
+        # Use the existing annotation service
+        annotations = annotation_service.get_user_annotations(user_id, limit=limit)
+
+        # Convert annotations to the expected format
+        annotation_responses = []
+        for annotation in annotations:
+            annotation_responses.append(
+                AnnotationResponse(
+                    id=annotation.get("id", "unknown"),
+                    user_id=user_id,
+                    pdf_filename=annotation.get("pdf_filename", book_id),
+                    content=annotation.get("content", ""),
+                    page=annotation.get("page", 1),
+                    type=annotation.get("type", "highlight"),
+                    created_at=annotation.get("created_at", datetime.now().isoformat())
+                )
+            )
+
+        return AnnotationsRecentResponse(annotations=annotation_responses[:limit])
+
+    except Exception as e:
+        logger.error(f"Error getting recent annotations: {e}")
+        # Return empty annotations if service fails
+        return AnnotationsRecentResponse(annotations=[])
+
+@app.get("/api/learning/profile", response_model=LearningProfileResponse)
+async def get_learning_profile(user_id: str, course_id: str):
+    """Get learning profile for a user in a course"""
+    try:
+        # For now, return a mock learning profile
+        # In the future, this would integrate with a real learning analytics service
+        mock_profile = {
+            "user_id": user_id,
+            "course_id": course_id,
+            "learning_style": "visual",
+            "progress": {
+                "completed_topics": 5,
+                "total_topics": 12,
+                " mastery_level": 0.65
+            },
+            "strengths": ["concerettuale", "visuale"],
+            "improvement_areas": ["pratica", "velocità"],
+            "recommended_next_steps": [
+                "Pratica con esercizi",
+                "Rivedi i diagrammi",
+                "Approfondisci gli esempi"
+            ],
+            "study_streak": 3,
+            "last_study_session": datetime.now().isoformat()
+        }
+
+        return LearningProfileResponse(profile=mock_profile)
+
+    except Exception as e:
+        logger.error(f"Error getting learning profile: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

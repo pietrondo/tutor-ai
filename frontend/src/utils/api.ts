@@ -166,7 +166,7 @@ const parseDateFromBackend = (dateString: string): Date => {
 }
 
 // Health check
-export const healthCheck = async () => {
+const healthCheck = async () => {
   const response = await apiClient.get('/health')
   return handleApiResponse(response)
 }
@@ -224,7 +224,7 @@ export const spacedRepetitionApi = {
   // Cards
   createCard: async (data: CreateCardRequest) => {
     const response = await apiClient.post('/spaced-repetition/cards', data)
-    return handleApiResponse<LearningCard>(response)
+    return handleApiResponse<LearningCard>(response as ApiResponse<LearningCard>)
   },
 
   getDueCards: async (courseId: string, userId: string, limit = 20) => {
@@ -232,7 +232,7 @@ export const spacedRepetitionApi = {
       user_id: userId,
       limit
     })
-    return handleApiResponse<LearningCard[]>(response)
+    return handleApiResponse<LearningCard[]>(response as ApiResponse<LearningCard[]>)
   },
 
   reviewCard: async (data: CardReviewRequest) => {
@@ -248,7 +248,7 @@ export const spacedRepetitionApi = {
       session_type: sessionType,
       max_cards: maxCards
     })
-    return handleApiResponse<StudySession>(response)
+    return handleApiResponse<StudySession>(response as ApiResponse<StudySession>)
   },
 
   // Analytics
@@ -315,7 +315,7 @@ export const activeRecallApi = {
 
   getNextQuestion: async (sessionId: string) => {
     const response = await apiClient.get(`/active-recall/sessions/${sessionId}/next-question`)
-    return handleApiResponse<Question>(response)
+    return handleApiResponse<Question>(response as ApiResponse<Question>)
   },
 
   completeSession: async (sessionId: string, userId: string) => {
@@ -361,7 +361,7 @@ export const dualCodingApi = {
 
   getVisualElements: async () => {
     const response = await apiClient.get('/dual-coding/visual-elements')
-    return handleApiResponse<VisualElement[]>(response)
+    return handleApiResponse<VisualElement[]>(response as ApiResponse<VisualElement[]>)
   }
 }
 
@@ -429,7 +429,7 @@ export const metacognitionApi = {
       learning_context: learningContext,
       session_type: sessionType
     })
-    return handleApiResponse<MetacognitiveSession>(response)
+    return handleApiResponse<MetacognitiveSession>(response as ApiResponse<MetacognitiveSession>)
   },
 
   createReflectionActivity: async (userId: string, courseId: string, activityType: string, reflectionContext: any) => {
@@ -439,7 +439,7 @@ export const metacognitionApi = {
       activity_type: activityType,
       reflection_context: reflectionContext
     })
-    return handleApiResponse<ReflectionActivity>(response)
+    return handleApiResponse<ReflectionActivity>(response as ApiResponse<ReflectionActivity>)
   },
 
   getAnalytics: async (userId: string, courseId: string, periodDays = 30) => {
@@ -494,7 +494,7 @@ export const elaborationNetworkApi = {
       network_id: networkId,
       config
     })
-    return handleApiResponse<NetworkVisualization>(response)
+    return handleApiResponse<NetworkVisualization>(response as ApiResponse<NetworkVisualization>)
   },
 
   getAnalytics: async (userId: string, courseId: string, periodDays = 30) => {

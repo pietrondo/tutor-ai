@@ -44,6 +44,7 @@ class AnnotationService:
                 "tags": annotation_data.get("tags", []),
                 "is_public": annotation_data.get("is_public", False),
                 "is_favorite": annotation_data.get("is_favorite", False),
+                "share_with_ai": annotation_data.get("share_with_ai", False),
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
@@ -124,7 +125,7 @@ class AnnotationService:
                 return None
 
             # Update allowed fields
-            allowed_fields = ["type", "content", "style", "tags", "is_public", "is_favorite"]
+            allowed_fields = ["type", "content", "style", "tags", "is_public", "is_favorite", "share_with_ai"]
             for field in allowed_fields:
                 if field in update_data:
                     annotations[annotation_index][field] = update_data[field]
@@ -363,6 +364,20 @@ class AnnotationService:
 
         except Exception as e:
             raise Exception(f"Error getting annotation stats: {e}")
+
+    def get_user_annotations(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get recent annotations for a user across all PDFs"""
+        try:
+            all_annotations = self._get_all_user_annotations(user_id)
+
+            # Sort by created_at (most recent first)
+            all_annotations.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+            # Return limited number of annotations
+            return all_annotations[:limit]
+
+        except Exception as e:
+            raise Exception(f"Error getting user annotations: {e}")
 
     def _get_all_user_annotations(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all annotations for a user across all PDFs"""

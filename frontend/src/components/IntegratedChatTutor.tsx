@@ -6,6 +6,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+// API configuration
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 import {
   SendIcon,
   BookOpenIcon,
@@ -96,7 +99,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
 
   const initializeChat = async () => {
     try {
-      const response = await fetch('/api/chat/initialize', {
+      const response = await fetch(`${API_BASE_URL}/api/chat/initialize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +136,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
 
   const loadUserNotes = async () => {
     try {
-      const response = await fetch(`/api/notes/recent?user_id=${userId}&course_id=${courseId}&limit=5`);
+      const response = await fetch(`${API_BASE_URL}/api/notes/recent?user_id=${userId}&course_id=${courseId}&limit=5`);
       if (response.ok) {
         const data = await response.json();
         setUserNotes(data.notes || []);
@@ -147,7 +150,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
     try {
       if (!bookId) return;
 
-      const response = await fetch(`/api/books/${bookId}/annotations/recent?user_id=${userId}&limit=3`);
+      const response = await fetch(`${API_BASE_URL}/api/books/${bookId}/annotations/recent?user_id=${userId}&limit=3`);
       if (response.ok) {
         const data = await response.json();
         setRecentAnnotations(data.annotations || []);
@@ -159,7 +162,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
 
   const loadLearningProfile = async () => {
     try {
-      const response = await fetch(`/api/learning/profile?user_id=${userId}&course_id=${courseId}`);
+      const response = await fetch(`${API_BASE_URL}/api/learning/profile?user_id=${userId}&course_id=${courseId}`);
       if (response.ok) {
         const data = await response.json();
         setLearningProfile(data.profile);
@@ -192,7 +195,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
     try {
       const startTime = Date.now();
 
-      const response = await fetch('/api/chat/send', {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -279,7 +282,7 @@ const IntegratedChatTutor: React.FC<IntegratedChatTutorProps> = ({
   // Crea nota da messaggio
   const createNoteFromMessage = async (message: ChatMessage) => {
     try {
-      const response = await fetch('/api/notes/from-chat', {
+      const response = await fetch(`${API_BASE_URL}/api/notes/from-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

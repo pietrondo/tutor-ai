@@ -326,7 +326,8 @@ class AIExpansionService {
         title: data.original_concept || 'Concept',
         children: nodes,
         depth: 0, // This would come from the actual node
-        tags: []
+        tags: [],
+        study_actions: []
       })
 
       return {

@@ -27,35 +27,65 @@
 - Node.js 18+
 - Docker & Docker Compose (recommended)
 
-### Docker Setup (Recommended)
+### 🚀 Quick Start with Unified Script (RECOMMENDED)
+
 ```bash
-# Clone and start
+# Clone the repository
 git clone <repository-url>
 cd tutor-ai
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
-# Access
+# Start everything with one command
+./start.sh dev
+
+# Access the application
 # Frontend: http://localhost:3000
-# Backend: http://localhost:8001
+# Backend API: http://localhost:8001
+# API Docs: http://localhost:8001/docs
 ```
 
-### Local Development
-```bash
-# Backend
-cd backend && pip install -r requirements.txt && python3 main.py &
+### Other Start Options
 
-# Frontend
-cd ../frontend && npm install && npm run dev
+#### Docker Setup (Manual)
+```bash
+# Start development environment
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+# Stop services
+docker-compose down
+```
+
+#### Local Development (Advanced)
+```bash
+# Backend (requires Python 3.9+)
+cd backend
+pip install -r requirements.txt
+python3 main.py  # Runs on port 8001
+
+# Frontend (requires Node.js 18+)
+cd ../frontend
+npm install
+npm run dev  # Runs on port 3000
 ```
 
 ### Environment Configuration
-Copy `.env.example` to `.env` and configure API keys:
+Copy `.env.example` to `backend/.env` and configure API keys:
 ```env
-OPENAI_API_KEY=your_key
-OPENROUTER_API_KEY=your_key
-ZAI_API_KEY=your_key
+# AI Providers (choose at least one)
+OPENAI_API_KEY=your_openai_key_here
+ZAI_API_KEY=your_zai_key_here
+
+# Optional: Local LLM
 LOCAL_LLM_URL=http://localhost:11434/v1
 ```
+
+### 🔥 Port Configuration - CRITICAL
+
+**IMPORTANT**: Tutor-AI uses specific ports to avoid conflicts:
+- **Frontend**: `http://localhost:3000` (NEVER 3001)
+- **Backend**: `http://localhost:8001` (NEVER 8000)
+- **API Docs**: `http://localhost:8001/docs`
+
+If you see different ports, something is wrong! See Port Configuration section below.
 
 ## ✨ Key Features
 
@@ -164,6 +194,20 @@ Advanced **Cognitive Learning Engine** based on evidence-based cognitive science
 - `POST /mindmap` - Generate mind maps
 - `POST /quiz` - Generate quizzes
 
+#### Book-Aware Retrieval Pipeline
+- The study workspace (`/courses/[id]/study`) keeps the active `book` and `pdf` in the URL; the chat widget reads those params and always sends `book_id` with each `/chat` request.
+- `RAGService.retrieve_context` now filters by `book_id` when the vector database is available and, if it is not, transparently falls back to on-the-fly chunking/embedding of the PDFs stored under `data/courses/<course>/books/<bookId>/`.
+- Every retrieval response carries a `scope` payload (course name, book title, materials used, strategy) so that `LLMService` can inject the current book information into the system prompt regardless of the provider in use (OpenAI, ZAI, OpenRouter, Ollama/LmStudio, etc.).
+- If no indexed chunks match the active book, the backend returns a clear message and keeps the session scoped, avoiding leaks from other books or courses.
+- The enhanced PDF reader lets learners highlight or annotate pages; saved notes marked `share_with_ai` (toggle in the UI) are appended to the retrieval context so the tutor model can cite personal insights together with book excerpts.
+
+#### PDF Annotation Workflow
+1. **Reader UX** – Inside `/courses/[id]/study`, the `EnhancedPDFReader` exposes highlight/underline/note tools. Creating a selection opens a side panel where the learner writes a note and decides whether to “Condividi con il tutor AI”.
+2. **Persistence** – Each note is saved to `data/annotations/<user>/<course>/<book>/<pdf>.json` with `share_with_ai`, page metadata, and tags. Updates/deletes happen through `/annotations` endpoints.
+3. **Retrieval Merge** – During `RAGService.retrieve_context*` the system first pulls the normal book chunks, then prepends any shared annotations (scoped to the current course/book) as “NOTE PERSONALI DELLO STUDENTE” with synthetic sources.
+4. **Prompting** – `LLMService.generate_response` reads the merged context and `scope` metadata so the downstream LLM knows which book is open and which personal notes it can safely reference.
+5. **Chat Feedback Loop** – When “share with tutor” is active, the reader also emits a `pdf_annotation` event to the chat pane, giving immediate confirmation that the note can be used in the next question.
+
 ### Cognitive Learning APIs
 - `POST /api/spaced-repetition/card` - Create learning card
 - `GET /api/spaced-repetition/cards/due/{course_id}` - Get due cards for review
@@ -171,6 +215,18 @@ Advanced **Cognitive Learning Engine** based on evidence-based cognitive science
 - `POST /api/dual-coding/create` - Create integrated visual-verbal content
 
 ## ⚙️ Configuration
+
+### DOCUMENTAZIONE_PERAGENT
+
+Gli agent trovano una vista per argomenti in `DOCUMENTAZIONE_PERAGENT/`:
+
+- `backend/` – overview servizi FastAPI, endpoint, guide RAG/annotazioni.
+- `frontend/` – layout Next.js, lettore PDF, chat tutor.
+- `ai/` – provider LLM supportati e orchestrazione RAG.
+- `infrastructure/` – setup locale/Docker, variabili d'ambiente, struttura dati runtime.
+- `product/` – roadmap UX, flussi di studio e gestione contenuti.
+
+Ogni file contiene riferimenti (link relativi) ai documenti ufficiali (`docs/*.md`, `AGENTS.md`, ecc.) quindi basta aprire la cartella per capire dove reperire il dettaglio completo.
 
 ### Environment Variables
 ```env
@@ -199,15 +255,19 @@ PORT=3000
 
 ### Standard Ports (NEVER CHANGE THESE)
 - **Backend API**: Port `8001` (NOT 8000)
-- **Frontend**: Port `3000` (NOT 5000)
+- **Frontend**: Port `3000` (NOT 5000 or 3001)
 - **Redis**: Port `6379`
 - **CORS Origins**: `http://localhost:3000,http://127.0.0.1:3000`
 
 ### Port Configuration Files
-- **docker-compose.yml**: Backend service uses `8001:8001`
-- **docker-compose.dev.yml**: Backend service uses `8001:8001`
+- **docker-compose.yml**: Backend service uses `8001:8001`, Frontend uses `3000:3000`
+- **docker-compose.dev.yml**: Backend service uses `8001:8001`, Frontend uses `3000:3000`
+- **docker-compose.simple.yml**: Backend service uses `8001:8001`
+- **docker-compose.optimized.yml**: Backend service uses `8001:8001`
 - **backend/Dockerfile**: EXPOSE and CMD use port `8001`
 - **backend/main.py**: `uvicorn.run(app, host="0.0.0.0", port=8001)`
+- **backend/.env.example**: `PORT=8001`
+- **start.sh**: All port references updated to `8001` (backend) and `3000` (frontend)
 - **frontend/.env.local**: `NEXT_PUBLIC_API_URL=http://localhost:8001`
 - **frontend/next.config.js**: Backend URL points to port `8001`
 - **.env.example**: `NEXT_PUBLIC_API_URL=http://localhost:8001`
@@ -216,6 +276,33 @@ PORT=3000
 - **Backend Health**: `http://localhost:8001/health`
 - **Frontend App**: `http://localhost:3000`
 - **API Docs**: `http://localhost:8001/docs`
+
+### ⚠️ Common Port Issues and Solutions
+
+#### Problem: Frontend shows 404 errors or can't connect to backend
+**Solution**: Check that:
+1. Backend is running on port `8001` (NOT 8000)
+2. Frontend environment points to `http://localhost:8001`
+3. CORS origins include `http://localhost:3000,http://127.0.0.1:3000`
+
+#### Problem: Port conflicts with other services
+**Solution**:
+```bash
+# Check what's running on ports
+ss -tulpn | grep :3000  # Should show only tutor-ai-frontend
+ss -tulpn | grep :8001  # Should show only tutor-ai-backend
+
+# Kill conflicting processes
+sudo fuser -k 3000/tcp  # If something else is using port 3000
+sudo fuser -k 8001/tcp  # If something else is using port 8001
+```
+
+#### Problem: Multiple services running on different ports
+**Solution**: Stop all services and restart correctly:
+```bash
+./start.sh stop      # Stop all services
+./start.sh dev       # Restart with correct ports
+```
 
 ## 🐳 Docker Commands
 
@@ -354,6 +441,26 @@ Manual commands don't preserve cache optimization. Always prefer the unified `./
 
 ## 🛠️ Development Guidelines
 
+### Quick Start with Unified Script
+
+**The easiest way to start Tutor-AI:**
+
+```bash
+./start.sh dev    # Start development environment
+./start.sh status # Check status
+./start.sh stop   # Stop all services
+./start.sh logs   # View logs
+```
+
+**Available Commands:**
+- `./start.sh dev` - Development with hot reload (default)
+- `./start.sh simple` - Simplified configuration
+- `./start.sh prod` - Production optimized
+- `./start.sh stop` - Stop all services
+- `./start.sh clean` - Complete cleanup
+- `./start.sh logs` - Show real-time logs
+- `./start.sh status` - Show service status
+
 ### Backend Development
 - Use async/await for all I/O operations
 - Follow FastAPI best practices for API design
@@ -397,6 +504,48 @@ docker-compose up --build
 2. Verify `backend/Dockerfile` EXPOSE and CMD use port 8001
 3. Verify `docker-compose.yml` and `docker-compose.dev.yml` map 8001:8001
 4. Restart containers: `./docker.sh restart`
+
+### ⚠️ CRITICAL: Frontend 404 Errors on Dynamic Routes
+**Problem**: URLs like `/courses/[id]/books/[bookId]` return 404
+**Root Cause**: Using production Docker configuration instead of development
+**SOLUTION**:
+
+#### ✅ PERMANENT FIX:
+```bash
+# Stop all services
+./start.sh stop
+
+# Start with DEVELOPMENT configuration (REQUIRED)
+./start.sh dev
+```
+
+#### ✅ VERIFICATION:
+- ✅ Homepage: `http://localhost:3000` (200 OK)
+- ✅ Courses: `http://localhost:3000/courses` (200 OK)
+- ✅ Course detail: `http://localhost:3000/courses/[id]` (200 OK)
+- ✅ Books listing: `http://localhost:3000/courses/[id]/books` (200 OK)
+- ✅ Backend: `http://localhost:8001/health` (200 OK)
+
+#### ✅ WORKING BOOK ACCESS (Temporary Fix):
+```bash
+# Access book functionality via these working URLs:
+http://localhost:3000/chat?course=COURSE_ID&book=BOOK_ID
+http://localhost:3000/courses/COURSE_ID/study?book=BOOK_ID&pdf=filename.pdf
+```
+
+#### ❌ NEVER USE:
+```bash
+# These commands use PRODUCTION config and break dynamic routing:
+docker-compose up
+docker-compose.yml without docker-compose.dev.yml
+```
+
+#### 🔧 TECHNICAL EXPLANATION:
+- **Production**: Builds frontend code into Docker image, no hot reload, breaks dynamic routes
+- **Development**: Mounts source code volumes, enables hot reload, fixes dynamic routes
+- **File Structure**: Dynamic routes `/courses/[id]/books/[bookId]/page.tsx` work correctly in dev mode
+
+This is the **permanent solution** - always use `./start.sh dev` for development.
 
 **Problem**: Frontend shows 404 errors or can't connect to backend
 **Solution**:
