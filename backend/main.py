@@ -2071,7 +2071,8 @@ async def course_chat(chat_request: EnhancedChatMessage):
                 session_id=session.id,
                 query=chat_request.message,
                 book_id=chat_request.book_id,
-                retrieval_k=chat_request.search_k
+                retrieval_k=chat_request.search_k,
+                user_id=chat_request.user_id
             )
         else:
             # Fallback to basic RAG
@@ -2079,7 +2080,8 @@ async def course_chat(chat_request: EnhancedChatMessage):
                 query=chat_request.message,
                 course_id=chat_request.course_id,
                 book_id=chat_request.book_id,
-                k=chat_request.search_k
+                k=chat_request.search_k,
+                user_id=chat_request.user_id
             )
 
         # Prepare enhanced prompt with session context

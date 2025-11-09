@@ -3,6 +3,10 @@ import os
 import torch
 import time
 import copy
+import math
+import re
+import socket
+from collections import Counter
 from typing import List, Dict, Any, Optional, Tuple
 from sentence_transformers import SentenceTransformer
 import PyPDF2
@@ -49,6 +53,9 @@ class RAGService:
         self.max_cached_chunk_sets = 8
         self.max_cached_chunks = 1200
         self.annotation_service = AnnotationService()
+        self.embedding_fallback_enabled = False
+        self._tokenizer_pattern = re.compile(r"\w+", re.UNICODE)
+        self._hf_available: Optional[bool] = None
 
         logger.info("RAG Service initialized with Italian-optimized settings",
                    model=self.model_name,
@@ -305,6 +312,10 @@ class RAGService:
 
         texts = [chunk["text"] for chunk in chunks]
         self._load_embedding_model()
+        if self.embedding_model is None:
+            # Fallback: no embeddings to pre-compute
+            return []
+
         embeddings = self.embedding_model.encode(texts, normalize_embeddings=True)
         return embeddings.tolist() if hasattr(embeddings, "tolist") else embeddings
 
@@ -338,14 +349,16 @@ class RAGService:
         embeddings = cache_entry.get("embeddings") or []
 
         if not chunks or not embeddings:
-            return []
+            return [] if not self.embedding_fallback_enabled else self._rank_with_lexical_similarity(query, chunks, k)
 
-        self._load_embedding_model()
+        if self.embedding_model is None:
+            return self._rank_with_lexical_similarity(query, chunks, k)
+
         query_embedding = self.embedding_model.encode([query], normalize_embeddings=True)[0]
         chunk_embeddings = np.array(embeddings)
 
         if chunk_embeddings.size == 0:
-            return []
+            return self._rank_with_lexical_similarity(query, chunks, k)
 
         scores = np.dot(chunk_embeddings, query_embedding)
         top_indices = np.argsort(scores)[::-1][:k]
@@ -360,6 +373,37 @@ class RAGService:
             })
 
         return ranked
+
+    def _tokenize_for_similarity(self, text: str) -> List[str]:
+        return self._tokenizer_pattern.findall(text.lower())
+
+    def _lexical_vector(self, text: str) -> Counter:
+        return Counter(self._tokenize_for_similarity(text))
+
+    def _simple_similarity(self, text_a: str, text_b: str) -> float:
+        vec_a = self._lexical_vector(text_a)
+        vec_b = self._lexical_vector(text_b)
+
+        if not vec_a or not vec_b:
+            return 0.0
+
+        dot = sum(vec_a[token] * vec_b.get(token, 0) for token in vec_a)
+        norm_a = math.sqrt(sum(value * value for value in vec_a.values()))
+        norm_b = math.sqrt(sum(value * value for value in vec_b.values()))
+
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+
+        return dot / (norm_a * norm_b)
+
+    def _rank_with_lexical_similarity(self, query: str, chunks: List[Dict[str, Any]], k: int) -> List[Dict[str, Any]]:
+        scored = []
+        for chunk in chunks:
+            score = self._simple_similarity(query, chunk.get("text", ""))
+            scored.append({"chunk": chunk, "score": score})
+
+        scored.sort(key=lambda item: item["score"], reverse=True)
+        return scored[:k]
 
     def _attach_scope_usage(self, scope_meta: Dict[str, Any], sources: List[Dict[str, Any]],
                              strategy: str) -> Dict[str, Any]:
@@ -431,7 +475,13 @@ class RAGService:
 
     async def _retrieve_context_vector(self, query: str, course_id: str,
                                         book_id: Optional[str], k: int) -> Dict[str, Any]:
+        if self.collection is None:
+            raise RuntimeError("Vector collection unavailable")
+
         self._load_embedding_model()
+        if self.embedding_model is None:
+            raise RuntimeError("Embedding model unavailable")
+
         query_embedding = self.embedding_model.encode([query]).tolist()
         where_filter = self._build_where_filter(course_id, book_id)
 
@@ -480,6 +530,15 @@ class RAGService:
         """Carica il modello di embedding solo quando necessario"""
         if self.embedding_model is None:
             logger.info("Loading embedding model...")
+            if self.embedding_fallback_enabled:
+                logger.info("Embedding fallback already enabled – skipping model load")
+                return
+
+            if not self._is_hf_available():
+                logger.warning("HuggingFace endpoint non raggiungibile: uso fallback testuale")
+                self.embedding_fallback_enabled = True
+                self.embedding_model = None
+                return
             try:
                 # Detecta automaticamente GPU/CUDA
                 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -492,8 +551,21 @@ class RAGService:
                 self.embedding_model = SentenceTransformer(self.model_name, device=device)
                 logger.info("Embedding model loaded successfully", device=device)
             except Exception as e:
-                logger.error(f"Failed to load embedding model: {e}")
-                raise
+                logger.error("Failed to load embedding model, falling back to lexical similarity", error=str(e))
+                self.embedding_model = None
+                self.embedding_fallback_enabled = True
+
+    def _is_hf_available(self) -> bool:
+        if self._hf_available is not None:
+            return self._hf_available
+
+        try:
+            socket.gethostbyname('huggingface.co')
+            self._hf_available = True
+        except OSError:
+            self._hf_available = False
+
+        return self._hf_available
 
     def setup_collection(self):
         """Setup or get the ChromaDB collection"""
@@ -1020,13 +1092,22 @@ class RAGService:
             # Inizializza cache service se necessario
             self._init_cache_service()
 
-            from services.cache_service import CacheType  # type: ignore
             result: Dict[str, Any]
             cache_key = None
+            cache_type_cls = None
 
             if self.cache_service:
+                try:
+                    from services.cache_service import CacheType  # type: ignore
+                    cache_type_cls = CacheType
+                except Exception as import_error:
+                    logger.error("Unable to import CacheType", error=str(import_error))
+                    cache_type_cls = None
+
                 cache_key = self._generate_cache_key(query, course_id, book_id, k, use_hybrid)
-                cached_result = await self.cache_service.get(CacheType.QUERY_RESULT, cache_key)
+                cached_result = None
+                if cache_type_cls is not None:
+                    cached_result = await self.cache_service.get(cache_type_cls.QUERY_RESULT, cache_key)
 
                 if cached_result is not None:
                     logger.info("Cache hit for RAG query", query=query[:50], cache_key=cache_key)
@@ -1042,8 +1123,8 @@ class RAGService:
                         result = await self.retrieve_context(query, course_id, book_id, k,
                                                              user_id=user_id, include_annotations=False)
 
-                    if result.get("text"):
-                        await self.cache_service.set(CacheType.QUERY_RESULT, cache_key, copy.deepcopy(result))
+                    if cache_type_cls is not None and result.get("text"):
+                        await self.cache_service.set(cache_type_cls.QUERY_RESULT, cache_key, copy.deepcopy(result))
                         logger.info("Cached RAG query result", query=query[:50], cache_key=cache_key)
             else:
                 if use_hybrid:

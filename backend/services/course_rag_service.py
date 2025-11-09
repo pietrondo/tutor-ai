@@ -37,7 +37,8 @@ class CourseRAGService:
         session_id: str,
         query: str,
         book_id: Optional[str] = None,
-        retrieval_k: int = None
+        retrieval_k: int = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Enhanced context retrieval with personalization and session awareness
@@ -50,7 +51,8 @@ class CourseRAGService:
                 query=query,
                 course_id=course_id,
                 book_id=book_id,
-                k=retrieval_k
+                k=retrieval_k,
+                user_id=user_id
             )
 
             # Phase 2: Session-aware retrieval
@@ -94,7 +96,8 @@ class CourseRAGService:
                 query=query,
                 course_id=course_id,
                 book_id=book_id,
-                k=retrieval_k
+                k=retrieval_k,
+                user_id=user_id
             )
 
     async def _retrieve_session_context(

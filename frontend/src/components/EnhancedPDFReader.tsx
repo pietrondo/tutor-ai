@@ -20,6 +20,8 @@ if (typeof Promise !== 'undefined' && !Promise.withResolvers) {
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { CustomHighlight, type HighlightPosition } from './CustomHighlight';
 import {
   HighlighterIcon,
@@ -33,9 +35,15 @@ import {
   DownloadIcon
 } from 'lucide-react';
 
-// Configura PDF.js - Use local worker for Next.js compatibility
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+// Configura PDF.js - usa CDN per evitare problemi di worker locali
+if (typeof window !== 'undefined' && pdfjs.GlobalWorkerOptions) {
+  const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+  const fallbackWorker = '/pdf.worker.min.js';
+  const desiredWorkerSrc = pdfjs.version ? cdnWorker : fallbackWorker;
+
+  if (pdfjs.GlobalWorkerOptions.workerSrc !== desiredWorkerSrc) {
+    pdfjs.GlobalWorkerOptions.workerSrc = desiredWorkerSrc;
+  }
 }
 
 type AnnotationMode = 'highlight' | 'underline' | 'note';
@@ -176,11 +184,6 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   const viewerRef = useRef<any>(null);
 
   
-  // Carica annotazioni esistenti
-  useEffect(() => {
-    loadAnnotations();
-  }, [loadAnnotations]);
-
   const mapAnnotationFromBackend = useCallback((annotation: any): ViewerAnnotation => {
     const position = annotation?.position || {};
     const page = position.pageNumber || annotation?.page_number || 1;
@@ -225,6 +228,11 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
       setIsLoading(false);
     }
   }, [API_BASE_URL, bookId, courseId, pdfFilename, userId, mapAnnotationFromBackend]);
+
+  // Carica annotazioni esistenti
+  useEffect(() => {
+    loadAnnotations();
+  }, [loadAnnotations]);
 
   // Gestione caricamento PDF
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {

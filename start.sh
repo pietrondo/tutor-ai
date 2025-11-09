@@ -14,20 +14,24 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Logo
-echo -e "${BLUE}"
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║                                                              ║"
-echo "║    ████████╗ █████╗ ███╗   ██╗██╗  ██╗    ██████╗ ███████╗  ║"
-echo "║    ╚══██╔══╝██╔══██╗████╗  ██║██║ ██╔╝    ██╔══██╗██╔════╝  ║"
-echo "║       ██║   ███████║██╔██╗ ██║█████╔╝     ██████╔╝█████╗    ║"
-echo "║       ██║   ██╔══██║██║╚██╗██║██╔═██╗     ██╔══██╗██╔══╝    ║"
-echo "║       ██║   ██║  ██║██║ ╚████║██║  ██╗    ██████╔╝███████╗  ║"
-echo "║       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝    ╚═════╝ ╚══════╝  ║"
-echo "║                                                              ║"
-echo "║                   🧠 COGNITIVE LEARNING ENGINE               ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+print_logo() {
+    if $SKIP_LOGO; then
+        return
+    fi
+    echo -e "${BLUE}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                                                              ║"
+    echo "║    ████████╗ █████╗ ███╗   ██╗██╗  ██╗    ██████╗ ███████╗  ║"
+    echo "║    ╚══██╔══╝██╔══██╗████╗  ██║██║ ██╔╝    ██╔══██╗██╔════╝  ║"
+    echo "║       ██║   ███████║██╔██╗ ██║█████╔╝     ██████╔╝█████╗    ║"
+    echo "║       ██║   ██╔══██║██║╚██╗██║██╔═██╗     ██╔══██╗██╔══╝    ║"
+    echo "║       ██║   ██║  ██║██║ ╚████║██║  ██╗    ██████╔╝███████╗  ║"
+    echo "║       ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝    ╚═════╝ ╚══════╝  ║"
+    echo "║                                                              ║"
+    echo "║                   🧠 COGNITIVE LEARNING ENGINE               ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
 
 # Funzioni
 print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -35,9 +39,72 @@ print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Configurazione
-MODE="${1:-dev}"  # Default: development
+MODE="dev"
+FORCE_REBUILD=false
+SKIP_HEALTH=false
+SKIP_LOGO=false
 COMPOSE_FILES=""
+
+print_usage() {
+    cat <<'EOU'
+Uso: ./start.sh [modalità] [opzioni]
+
+Modalità disponibili:
+  dev (default)   Avvio ambiente di sviluppo con hot reload
+  simple          Stack docker minimale
+  prod            Configurazione ottimizzata per produzione
+  stop/clean/logs/status (come in precedenza)
+
+Opzioni:
+  --build, -b     Ricostruisce e ricrea i container (utile dopo modifiche code base)
+  --no-health     Salta l'health check (per start rapidissimi)
+  --no-logo       Nasconde il banner ASCII
+  --help          Mostra questo messaggio
+
+Esempi:
+  ./start.sh                      # avvio dev standard
+  ./start.sh dev --build          # rebuild rapido dopo modifiche
+  ./start.sh prod --no-health     # avvio produzione senza health check
+EOU
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            dev|development)
+                MODE="dev"
+                ;;
+            simple)
+                MODE="simple"
+                ;;
+            prod|production)
+                MODE="prod"
+                ;;
+            stop|clean|logs|status)
+                MODE="$1"
+                ;;
+            --build|-b)
+                FORCE_REBUILD=true
+                ;;
+            --no-health)
+                SKIP_HEALTH=true
+                ;;
+            --no-logo)
+                SKIP_LOGO=true
+                ;;
+            --help|-h)
+                print_usage
+                exit 0
+                ;;
+            *)
+                echo "Argomento non valido: $1"
+                print_usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+}
 
 # Verifica Docker
 check_docker() {
@@ -171,14 +238,11 @@ select_mode() {
 start_services() {
     print_info "Avvio servizi Docker..."
 
-    # Build se necessario
-    if ! docker images | grep -q "tutor-ai"; then
-        print_info "Build immagini Docker..."
-        $DOCKER_COMPOSE $COMPOSE_FILES build
+    if $FORCE_REBUILD; then
+        $DOCKER_COMPOSE $COMPOSE_FILES up -d --build --force-recreate
+    else
+        $DOCKER_COMPOSE $COMPOSE_FILES up -d
     fi
-
-    # Avvia
-    $DOCKER_COMPOSE $COMPOSE_FILES up -d
 
     if [ $? -eq 0 ]; then
         print_success "Servizi avviati!"
@@ -190,6 +254,11 @@ start_services() {
 
 # Health check
 health_check() {
+    if $SKIP_HEALTH; then
+        print_warning "Health check saltato (--no-health)"
+        return
+    fi
+
     print_info "Attesa servizi pronti..."
 
     local max_attempts=30
@@ -249,16 +318,40 @@ show_info() {
 
 # Main
 main() {
+    parse_args "$@"
+
+    local is_start_mode=true
+    case "$MODE" in
+        stop|clean|logs|status)
+            is_start_mode=false
+            ;;
+    esac
+
+    if $is_start_mode; then
+        print_logo
+    fi
+
     echo
-    print_info "Avvio Tutor-AI in modalità: $MODE"
+    if $is_start_mode; then
+        print_info "Avvio Tutor-AI in modalità: $MODE"
+        if $FORCE_REBUILD; then
+            print_info "Opzione rebuild attiva: verrà eseguito docker compose up -d --build --force-recreate"
+        fi
+    else
+        print_info "Esecuzione comando: $MODE"
+    fi
     echo
 
     check_docker
-    create_directories
+    if $is_start_mode; then
+        create_directories
+    fi
     select_mode
-    start_services
-    health_check
-    show_info
+    if $is_start_mode; then
+        start_services
+        health_check
+        show_info
+    fi
 }
 
 # Trap per cleanup
