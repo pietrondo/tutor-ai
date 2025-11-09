@@ -10,7 +10,7 @@ Documenti di riferimento:
 - `frontend/src/components/books/BookDetailClient.tsx` → navigazione materiali.
 
 Elementi principali:
-1. **Routing** – Next.js App Router in `frontend/src/app`. Le pagine corso includono sottopagine `chat`, `study`, `books`, ecc.
+1. **Routing** – Next.js App Router in `frontend/src/app`. Le pagine corso includono sottopagine `chat`, `study`, `books`, `book-detail`, ecc. Le route dinamiche devono usare `async function Page({ params })` (vedi fix in `book-detail/[courseId]/[bookId]/page.tsx`).
 2. **State/UI** – Hooks personalizzati (`src/hooks`) e componenti condivisi (`src/components/ui`).
 3. **API base URL** – `process.env.NEXT_PUBLIC_API_URL` (default `http://localhost:8001`).
-4. **PDF Reader** – usa `react-pdf` + `CustomHighlight`; salva note via `/annotations` e al bisogno invia eventi al Tutor.
+4. **PDF Reader** – usa `react-pdf` + `CustomHighlight`; salva note via `/annotations` e al bisogno invia eventi al Tutor. Il worker pdf.js punta ora a `unpkg.com/pdfjs-dist@<version>/build/pdf.worker.min.js` con fallback locale per evitare errori “fake worker”.

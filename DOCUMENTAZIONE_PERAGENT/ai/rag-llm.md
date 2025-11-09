@@ -5,6 +5,7 @@
 - **Chunk cache**: `book_chunk_cache` limita a 1.2k chunk per volume.
 - **Annotations merge**: `_merge_user_annotations()` antepone "NOTE PERSONALI" se `share_with_ai` attivo.
 - **Cache layer**: `retrieve_context_cached` usa Redis (`services/cache_service.py`) e aggiunge annotation merge fuori dalla cache.
+- **Offline fallback**: se il download del modello SentenceTransformer fallisce (es. niente accesso a HuggingFace) il servizio passa automaticamente a una similarità lessicale (tokenizzazione semplice + coseno) così il tutor continua a citare il libro selezionato e le note condivise.
 
 ## Generation
 - `LLMService` supporta provider `openai`, `zai`, `openrouter`, `ollama`, `lmstudio`, `local`.

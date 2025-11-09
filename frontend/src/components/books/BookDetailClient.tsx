@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, type ChangeEvent } from 'react'
+import { useState, useEffect, useRef, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play, Eye, Highlighter } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { fetchFromBackend } from '@/lib/api'
 
 const StudyIcon = BookOpen
@@ -126,6 +127,7 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (courseId && bookId) {
@@ -227,6 +229,12 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
     router.push(`/chat?course=${courseId}&book=${bookId}`)
   }
 
+  const handleUploadButtonClick = () => {
+    if (!uploading) {
+      fileInputRef.current?.click()
+    }
+  }
+
   if (!courseId || !bookId) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -306,6 +314,15 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={uploading}
+            />
             {/* Book Info */}
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Informazioni Libro</h2>
@@ -399,22 +416,14 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">Materiali</h2>
-                <label className="cursor-pointer">
-                  <Button
-                    disabled={uploading}
-                    icon={<Upload className="h-4 w-4" />}
-                  >
-                    {uploading ? 'Caricamento...' : 'Carica PDF'}
-                  </Button>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    multiple
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                </label>
+                <Button
+                  type="button"
+                  disabled={uploading}
+                  icon={<Upload className="h-4 w-4" />}
+                  onClick={handleUploadButtonClick}
+                >
+                  {uploading ? 'Caricamento...' : 'Carica PDF'}
+                </Button>
               </div>
 
               {book.materials && book.materials.length > 0 ? (
@@ -473,22 +482,15 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600 mb-4">Nessun materiale caricato</p>
-                  <label className="cursor-pointer">
-                    <Button
-                      variant="secondary"
-                      icon={<Upload className="h-4 w-4" />}
-                    >
-                      Carica il primo materiale
-                    </Button>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={uploading}
-                    />
-                  </label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    icon={<Upload className="h-4 w-4" />}
+                    disabled={uploading}
+                    onClick={handleUploadButtonClick}
+                  >
+                    Carica il primo materiale
+                  </Button>
                 </div>
               )}
             </div>

@@ -6,6 +6,19 @@
 - Frontend: `cd frontend && npm run dev -- --port 3000`.
 - Env file: duplicare `backend/.env.example` e `frontend/.env.local` (vedi `AGENTS.md`, `LOCAL_SETUP_GUIDE.md`).
 
+### start.sh (workflow rapido)
+`./start.sh` gestisce l'intero stack Docker. Opzioni utili introdotte:
+
+| Opzione | Effetto |
+| --- | --- |
+| `dev` (default) | Avvio ambiente con hot reload |
+| `--build` / `-b` | Forza `docker compose up -d --build --force-recreate` (comodo dopo modifiche al codice) |
+| `--no-health` | Salta l'health check per avvii più veloci |
+| `--no-logo` | Nasconde il banner |
+| `stop`, `clean`, `logs`, `status` | Restano disponibili come prima |
+
+Esempi: `./start.sh dev --build`, `./start.sh prod --no-health`.
+
 ## Docker / Compose
 - File principali: `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.simple.yml`.
 - Porta obbligatoria backend `8001`, frontend `3000` (riassunto in `CLAUDE.md` → sezione Port Configuration).
