@@ -8,6 +8,7 @@ import json
 import uuid
 import asyncio
 import os
+from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
@@ -143,7 +144,7 @@ class KnowledgeAreaService:
         self.active_recall_engine = active_recall_engine
 
         # Persistent storage for knowledge areas
-        self.data_dir = os.environ.get('DATA_DIR', '/app/data')
+        self.data_dir = self._resolve_data_dir()
         self.knowledge_areas_dir = os.path.join(self.data_dir, "knowledge_areas")
         os.makedirs(self.knowledge_areas_dir, exist_ok=True)
         self.knowledge_areas_file = os.path.join(self.knowledge_areas_dir, "knowledge_areas.json")
@@ -160,6 +161,29 @@ class KnowledgeAreaService:
         self.load_knowledge_areas()
 
         logger.info("Knowledge Area Service initialized")
+
+    def _resolve_data_dir(self) -> str:
+        """
+        Determine a writable data directory.
+        Prefers DATA_DIR env var, falls back to repo-relative backend/data.
+        """
+        default_dir = Path(__file__).resolve().parent.parent / "data"
+        env_dir = os.environ.get("DATA_DIR")
+        candidate_dirs = []
+
+        if env_dir:
+            candidate_dirs.append(Path(env_dir).expanduser())
+        candidate_dirs.append(default_dir)
+
+        for directory in candidate_dirs:
+            resolved_dir = directory if directory.is_absolute() else (Path.cwd() / directory)
+            try:
+                resolved_dir.mkdir(parents=True, exist_ok=True)
+                return str(resolved_dir)
+            except PermissionError:
+                logger.warning(f"Permission denied for data directory '{resolved_dir}'. Trying fallback.")
+
+        raise PermissionError("Unable to access any writable data directory for KnowledgeAreaService.")
 
     async def extract_main_concepts_fast(self, course_id: str, book_id: Optional[str] = None) -> KnowledgeArea:
         """Extract main concepts quickly from course materials"""

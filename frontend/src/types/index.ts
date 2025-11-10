@@ -479,7 +479,7 @@ export type SortField<T> = keyof T
 
 export interface BaseComponentProps {
   className?: string
-  children?: React.ReactNode
+  children?: ReactNode
 }
 
 export interface LoadingProps extends BaseComponentProps {
@@ -504,3 +504,4 @@ export type EntityType = 'course' | 'book' | 'session' | 'quiz' | 'mindmap'
 // Export commonly used type unions
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type QuizDifficulty = Quiz['difficulty']
+import type { ReactNode } from 'react'

@@ -80,6 +80,9 @@ parse_args() {
             prod|production)
                 MODE="prod"
                 ;;
+            build)
+                MODE="build"
+                ;;
             stop|clean|logs|status)
                 MODE="$1"
                 ;;
@@ -189,6 +192,11 @@ select_mode() {
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.optimized.yml"
             FRONTEND_PORT=3000
             ;;
+        "build")
+            print_info "Compilazione immagini (stack dev)"
+            COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
+            FRONTEND_PORT=3000
+            ;;
         "stop")
             print_info "Arresto servizi..."
             $DOCKER_COMPOSE $COMPOSE_FILES down 2>/dev/null || $DOCKER_COMPOSE down 2>/dev/null || true
@@ -248,6 +256,24 @@ start_services() {
         print_success "Servizi avviati!"
     else
         print_error "Errore avvio servizi"
+        exit 1
+    fi
+}
+
+build_images() {
+    print_info "Compilazione immagini Docker..."
+    local build_args=""
+    if $FORCE_REBUILD; then
+        build_args="--no-cache"
+        print_info "Ricostruzione forzata (build senza cache)"
+    fi
+
+    $DOCKER_COMPOSE $COMPOSE_FILES build $build_args
+
+    if [ $? -eq 0 ]; then
+        print_success "Build completata"
+    else
+        print_error "Build fallita"
         exit 1
     fi
 }
@@ -322,7 +348,7 @@ main() {
 
     local is_start_mode=true
     case "$MODE" in
-        stop|clean|logs|status)
+        stop|clean|logs|status|build)
             is_start_mode=false
             ;;
     esac
@@ -347,6 +373,12 @@ main() {
         create_directories
     fi
     select_mode
+
+    if [[ "$MODE" == "build" ]]; then
+        build_images
+        exit 0
+    fi
+
     if $is_start_mode; then
         start_services
         health_check

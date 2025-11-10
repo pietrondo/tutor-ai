@@ -26,11 +26,13 @@ import { ConceptVisualMap } from '@/components/ConceptVisualMap'
 import { llmManager, LLMRequest, LLMResponse } from '@/lib/llm-manager'
 import type { CourseConcept, ConceptMetrics, CourseConceptMap } from '@/types/concept'
 import { useConceptMapStore } from '@/stores/conceptMapStore'
+import type { ConceptNode } from '@/stores/conceptMapStore'
 import { AnimatedConceptNode } from './concept-map/AnimatedConceptNode'
 import { BreadcrumbNavigation } from './concept-map/BreadcrumbNavigation'
 import { NavigationControls } from './concept-map/NavigationControls'
 import { useAIExpansion } from './concept-map/AIExpansionService'
 import { mindmapService } from '@/services/mindmapService'
+import type { StudyMindmap, StudyMindmapNode } from '@/types/mindmap'
 
 interface Message {
   id: string
@@ -144,6 +146,7 @@ export function ChatWrapper() {
   const { quickExpand, getPrompts } = useAIExpansion()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const autoGenerationAttemptsRef = useRef<Record<string, boolean>>({})
 
   useEffect(() => {
     initializeChat()
@@ -239,7 +242,201 @@ export function ChatWrapper() {
     }
   }
 
-  const loadConceptContext = async (courseId: string, bookId?: string) => {
+  const loadConceptMetrics = async (courseId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/concepts/metrics`)
+      if (response.ok) {
+        const data = await response.json()
+        setConceptMetrics(data.metrics || {})
+      }
+    } catch (error) {
+      console.error('Errore caricamento metriche concetti:', error)
+    }
+  }
+
+  const buildConceptNodeFromMindmap = (
+    node: StudyMindmapNode,
+    depth: number,
+    sourceType: 'course' | 'book'
+  ): ConceptNode => {
+    return {
+      id: node.id,
+      title: node.title,
+      summary: node.summary || '',
+      description: node.summary || '',
+      ai_hint: node.ai_hint || '',
+      study_actions: node.study_actions || [],
+      priority: node.priority ?? null,
+      references: node.references || [],
+      children: (node.children || []).map(child => buildConceptNodeFromMindmap(child, depth + 1, sourceType)),
+      depth,
+      sourceType,
+      masteryLevel: 0,
+      visited: false,
+      bookmarked: false,
+      tags: node.study_actions?.slice(0, 3) || []
+    }
+  }
+
+  const buildRootNodeFromMindmap = (mindmap: StudyMindmap, courseId: string, bookId?: string): ConceptNode | null => {
+    if (!mindmap?.nodes || mindmap.nodes.length === 0) {
+      return null
+    }
+
+    const sourceType: 'course' | 'book' = bookId ? 'book' : 'course'
+
+    return {
+      id: `mindmap-root-${courseId}-${bookId || 'all'}`,
+      title: mindmap.title || 'Mappa Concettuale',
+      summary: mindmap.overview || 'Mappa generata automaticamente dai materiali caricati',
+      description: mindmap.overview || '',
+      ai_hint: 'Mappa generata automaticamente dalle mindmap di studio',
+      study_actions: mindmap.study_plan?.flatMap(phase => phase.activities) || [],
+      priority: null,
+      references: mindmap.references || [],
+      children: mindmap.nodes.map(node => buildConceptNodeFromMindmap(node, 1, sourceType)),
+      depth: 0,
+      sourceType,
+      masteryLevel: 0,
+      visited: false,
+      bookmarked: false,
+      tags: mindmap.study_plan?.map(phase => phase.phase).filter(Boolean) || []
+    }
+  }
+
+  const buildCourseConceptMapFromMindmap = (mindmap: StudyMindmap, courseId: string): CourseConceptMap => {
+    const concepts: CourseConcept[] = []
+
+    const traverse = (node: StudyMindmapNode, parentTitle?: string) => {
+      const learningObjectives = node.study_actions && node.study_actions.length > 0
+        ? node.study_actions
+        : ['Comprendere il concetto', 'Applicare il concetto a un esempio pratico']
+
+      concepts.push({
+        id: node.id,
+        name: node.title,
+        summary: node.summary || '',
+        chapter: {
+          title: parentTitle || mindmap.title || 'Mindmap'
+        },
+        related_topics: node.children?.map(child => child.title).filter(Boolean).slice(0, 3) || [],
+        learning_objectives: learningObjectives,
+        suggested_reading: node.references || [],
+        recommended_minutes: Math.max(5, learningObjectives.length * 5),
+        quiz_outline: learningObjectives.slice(0, 3)
+      })
+
+      node.children?.forEach(child => traverse(child, node.title))
+    }
+
+    mindmap.nodes?.forEach(node => traverse(node, node.title))
+
+    return {
+      course_id: courseId,
+      generated_at: new Date().toISOString(),
+      concepts
+    }
+  }
+
+  const hydrateConceptStateFromMindmap = (mindmap: StudyMindmap, courseId: string, bookId?: string): boolean => {
+    const rootNodeFromMindmap = buildRootNodeFromMindmap(mindmap, courseId, bookId)
+    if (!rootNodeFromMindmap) {
+      console.warn('Mindmap priva di nodi, impossibile costruire la mappa concettuale.')
+      return false
+    }
+
+    setRootNode(rootNodeFromMindmap)
+    setCurrentContext(courseId, bookId || null)
+    setConceptMap(buildCourseConceptMapFromMindmap(mindmap, courseId))
+    return true
+  }
+
+  const generateMindmapConceptState = async ({
+    courseId,
+    bookId,
+    forceRegenerate = false,
+    silent = false
+  }: {
+    courseId: string
+    bookId?: string
+    forceRegenerate?: boolean
+    silent?: boolean
+  }): Promise<boolean> => {
+    try {
+      const result = await mindmapService.getMindmap({
+        courseId,
+        bookId,
+        forceRegenerate
+      })
+
+      if (result.mindmap) {
+        const hydrated = hydrateConceptStateFromMindmap(result.mindmap, courseId, bookId)
+        if (hydrated) {
+          setSelectedConceptIds([])
+          await loadConceptMetrics(courseId)
+          setConceptProgress(100)
+          if (!silent && result.fromCache) {
+            console.log('📦 Mappa caricata automaticamente dalla cache')
+          }
+          return true
+        }
+      } else if (!silent) {
+        setConceptError(result.error || 'Generazione mappa fallita')
+        setConceptMap(null)
+        setConceptMetrics({})
+      }
+    } catch (error) {
+      console.error('Errore generazione mappa unificata:', error)
+
+      if (!silent) {
+        const fallbackMessage = 'Impossibile generare la mappa concettuale. Riprova più tardi.'
+        let message = fallbackMessage
+
+        if (error instanceof Error) {
+          message = error.message || fallbackMessage
+        }
+
+        if (message.toLowerCase().includes('nessun materiale')) {
+          message = 'Non sono stati indicizzati materiali per questo corso. Carica o reindicizza i contenuti prima di generare la mappa.'
+        }
+
+        setConceptError(message)
+        setConceptMap(null)
+        setConceptMetrics({})
+      }
+    }
+
+    return false
+  }
+
+  const maybeAutoGenerateMindmap = async (courseId?: string, bookId?: string) => {
+    if (!courseId) return false
+    const key = `${courseId}:${bookId || 'course'}`
+
+    if (autoGenerationAttemptsRef.current[key]) {
+      return false
+    }
+
+    autoGenerationAttemptsRef.current[key] = true
+    const success = await generateMindmapConceptState({
+      courseId,
+      bookId,
+      forceRegenerate: false,
+      silent: true
+    })
+
+    if (!success) {
+      console.warn(`Auto-generazione mappa concettuale fallita per ${key}`)
+    }
+
+    return success
+  }
+
+  const loadConceptContext = async (courseId?: string | null, bookId?: string | null) => {
+    if (!courseId) {
+      return
+    }
+
     setConceptsLoading(true)
     setConceptError(null)
     try {
@@ -261,6 +458,10 @@ export function ChatWrapper() {
 
           if (validConcepts.length === 0) {
             console.warn('No valid concepts found in concept map')
+            const autoGenerated = await maybeAutoGenerateMindmap(courseId, bookId || undefined)
+            if (autoGenerated) {
+              return
+            }
             setConceptError('Nessun concetto valido trovato nella mappa.')
             return
           }
@@ -340,6 +541,10 @@ export function ChatWrapper() {
 
         await loadConceptMetrics(courseId)
       } else if (response.status === 404) {
+        const autoGenerated = await maybeAutoGenerateMindmap(courseId, bookId || undefined)
+        if (autoGenerated) {
+          return
+        }
         setConceptMap(null)
         setConceptMetrics({})
         // Don't set rootNode to null here to avoid buildNodesMap error
@@ -357,18 +562,6 @@ export function ChatWrapper() {
     }
   }
 
-  const loadConceptMetrics = async (courseId: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/concepts/metrics`)
-      if (response.ok) {
-        const data = await response.json()
-        setConceptMetrics(data.metrics || {})
-      }
-    } catch (error) {
-      console.error('Errore caricamento metriche concetti:', error)
-    }
-  }
-
   const handleGenerateConceptMap = async () => {
     if (!selectedCourse) return
 
@@ -376,46 +569,15 @@ export function ChatWrapper() {
     setConceptError(null)
 
     try {
-      // Usa il servizio unificato per generare/ottenere la mappa
-      const result = await mindmapService.getMindmap({
+      const success = await generateMindmapConceptState({
         courseId: selectedCourse,
         bookId: selectedBook || undefined,
-        forceRegenerate: false // Non forzare, usa cache se disponibile
+        silent: false
       })
 
-      if (result.mindmap) {
-        // Converti StudyMindmap in CourseConceptMap per compatibilità
-        const conceptMap = mindmapService.convertToConceptMap(result.mindmap)
-        setConceptMap(conceptMap)
-        setSelectedConceptIds([])
-        await loadConceptMetrics(selectedCourse)
-        setConceptProgress(100)
-
-        // Mostra messaggio informativo se dalla cache
-        if (result.fromCache) {
-          console.log('📦 Mappa caricata dalla cache condivisa')
-        }
-      } else {
-        throw new Error(result.error || 'Generazione mappa fallita')
+      if (!success) {
+        setConceptProgress(0)
       }
-
-    } catch (error) {
-      console.error('Errore generazione mappa unificata:', error)
-
-      const fallbackMessage = 'Impossibile generare la mappa concettuale. Riprova più tardi.'
-      let message = fallbackMessage
-
-      if (error instanceof Error) {
-        message = error.message || fallbackMessage
-      }
-
-      if (message.toLowerCase().includes('nessun materiale')) {
-        message = 'Non sono stati indicizzati materiali per questo corso. Carica o reindicizza i contenuti prima di generare la mappa.'
-      }
-
-      setConceptError(message)
-      setConceptMap(null)
-      setConceptMetrics({})
     } finally {
       setConceptsGenerating(false)
     }

@@ -4,6 +4,7 @@
  */
 
 import { StudyMindmap, StudyMindmapNode } from '@/types/mindmap'
+import { API_BASE_URL } from '@/lib/api'
 
 const CACHE_KEY_PREFIX = 'mindmap_'
 const CACHE_VERSION = '1.0'
@@ -38,13 +39,33 @@ export interface MindmapStorage {
   lastAccessed: string
 }
 
+export interface MindmapStoragePayload {
+  title?: string
+  structured_map?: StudyMindmap
+  content_markdown?: string
+  references?: string[]
+  sources?: any[]
+}
+
 class MindmapService {
   private cache: Map<string, MindmapCache> = new Map()
+  private get storage(): Storage | null {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return null
+      }
+      return window.localStorage
+    } catch {
+      return null
+    }
+  }
 
   constructor() {
-    this.loadCacheFromStorage()
-    // Pulizia cache scaduti
-    this.cleanExpiredCache()
+    if (typeof window !== 'undefined') {
+      this.loadCacheFromStorage()
+      // Pulizia cache scaduti
+      this.cleanExpiredCache()
+    }
   }
 
   /**
@@ -71,7 +92,7 @@ class MindmapService {
     console.log('🔄 Generating new mindmap:', { courseId: request.courseId, bookId: request.bookId })
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/mindmap`, {
+      const response = await fetch(`${API_BASE_URL}/mindmap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,6 +150,39 @@ class MindmapService {
     }
   }
 
+  saveMindmap(courseId: string, bookId: string | undefined, payload: MindmapStoragePayload): MindmapStorage {
+    if (!payload.structured_map) {
+      throw new Error('structured_map mancante: impossibile salvare la mindmap')
+    }
+
+    const cacheKey = this.buildCacheKey(courseId, bookId)
+    const now = new Date().toISOString()
+
+    const entry: MindmapStorage = {
+      id: cacheKey,
+      courseId,
+      bookId,
+      title: payload.title || payload.structured_map.title || 'Mappa concettuale',
+      mindmap: payload.structured_map,
+      markdown: payload.content_markdown || '',
+      references: payload.references,
+      sources: payload.sources,
+      createdAt: now,
+      lastAccessed: now
+    }
+
+    this.cacheMindmap(cacheKey, {
+      data: payload.structured_map,
+      timestamp: Date.now(),
+      courseId,
+      bookId,
+      version: CACHE_VERSION
+    })
+
+    this.saveMindmapStorage(entry)
+    return entry
+  }
+
   /**
    * Espande un nodo della mappa mentale
    */
@@ -140,7 +194,7 @@ class MindmapService {
     customPrompt?: string
   ): Promise<{ expandedNodes: StudyMindmapNode[]; sources: string[] } | null> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/mindmap/expand`, {
+      const response = await fetch(`${API_BASE_URL}/mindmap/expand`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,8 +243,12 @@ class MindmapService {
    * Recupera tutte le mappe salvate per un corso
    */
   getSavedMindmaps(courseId: string, bookId?: string): MindmapStorage[] {
+    const storage = this.storage
+    if (!storage) {
+      return []
+    }
     const storageKey = `mindmaps_${courseId}${bookId ? `_${bookId}` : ''}`
-    const stored = localStorage.getItem(storageKey)
+    const stored = storage.getItem(storageKey)
 
     if (!stored) return []
 
@@ -202,16 +260,26 @@ class MindmapService {
     }
   }
 
+  getSavedMindmap(courseId: string, bookId?: string): MindmapStorage | null {
+    const saved = this.getSavedMindmaps(courseId, bookId)
+    return saved.length > 0 ? saved[0] : null
+  }
+
   /**
    * Elimina una mappa salvata
    */
   deleteSavedMindmap(courseId: string, bookId: string, mindmapId: string): boolean {
+    const storageRef = this.storage
+    if (!storageRef) {
+      return false
+    }
+
     try {
       const mindmaps = this.getSavedMindmaps(courseId, bookId)
       const filtered = mindmaps.filter(m => m.id !== mindmapId)
 
       const storageKey = `mindmaps_${courseId}${bookId ? `_${bookId}` : ''}`
-      localStorage.setItem(storageKey, JSON.stringify(filtered))
+      storageRef.setItem(storageKey, JSON.stringify(filtered))
 
       // Rimuovi anche dalla cache
       const cacheKey = this.buildCacheKey(courseId, bookId)
@@ -282,14 +350,17 @@ class MindmapService {
   }
 
   private updateLastAccessed(cacheKey: string): void {
+    const storageRef = this.storage
+    if (!storageRef) return
+
     const storageKey = `mindmaps_storage_${cacheKey}`
-    const stored = localStorage.getItem(storageKey)
+    const stored = storageRef.getItem(storageKey)
 
     if (stored) {
       try {
-        const storage = JSON.parse(stored)
-        storage.lastAccessed = new Date().toISOString()
-        localStorage.setItem(storageKey, JSON.stringify(storage))
+        const parsed = JSON.parse(stored)
+        parsed.lastAccessed = new Date().toISOString()
+        storageRef.setItem(storageKey, JSON.stringify(parsed))
       } catch (error) {
         console.error('Error updating last accessed:', error)
       }
@@ -348,6 +419,9 @@ class MindmapService {
   }
 
   private saveMindmapStorage(storage: MindmapStorage): void {
+    const storageRef = this.storage
+    if (!storageRef) return
+
     try {
       const storageKey = `mindmaps_${storage.courseId}${storage.bookId ? `_${storage.bookId}` : ''}`
       const existing = this.getSavedMindmaps(storage.courseId, storage.bookId)
@@ -356,11 +430,11 @@ class MindmapService {
       const filtered = existing.filter(m => m.id !== storage.id)
       const updated = [storage, ...filtered]
 
-      localStorage.setItem(storageKey, JSON.stringify(updated))
+      storageRef.setItem(storageKey, JSON.stringify(updated))
 
       // Salva anche storage individuale
       const individualKey = `mindmaps_storage_${storage.id}`
-      localStorage.setItem(individualKey, JSON.stringify(storage))
+      storageRef.setItem(individualKey, JSON.stringify(storage))
 
     } catch (error) {
       console.error('Error saving mindmap storage:', error)
@@ -369,14 +443,16 @@ class MindmapService {
 
   private updateMindmapStorage(cacheKey: string, mindmap: StudyMindmap): void {
     const individualKey = `mindmaps_storage_${cacheKey}`
-    const stored = localStorage.getItem(individualKey)
+    const storageRef = this.storage
+    if (!storageRef) return
+    const stored = storageRef.getItem(individualKey)
 
     if (stored) {
       try {
-        const storage = JSON.parse(stored)
-        storage.mindmap = mindmap
-        storage.lastAccessed = new Date().toISOString()
-        localStorage.setItem(individualKey, JSON.stringify(storage))
+        const parsed = JSON.parse(stored)
+        parsed.mindmap = mindmap
+        parsed.lastAccessed = new Date().toISOString()
+        storageRef.setItem(individualKey, JSON.stringify(parsed))
       } catch (error) {
         console.error('Error updating mindmap storage:', error)
       }
@@ -384,8 +460,10 @@ class MindmapService {
   }
 
   private loadCacheFromStorage(): void {
+    const storage = this.storage
+    if (!storage) return
     try {
-      const cached = localStorage.getItem('mindmap_cache')
+      const cached = storage.getItem('mindmap_cache')
       if (cached) {
         const data = JSON.parse(cached)
         this.cache = new Map(Object.entries(data))
@@ -396,9 +474,11 @@ class MindmapService {
   }
 
   private saveCacheToStorage(): void {
+    const storage = this.storage
+    if (!storage) return
     try {
       const data = Object.fromEntries(this.cache)
-      localStorage.setItem('mindmap_cache', JSON.stringify(data))
+      storage.setItem('mindmap_cache', JSON.stringify(data))
     } catch (error) {
       console.error('Error saving cache to storage:', error)
     }

@@ -138,7 +138,7 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
 
   const fetchBook = async () => {
     try {
-      const response = await fetchFromBackend(`/api/courses/${courseId}/books/${bookId}`)
+      const response = await fetchFromBackend(`/courses/${courseId}/books/${bookId}`)
       if (response.ok) {
         const data = await response.json()
         setBook(normalizeBook(data.book))
@@ -156,7 +156,7 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
 
   const fetchCourseInfo = async () => {
     try {
-      const response = await fetchFromBackend(`/api/courses/${courseId}`)
+      const response = await fetchFromBackend(`/courses/${courseId}`)
       if (response.ok) {
         const data = await response.json()
         setCourseName(data.course.name)

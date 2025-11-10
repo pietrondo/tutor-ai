@@ -798,7 +798,7 @@ export default function VisualMindmap({
     }
 
     // NEW: Estrai URL e link web
-    const urlMatch = title.match(/https?:\/\/[^\s\)]+/gi)
+    const urlMatch = title.match(/https?:\/\/[^\s)]+/gi)
     if (urlMatch && !sourceRef) {
       sourceRef = 'Fonte web'
     }
@@ -812,7 +812,7 @@ export default function VisualMindmap({
       // Rimuovi riferimenti tra parentesi quadre
       .replace(/\[.*?\]/g, '')
       // Rimuovi URL e link
-      .replace(/https?:\/\/[^\s\)]+/gi, '')
+      .replace(/https?:\/\/[^\s)]+/gi, '')
       // Rimuovi riferimenti a documenti e posizioni
       .replace(/\(.*?posizione.*?\)/gi, '')
       .replace(/\(.*?documento.*?\)/gi, '')
@@ -820,11 +820,11 @@ export default function VisualMindmap({
       .replace(/tratto\s+da\s*:\s*.*/gi, '')
       .replace(/estratto\s+da\s*:\s*.*/gi, '')
       // Rimuovi riferimenti a file o documenti
-      .replace(/\b(file|documento|pdf)\s*[:\-]?\s*[^\n]*/gi, '')
+      .replace(/\b(file|documento|pdf)\s*[:-]?\s*[^\n]*/gi, '')
       // Rimuovi ID numerici lunghi (probabilmente ID documento)
       .replace(/\b[a-f0-9]{20,}\b/g, '')
       // Rimuovi testo che sembra essere un riferimento tecnico
-      .replace(/\b(doc|ref|source)\s*[:\-]?\s*[^\n]*/gi, '')
+      .replace(/\b(doc|ref|source)\s*[:-]?\s*[^\n]*/gi, '')
 
     cleaned = cleaned.trim()
     // Rimuovi spazi multipli e caratteri strani rimanenti

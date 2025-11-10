@@ -5,12 +5,12 @@
  * This ensures compatibility features are available when needed
  */
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 // Import polyfills to ensure they're loaded
 import '../polyfills';
 
-export function PolyfillsProvider({ children }: { children: React.ReactNode }) {
+export function PolyfillsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Verify that polyfills are loaded
     if (typeof Promise !== 'undefined' && !Promise.withResolvers) {

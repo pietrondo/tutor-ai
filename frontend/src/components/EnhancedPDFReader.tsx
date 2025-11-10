@@ -22,6 +22,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { CustomHighlight, type HighlightPosition } from './CustomHighlight';
 import {
   HighlighterIcon,
@@ -37,13 +38,7 @@ import {
 
 // Configura PDF.js - usa CDN per evitare problemi di worker locali
 if (typeof window !== 'undefined' && pdfjs.GlobalWorkerOptions) {
-  const cdnWorker = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
-  const fallbackWorker = '/pdf.worker.min.js';
-  const desiredWorkerSrc = pdfjs.version ? cdnWorker : fallbackWorker;
-
-  if (pdfjs.GlobalWorkerOptions.workerSrc !== desiredWorkerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = desiredWorkerSrc;
-  }
+  pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 }
 
 type AnnotationMode = 'highlight' | 'underline' | 'note';
@@ -72,6 +67,8 @@ interface AnnotationDraft {
   isExisting?: boolean;
 }
 
+type BackendAnnotation = Record<string, unknown>;
+
 interface EnhancedPDFReaderProps {
   pdfUrl: string;
   pdfFilename: string;
@@ -79,8 +76,8 @@ interface EnhancedPDFReaderProps {
   bookId: string;
   courseId: string;
   userId: string;
-  onAnnotationCreate?: (annotation: Annotation) => void;
-  onAnnotationUpdate?: (annotation: Annotation) => void;
+  onAnnotationCreate?: (annotation: BackendAnnotation) => void;
+  onAnnotationUpdate?: (annotation: BackendAnnotation) => void;
   onChatWithContext?: (context: any) => void;
 }
 
@@ -184,7 +181,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   const viewerRef = useRef<any>(null);
 
   
-  const mapAnnotationFromBackend = useCallback((annotation: any): ViewerAnnotation => {
+  const mapAnnotationFromBackend = useCallback((annotation: BackendAnnotation): ViewerAnnotation => {
     const position = annotation?.position || {};
     const page = position.pageNumber || annotation?.page_number || 1;
 

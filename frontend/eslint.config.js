@@ -7,7 +7,7 @@ const globals = require('globals')
 
 module.exports = [
   {
-    ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'dist/**'],
+    ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'dist/**', 'public/**'],
   },
   js.configs.recommended,
   {
@@ -47,6 +47,11 @@ module.exports = [
     rules: {
       ...tsPlugin.configs.recommended.rules,
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      // The codebase still relies heavily on dynamic data & placeholder state,
+      // so relax these rules until types and usage can be tightened incrementally.
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {

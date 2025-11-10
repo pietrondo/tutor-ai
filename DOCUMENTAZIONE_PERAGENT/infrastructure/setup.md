@@ -12,12 +12,13 @@
 | Opzione | Effetto |
 | --- | --- |
 | `dev` (default) | Avvio ambiente con hot reload |
-| `--build` / `-b` | Forza `docker compose up -d --build --force-recreate` (comodo dopo modifiche al codice) |
+| `build` | Solo compilazione immagini Docker (equivalente a `docker compose build`) |
+| `--build` / `-b` | Durante `dev/simple/prod` forza `up -d --build --force-recreate`; nel comando `build` aggiunge `--no-cache` |
 | `--no-health` | Salta l'health check per avvii più veloci |
 | `--no-logo` | Nasconde il banner |
 | `stop`, `clean`, `logs`, `status` | Restano disponibili come prima |
 
-Esempi: `./start.sh dev --build`, `./start.sh prod --no-health`.
+Esempi: `./start.sh dev --build`, `./start.sh prod --no-health`, `./start.sh build -b` (build immagini senza cache).
 
 ## Docker / Compose
 - File principali: `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.simple.yml`.

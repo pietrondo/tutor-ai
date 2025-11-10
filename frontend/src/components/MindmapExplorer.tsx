@@ -7,15 +7,18 @@ import { StudyMindmap, StudyMindmapNode, StudyPlanPhase } from '@/types/mindmap'
 interface MindmapExplorerProps {
   mindmap: StudyMindmap
   onExpandNode?: (path: StudyMindmapNode[]) => Promise<void>
-}
-
-interface MindmapExplorerProps {
-  mindmap: StudyMindmap
-  onExpandNode?: (path: StudyMindmapNode[]) => Promise<void>
   onEditNode?: (node: StudyMindmapNode, instruction: string) => Promise<void>
 }
 
 export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapExplorerProps) {
+  if (!mindmap || !Array.isArray(mindmap.nodes)) {
+    return (
+      <div className="p-6 bg-white border rounded-xl text-center text-gray-500">
+        Nessuna mindmap disponibile
+      </div>
+    )
+  }
+
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
   const [editingNodes, setEditingNodes] = useState<Set<string>>(new Set())
@@ -23,13 +26,13 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
 
   // Log dettagliati per debugging
   console.log('🔍 MindmapExplorer - Dati ricevuti:', {
-    mindmapTitle: mindmap.title,
-    nodesCount: mindmap.nodes.length,
-    firstNodeTitle: mindmap.nodes[0]?.title,
-    firstNodeSummary: mindmap.nodes[0]?.summary,
-    firstNodeChildrenCount: mindmap.nodes[0]?.children?.length || 0,
-    allNodeTitles: mindmap.nodes.map(n => n.title),
-    allNodeSources: mindmap.nodes.map(n => n.references || [])
+    mindmapTitle: mindmap?.title,
+    nodesCount: mindmap?.nodes?.length ?? 0,
+    firstNodeTitle: mindmap?.nodes?.[0]?.title,
+    firstNodeSummary: mindmap?.nodes?.[0]?.summary,
+    firstNodeChildrenCount: mindmap?.nodes?.[0]?.children?.length || 0,
+    allNodeTitles: mindmap?.nodes?.map(n => n.title) ?? [],
+    allNodeSources: mindmap?.nodes?.map(n => n.references || []) ?? []
   })
 
   const getPriorityMeta = (priority: number | null | undefined) => {

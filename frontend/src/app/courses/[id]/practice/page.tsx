@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense, type FormEvent } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Brain, Target, Plus, BarChart3, Settings } from 'lucide-react'
 import Flashcard from '@/components/Flashcard'
@@ -43,7 +43,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 function PracticeContent() {
   const params = useParams()
-  const router = useRouter()
   const courseId = params.id as string
 
   const [course, setCourse] = useState<Course | null>(null)
@@ -92,7 +91,7 @@ function PracticeContent() {
     }
   }
 
-  const handleCreateCard = async (e: React.FormEvent) => {
+  const handleCreateCard = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (!newCard.question.trim() || !newCard.answer.trim()) {

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense, type KeyboardEvent } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Send, Brain, Zap, AlertCircle, RefreshCw, MessageSquare, BookOpen, Target } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
@@ -90,7 +90,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 function CourseChatContent() {
   const params = useParams()
-  const router = useRouter()
   const courseId = params.id as string
 
   const [course, setCourse] = useState<Course | null>(null)
@@ -274,7 +273,7 @@ function CourseChatContent() {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()

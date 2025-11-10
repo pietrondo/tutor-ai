@@ -48,7 +48,9 @@
       "Bash(netstat:*)",
       "Bash(ss:*)",
       "Bash(./start.sh:*)",
-      "mcp__serena__list_dir"
+      "mcp__serena__list_dir",
+      "mcp__serena__get_symbols_overview",
+      "Bash(docker restart:*)"
     ],
     "deny": [],
     "ask": []

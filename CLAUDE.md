@@ -547,6 +547,12 @@ docker-compose.yml without docker-compose.dev.yml
 
 This is the **permanent solution** - always use `./start.sh dev` for development.
 
+#### 🔁 Mindmap 404 Regression Tests
+- Test suite: `frontend/src/components/books/__tests__/MindmapLinks.test.tsx`
+- Scope: verifies the “Mappa Concettuale” quick action links to `/courses/{courseId}/books/{bookId}/mindmap` and that both `courses/.../mindmap` and `book-detail/.../mindmap` routes render the shared `MindmapClient` (prevents silent 404s on future refactors).
+- Run locally with `cd frontend && npm run test -- MindmapLinks --runInBand` to keep Jest in a single worker (avoids sporadic Next/Jest worker crashes on Windows).
+- CI note: include this spec whenever debugging navigation regressions related to concept maps; it fails fast if a link or route mapping is removed.
+
 **Problem**: Frontend shows 404 errors or can't connect to backend
 **Solution**:
 1. Ensure backend is healthy: `curl http://localhost:8001/health`
