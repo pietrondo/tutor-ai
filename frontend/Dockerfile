@@ -6,12 +6,18 @@ ARG NEXT_INTERNAL_API_URL="http://backend:8000"
 ENV NEXT_INTERNAL_API_URL=${NEXT_INTERNAL_API_URL}
 
 # Installa dipendenze base per Alpine
-RUN apk add --no-cache libc6-compat curl
+RUN apk add --no-cache libc6-compat curl \
+    python3 \
+    make \
+    g++
 
 WORKDIR /app
 
 # Copia package files con lockfile ottimizzato
 COPY package.json package-lock.json* ./
+
+# Copia la directory scripts per i postinstall scripts
+COPY scripts/ ./scripts/
 
 # Stage di installazione dipendenze
 FROM base AS deps
@@ -22,14 +28,14 @@ RUN npm config set registry https://registry.npmjs.org/ && \
 
 # Installa dipendenze con cache ottimizzato
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --include=dev --silent
+    npm ci --include=dev --no-audit --prefer-offline
 
 # Stage di sviluppo
 FROM base AS development
 
 # Installa dipendenze con cache
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --include=dev --silent
+    npm ci --include=dev --no-audit --prefer-offline
 
 # Copia il codice sorgente
 COPY . .

@@ -90,6 +90,8 @@ interface EnhancedPDFReaderProps {
   onAnnotationCreate?: (annotation: BackendAnnotation) => void;
   onAnnotationUpdate?: (annotation: BackendAnnotation) => void;
   onChatWithContext?: (context: any) => void;
+  onError?: (message: string | null) => void;
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 const COLORS = [
@@ -276,7 +278,9 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   userId,
   onAnnotationCreate,
   onAnnotationUpdate,
-  onChatWithContext
+  onChatWithContext,
+  onError,
+  onLoadingChange
 }) => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const existingWorkerDiagnostics = typeof window === 'undefined' ? null : getWorkerDiagnostics();
@@ -284,6 +288,23 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   const [workerReady, setWorkerReady] = useState<boolean>(() => typeof window === 'undefined' || Boolean(existingWorkerDiagnostics));
   const [workerDiagnostics, setWorkerDiagnostics] = useState<WorkerConfigResult | null>(existingWorkerDiagnostics);
   const [workerError, setWorkerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pdfUrl) {
+      return;
+    }
+    onLoadingChange?.(true);
+    return () => {
+      onLoadingChange?.(false);
+    };
+  }, [pdfUrl, onLoadingChange]);
+
+  useEffect(() => {
+    if (workerError) {
+      onError?.(`PDF.js worker error: ${workerError}`);
+      onLoadingChange?.(false);
+    }
+  }, [workerError, onError, onLoadingChange]);
 
   // Log PDF URL for debugging
   useEffect(() => {
@@ -403,6 +424,8 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   // Gestione caricamento PDF
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+    onLoadingChange?.(false);
+    onError?.(null);
   };
 
   // Gestione selezione testo
@@ -854,6 +877,8 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
                       name: error.name,
                       stack: error.stack
                     });
+                    onLoadingChange?.(false);
+                    onError?.(error?.message || 'Errore caricamento PDF');
 
                     // Test if the PDF is actually accessible
                     fetch(pdfUrl, { method: 'HEAD' })

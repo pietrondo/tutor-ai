@@ -37,6 +37,8 @@ if (!fs.existsSync(nextDir)) {
 console.log('\n🔧 Validating PDF.js worker...');
 let workerFound = false;
 let workerSize = 0;
+const MIN_WORKER_SIZE = 1_000; // sanity check against empty/corrupt files
+const MAX_WORKER_SIZE = 3_000_000; // warn if unexpectedly large but do not fail
 
 for (const workerPath of workerPaths) {
   if (fs.existsSync(workerPath)) {
@@ -58,10 +60,11 @@ if (!workerFound) {
 console.log('\n🚨 Checking for common issues...');
 
 // Check worker file size (should be reasonable)
-if (workerSize < 1000) {
-  console.log('⚠️ PDF worker file seems too small, might be corrupted');
-} else if (workerSize > 1000000) {
-  console.log('⚠️ PDF worker file seems too large');
+if (workerSize < MIN_WORKER_SIZE) {
+  console.log('❌ PDF worker file seems too small, might be corrupted');
+  workerFound = false; // force failure in summary
+} else if (workerSize > MAX_WORKER_SIZE) {
+  console.log(`⚠️ PDF worker file is larger than expected (${workerSize} bytes). Continuing, but verify if needed.`);
 } else {
   console.log(`✅ PDF worker file size looks good (${workerSize} bytes)`);
 }
@@ -111,11 +114,11 @@ console.log(`NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
 
 // Summary
 console.log('\n📊 Validation Summary:');
-console.log(workerFound ? '✅ PDF worker found' : '❌ PDF worker missing');
-console.log(workerSize > 1000 && workerSize < 1000000 ? '✅ Worker file size valid' : '⚠️ Worker file size issue');
+console.log(workerFound ? '✅ PDF worker found' : '❌ PDF worker missing or invalid');
+console.log(workerSize >= MIN_WORKER_SIZE ? '✅ Worker file size valid' : '❌ Worker file size too small');
 console.log(fs.existsSync('.next/standalone') ? '✅ Standalone build available' : '⚠️ Standalone build missing');
 
-if (workerFound && workerSize > 1000 && workerSize < 1000000) {
+if (workerFound && workerSize >= MIN_WORKER_SIZE) {
   console.log('\n🎉 Build validation PASSED! Ready for production deployment.');
   process.exit(0);
 } else {

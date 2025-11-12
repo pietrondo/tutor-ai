@@ -53,8 +53,8 @@ const nextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: http: https:",
-              "font-src 'self' data:",
-              "connect-src 'self' http://localhost:8000 ws://localhost:3001 ws://localhost:8000",
+              "font-src 'self' data: https:",
+              "connect-src 'self' http://localhost:8000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234",
               "media-src 'self'",
               "object-src 'self'",
               // Enhanced worker-src for PDF.js support in both dev and prod

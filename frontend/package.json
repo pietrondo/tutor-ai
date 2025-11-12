@@ -7,14 +7,18 @@
     "dev:turbo": "next dev --turbo -p 3001",
     "dev:fast": "NODE_OPTIONS='--max-old-space-size=4096' next dev -p 3001",
     "build": "next build && node scripts/validate-build.js",
+    "prebuild": "npm run sync:pdf-worker",
     "build:prod": "NODE_ENV=production npm run build",
+    "predev": "npm run sync:pdf-worker",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "validate:build": "node scripts/validate-build.js"
+    "validate:build": "node scripts/validate-build.js",
+    "sync:pdf-worker": "node scripts/sync-pdf-worker.js",
+    "postinstall": "npm run sync:pdf-worker"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

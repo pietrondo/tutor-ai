@@ -68,7 +68,8 @@
       "Bash(docker-compose -f docker-compose.yml -f docker-compose.optimized.yml build --no-cache backend)",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(docker inspect:*)",
-      "Bash(KillShell:*)"
+      "Bash(KillShell:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []

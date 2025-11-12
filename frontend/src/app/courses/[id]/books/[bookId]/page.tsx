@@ -167,11 +167,11 @@ export default function SimpleBookPage() {
     })
   }
 
-  const handlePDFError = (error: string) => {
+  const handlePDFError = (error: string | null) => {
     setPdfState(prev => ({
       ...prev,
       pdfError: error,
-      showPDF: false
+      showPDF: error ? false : prev.showPDF
     }))
   }
 
@@ -329,11 +329,11 @@ export default function SimpleBookPage() {
               )}
               <EnhancedPDFReader
                 pdfUrl={pdfState.selectedPDF.url}
-                filename={pdfState.selectedPDF.filename}
+                pdfFilename={pdfState.selectedPDF.filename}
                 bookId={bookId}
                 courseId={courseId}
+                userId="default-user"
                 onError={handlePDFError}
-                onClose={handleClosePDF}
                 onLoadingChange={setPdfLoading}
               />
             </div>
