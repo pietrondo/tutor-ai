@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV === 'development';
 const isProd = process.env.NODE_ENV === 'production';
+const normalizeUrl = (url = '') => url.replace(/\/+$/, '');
+const internalApiUrl = normalizeUrl(
+  process.env.NEXT_INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:8000'
+);
 
 const nextConfig = {
   images: {
@@ -23,15 +29,15 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://backend:8000/:path*',
+        destination: `${internalApiUrl}/:path*`,
       },
       {
         source: '/uploads/:path*',
-        destination: 'http://backend:8000/uploads/:path*',
+        destination: `${internalApiUrl}/uploads/:path*`,
       },
       {
         source: '/course-files/:path*',
-        destination: 'http://backend:8000/course-files/:path*',
+        destination: `${internalApiUrl}/course-files/:path*`,
       },
     ]
   },

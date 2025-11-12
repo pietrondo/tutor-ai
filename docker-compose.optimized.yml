@@ -56,6 +56,7 @@ services:
       - ./frontend/public:/app/public:ro
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_INTERNAL_API_URL=http://backend:8000
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
       - PORT=3001
@@ -112,5 +113,6 @@ x-dev-volumes: &dev-volumes
 x-dev-frontend: &dev-frontend
   environment:
     - NEXT_PUBLIC_API_URL=http://localhost:8000
+    - NEXT_INTERNAL_API_URL=http://backend:8000
     - NODE_ENV=development
   volumes: *dev-volumes

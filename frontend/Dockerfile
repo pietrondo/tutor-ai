@@ -1,6 +1,10 @@
 # Multi-stage build ottimizzato per Next.js
 FROM node:20-alpine AS base
 
+# Internal API endpoint used for Next.js rewrites during docker builds
+ARG NEXT_INTERNAL_API_URL="http://backend:8000"
+ENV NEXT_INTERNAL_API_URL=${NEXT_INTERNAL_API_URL}
+
 # Installa dipendenze base per Alpine
 RUN apk add --no-cache libc6-compat curl
 
@@ -63,6 +67,9 @@ RUN npm run build
 FROM node:20-alpine AS runner
 
 WORKDIR /app
+
+ARG NEXT_INTERNAL_API_URL="http://backend:8000"
+ENV NEXT_INTERNAL_API_URL=${NEXT_INTERNAL_API_URL}
 
 # Crea utente non-root per sicurezza
 RUN addgroup --system --gid 1001 nodejs && \

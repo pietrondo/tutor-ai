@@ -61,6 +61,7 @@ services:
       - frontend_cache:/app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_INTERNAL_API_URL=http://backend:8000
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_DEBUG=true
@@ -85,4 +86,3 @@ volumes:
     driver: local
   frontend_cache:
     driver: local
-
