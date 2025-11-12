@@ -404,6 +404,107 @@ Materiali di riferimento (estratti):
         metrics = self._load_metrics()
         return metrics.get(course_id, {})
 
+    def aggregate_book_concepts(self, concepts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        import re, unicodedata
+        def norm(s: str) -> str:
+            x = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode("ascii")
+            x = re.sub(r"[^a-z0-9\s]", " ", x.lower())
+            x = re.sub(r"\s+", " ", x).strip()
+            return x
+        def jaro(s1: str, s2: str) -> float:
+            if s1 == s2:
+                return 1.0
+            len1, len2 = len(s1), len(s2)
+            if len1 == 0 or len2 == 0:
+                return 0.0
+            max_dist = max(len1, len2) // 2 - 1
+            match1 = [False] * len1
+            match2 = [False] * len2
+            matches = 0
+            transpositions = 0
+            for i in range(len1):
+                start = max(0, i - max_dist)
+                end = min(i + max_dist + 1, len2)
+                for j in range(start, end):
+                    if match2[j]:
+                        continue
+                    if s1[i] != s2[j]:
+                        continue
+                    match1[i] = True
+                    match2[j] = True
+                    matches += 1
+                    break
+            if matches == 0:
+                return 0.0
+            k = 0
+            for i in range(len1):
+                if not match1[i]:
+                    continue
+                while not match2[k]:
+                    k += 1
+                if s1[i] != s2[k]:
+                    transpositions += 1
+                k += 1
+            transpositions /= 2
+            return (matches / len1 + matches / len2 + (matches - transpositions) / matches) / 3.0
+        def jaro_winkler(a: str, b: str) -> float:
+            j = jaro(a, b)
+            l = 0
+            p = 0.1
+            for i in range(min(4, len(a), len(b))):
+                if a[i] == b[i]:
+                    l += 1
+                else:
+                    break
+            return j + l * p * (1 - j)
+        def dyn_threshold(s: str) -> float:
+            n = len(s)
+            if n < 10:
+                return 0.88
+            if n < 20:
+                return 0.82
+            return 0.75
+        buckets: List[Dict[str, Any]] = []
+        for c in concepts or []:
+            name = str(c.get("name") or "").strip()
+            if not name:
+                continue
+            key = norm(name)
+            placed = False
+            for b in buckets:
+                t = dyn_threshold(key)
+                if jaro_winkler(key, norm(b["name"])) >= t:
+                    b["weight"] += 1
+                    if c.get("summary") and not b.get("summary"):
+                        b["summary"] = c.get("summary")
+                    for lo in (c.get("learning_objectives") or []):
+                        if lo not in b["learning_objectives"]:
+                            b["learning_objectives"].append(lo)
+                    for ref in (c.get("suggested_reading") or []):
+                        if ref not in b["suggested_reading"]:
+                            b["suggested_reading"].append(ref)
+                    for tpc in (c.get("related_topics") or []):
+                        if tpc not in b["related_topics"]:
+                            b["related_topics"].append(tpc)
+                    if c.get("chapter"):
+                        title = str(c["chapter"].get("title") or "").strip()
+                        if title and title not in b["references"]:
+                            b["references"].append(title)
+                    placed = True
+                    break
+            if not placed:
+                buckets.append({
+                    "name": name,
+                    "summary": c.get("summary") or "",
+                    "learning_objectives": list(c.get("learning_objectives") or []),
+                    "suggested_reading": list(c.get("suggested_reading") or []),
+                    "related_topics": list(c.get("related_topics") or []),
+                    "references": [],
+                    "weight": 1
+                })
+        buckets.sort(key=lambda x: (-x["weight"], x["name"]))
+        return buckets
+
     def record_quiz_attempt(
         self,
         course_id: str,

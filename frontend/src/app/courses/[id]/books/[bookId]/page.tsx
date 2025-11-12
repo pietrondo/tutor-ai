@@ -47,18 +47,7 @@ export default function SimpleBookPage() {
     fetchBook()
   }, [courseId, bookId])
 
-  // Auto-open first PDF when book is loaded
-  useEffect(() => {
-    if (book && book.materials.length > 0 && !pdfState.showPDF) {
-      // Find the first PDF file
-      const firstPDF = book.materials.find(material =>
-        material.filename.toLowerCase().endsWith('.pdf')
-      )
-      if (firstPDF) {
-        handleOpenPDF(firstPDF)
-      }
-    }
-  }, [book, pdfState.showPDF])
+  
 
   const fetchBook = async () => {
     try {
@@ -342,7 +331,7 @@ export default function SimpleBookPage() {
 
         {/* Materials Section */}
         {book.materials && book.materials.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div id="materials" className="bg-white rounded-xl shadow-lg p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Materiali del Corso</h2>
             <div className="space-y-4">
               {book.materials.map((material, index) => {

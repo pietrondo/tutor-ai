@@ -83,6 +83,7 @@ export default function MaterialWorkspace() {
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [layoutMode, setLayoutMode] = useState<'split' | 'pdf-focus' | 'chat-focus'>('split')
   const [rightPanelTab, setRightPanelTab] = useState<'chat' | 'mindmap'>('chat')
+  const [mindmapScope, setMindmapScope] = useState<'book' | 'pdf'>('book')
   const [mindmap, setMindmap] = useState<any>(null)
 
   // Find book ID by searching through all books in the course to find which one contains the material
@@ -209,7 +210,7 @@ export default function MaterialWorkspace() {
     try {
       const bookId = await getBookIdFromParams(filename, courseId)
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_BASE_URL}/mindmap`, {
+      const response = await fetch(`${API_BASE_URL}/mindmap/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,13 +218,14 @@ export default function MaterialWorkspace() {
         body: JSON.stringify({
           course_id: courseId,
           book_id: bookId,
-          pdf_filename: filename
+          scope: mindmapScope,
+          pdf_filename: mindmapScope === 'pdf' ? filename : undefined
         })
       })
 
       if (response.ok) {
         const data = await response.json()
-        setMindmap(data.mindmap)
+        setMindmap(data)
       }
     } catch (error) {
       console.error('Errore caricamento mindmap:', error)
@@ -232,10 +234,10 @@ export default function MaterialWorkspace() {
 
   // Load mindmap when switching to mindmap tab
   useEffect(() => {
-    if (rightPanelTab === 'mindmap' && !mindmap) {
+    if (rightPanelTab === 'mindmap') {
       loadMindmap()
     }
-  }, [rightPanelTab, mindmap])
+  }, [rightPanelTab, mindmapScope])
 
   if (isLoading) {
     return (
@@ -335,7 +337,7 @@ export default function MaterialWorkspace() {
         {/* PDF Panel */}
         <div className={`${layoutMode === 'chat-focus' ? 'hidden md:hidden' : ''} ${
           layoutMode === 'pdf-focus' ? 'flex-1' : layoutMode === 'split' ? 'w-1/2' : 'w-1/2'
-        } bg-white border-r border-gray-200`}>
+        } bg-white border-r border-gray-200 overflow-auto`}>
           {pdfUrl && bookId && (
             <EnhancedPDFReader
               pdfUrl={pdfUrl}
@@ -386,10 +388,29 @@ export default function MaterialWorkspace() {
                 <span>Mappa Concettuale</span>
               </button>
             </div>
+            {rightPanelTab === 'mindmap' && (
+              <div className="px-4 py-2 border-t border-gray-200 flex items-center gap-2 text-xs text-gray-600">
+                <span>Scope:</span>
+                <button
+                  onClick={() => setMindmapScope('book')}
+                  className={`px-2 py-1 rounded ${mindmapScope === 'book' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}
+                  title="Mappa aggregata del libro"
+                >
+                  Libro
+                </button>
+                <button
+                  onClick={() => setMindmapScope('pdf')}
+                  className={`px-2 py-1 rounded ${mindmapScope === 'pdf' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}
+                  title="Mappa del PDF corrente"
+                >
+                  PDF
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto">
             {rightPanelTab === 'chat' ? (
               <ChatWrapper course={courseId} book={bookId} />
             ) : (

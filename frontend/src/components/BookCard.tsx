@@ -136,14 +136,6 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
       {book.materials_count > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           <Link
-            href={`/courses/${courseId}/books/${book.id}`}
-            className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-200 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Read PDF
-          </Link>
-          <Link
             href={`/courses/${courseId}/study?book=${book.id}`}
             className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 text-xs font-medium rounded-lg hover:bg-green-200 transition-colors"
             onClick={(e) => e.stopPropagation()}
@@ -182,9 +174,13 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
             <span>{Math.round(book.total_study_time / 60)}h</span>
           )}
         </div>
-        <span className="text-blue-600 hover:text-blue-700 font-medium">
+        <Link
+          href={`/courses/${courseId}/books/${book.id}#materials`}
+          className="text-blue-600 hover:text-blue-700 font-medium"
+          onClick={(e) => e.stopPropagation()}
+        >
           Vedi dettagli →
-        </span>
+        </Link>
       </div>
     </div>
   )

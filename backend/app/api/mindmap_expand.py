@@ -9,7 +9,7 @@ from datetime import datetime
 from services.llm_service import LLMService
 from services.rag_service import RAGService
 
-router = APIRouter(prefix="/mindmap", tags=["mindmap"])
+router = APIRouter(prefix="/mindmap", tags=["mindmap"]) 
 
 class MindmapExpandRequest(BaseModel):
     course_id: str
@@ -711,3 +711,155 @@ async def get_mindmap_status():
         "max_expansions_per_request": 10,
         "supported_node_types": ["concept", "topic", "definition", "example"]
     }
+class GenerateMindmapRequest(BaseModel):
+    course_id: str
+    book_id: str
+    scope: str = "book"  # 'book' | 'pdf'
+    pdf_filename: Optional[str] = None
+
+class StudyMindmapNode(BaseModel):
+    id: str
+    title: str
+    summary: Optional[str] = ""
+    ai_hint: Optional[str] = None
+    study_actions: List[str] = []
+    priority: Optional[int] = None
+    references: List[str] = []
+    children: List[Dict[str, Any]] = []
+
+class StudyMindmapResponse(BaseModel):
+    title: str
+    overview: Optional[str] = None
+    nodes: List[StudyMindmapNode]
+    references: List[str] = []
+
+def _normalize_title(text: str) -> str:
+    cleaned = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+@router.post("/generate", response_model=StudyMindmapResponse)
+async def generate_mindmap(
+    request: GenerateMindmapRequest,
+    llm_service: LLMService = Depends(get_llm_service),
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    """
+    Generate a study mindmap.
+    - scope = 'book': aggregate concepts for the whole book via ConceptMapService
+    - scope = 'pdf': placeholder that can be extended to use per-PDF RAG
+    """
+    try:
+        from services.concept_map_service import ConceptMapService
+        concept_service = ConceptMapService()
+
+        if request.scope == "book":
+            concept_map = concept_service.get_concept_map(request.course_id, book_id=request.book_id)
+            if not concept_map:
+                raise HTTPException(status_code=404, detail="Concept map non disponibile per questo libro")
+
+            concepts = concept_map.get("concepts", [])
+            concepts = concept_service.aggregate_book_concepts(concepts)
+            nodes: List[StudyMindmapNode] = []
+
+            for idx, c in enumerate(concepts):
+                title = _normalize_title(c.get("name", f"Concetto {idx+1}"))
+                summary = c.get("summary") or ""
+                learning_objectives = c.get("learning_objectives", [])
+                suggested_reading = c.get("suggested_reading", [])
+
+                nodes.append(StudyMindmapNode(
+                    id=f"{request.book_id}-{idx+1}",
+                    title=title,
+                    summary=summary,
+                    ai_hint="Usa il tutor per esempi e quiz rapidi su questo concetto",
+                    study_actions=learning_objectives or ["Rivedi il capitolo correlato", "Crea flashcards"],
+                    priority=c.get("weight") if isinstance(c.get("weight"), int) else None,
+                    references=(c.get("references") or []) + (suggested_reading or []),
+                    children=[]
+                ))
+
+            return StudyMindmapResponse(
+                title=_normalize_title(concept_map.get("course_name", "Mappa di studio")),
+                overview="Mappa concettuale aggregata del libro basata sui riassunti PDF",
+                nodes=nodes,
+                references=[]
+            )
+
+        # scope == 'pdf': generate using RAG context filtered by pdf filename
+        if not request.pdf_filename:
+            raise HTTPException(status_code=400, detail="pdf_filename richiesto per scope=pdf")
+
+        search_query = f"concetti principali {request.pdf_filename}"
+        rag_ctx = await rag_service.retrieve_context(
+            query=search_query,
+            course_id=request.course_id,
+            book_id=request.book_id,
+            k=12
+        )
+
+        full_text = rag_ctx.get("text", "") if isinstance(rag_ctx, dict) else ""
+        sources_list = rag_ctx.get("sources", []) if isinstance(rag_ctx, dict) else []
+        pdf_key = _normalize_title(request.pdf_filename).lower()
+        filtered_sources = []
+        for s in sources_list:
+            try:
+                src = str(s)
+                if pdf_key in src.lower():
+                    filtered_sources.append(src)
+            except Exception:
+                continue
+
+        text_segments = [seg.strip() for seg in re.split(r"[\n\r\.;]", full_text) if seg.strip()]
+        top_segments = text_segments[:8] if text_segments else [f"Contenuti chiave da {request.pdf_filename}"]
+
+        nodes: List[StudyMindmapNode] = []
+        for idx, seg in enumerate(top_segments):
+            title_prompt = f"Titolo sintetico (max 6 parole) in italiano per: {seg}"
+            try:
+                title = await llm_service.generate_response(prompt=title_prompt, max_tokens=16)
+                title = _normalize_title(title)[:80] or f"Concetto {idx+1}"
+            except Exception:
+                title = _normalize_title(seg.split(':')[0][:80]) or f"Concetto {idx+1}"
+            children: List[Dict[str, Any]] = []
+            try:
+                child_prompt = (
+                    f"Elenca 3 sotto-concetti in italiano, ciascuno in 3-6 parole, pertinenti a: {seg}. "
+                    f"Formato: una voce per riga, senza numeri né punteggiatura extra."
+                )
+                child_text = await llm_service.generate_response(prompt=child_prompt, max_tokens=64)
+                lines = [l.strip() for l in str(child_text or '').split('\n') if l.strip()]
+                for cidx, line in enumerate(lines[:3]):
+                    children.append({
+                        "id": f"{request.book_id}-pdf-{idx+1}-{cidx+1}",
+                        "title": _normalize_title(line)[:80] or f"Sotto-concetto {cidx+1}",
+                        "summary": "",
+                        "ai_hint": None,
+                        "study_actions": [],
+                        "priority": None,
+                        "references": filtered_sources,
+                        "children": []
+                    })
+            except Exception:
+                pass
+            nodes.append(StudyMindmapNode(
+                id=f"{request.book_id}-pdf-{idx+1}",
+                title=title,
+                summary=seg[:200],
+                ai_hint="Chiedi esempi e quiz mirati su questo punto",
+                study_actions=["Sintetizza in 2 frasi", "Crea 1 domanda a risposta breve"],
+                priority=None,
+                references=filtered_sources,
+                children=children
+            ))
+
+        return StudyMindmapResponse(
+            title=f"Mappa PDF: {request.pdf_filename}",
+            overview="Mappa concettuale generata con RAG dal PDF corrente",
+            nodes=nodes,
+            references=filtered_sources
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate mindmap: {str(e)}")

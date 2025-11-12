@@ -23,6 +23,9 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
   const [editingNodes, setEditingNodes] = useState<Set<string>>(new Set())
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [sortMode, setSortMode] = useState<'priority' | 'alpha'>('priority')
+  const [minWeight, setMinWeight] = useState<number>(0)
+  const [showMainOnly, setShowMainOnly] = useState<boolean>(false)
 
   // Log dettagliati per debugging
   console.log('🔍 MindmapExplorer - Dati ricevuti:', {
@@ -168,6 +171,15 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
     })
   }, [mindmap.nodes])
 
+  useEffect(() => {
+    const manyNodes = (mindmap.nodes?.length || 0) >= 12
+    const hasWeighted = mindmap.nodes?.some(n => (n.priority || 0) >= 2) || false
+    if (manyNodes && hasWeighted && !showMainOnly && minWeight === 0) {
+      setShowMainOnly(true)
+      setMinWeight(2)
+    }
+  }, [mindmap.nodes])
+
   const findNodeById = (nodes: StudyMindmapNode[], id: string | null): StudyMindmapNode | null => {
     if (!id) return null
     for (const node of nodes) {
@@ -288,6 +300,7 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="font-semibold text-gray-900 truncate">{node.title}</div>
                   {renderPriorityBadge(node.priority)}
+                  {renderWeightBadge(node.priority)}
 
                   {/* Session metadata indicators */}
                   {node.session_metadata && (
@@ -477,7 +490,47 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
         )}
 
         <div className="bg-white border border-gray-200 rounded-xl p-4 max-h-[600px] overflow-auto">
-          {mindmap.nodes.map((node) => renderNode(node, 0, []))}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="text-xs text-gray-600">Ordina:</div>
+            <button
+              onClick={() => setSortMode('priority')}
+              className={`px-2 py-1 text-xs rounded ${sortMode === 'priority' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Priorità
+            </button>
+            <button
+              onClick={() => setSortMode('alpha')}
+              className={`px-2 py-1 text-xs rounded ${sortMode === 'alpha' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Alfabetico
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <label className="inline-flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={showMainOnly}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setShowMainOnly(checked)
+                    setMinWeight(checked ? 2 : 0)
+                  }}
+                />
+                Solo concetti principali
+              </label>
+              <span className="text-xs text-gray-600">Peso minimo:</span>
+              <input
+                type="number"
+                min={0}
+                value={minWeight}
+                onChange={(e) => setMinWeight(Math.max(0, parseInt(e.target.value || '0')))}
+                className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"
+              />
+            </div>
+          </div>
+          {[...mindmap.nodes]
+            .filter((n) => (n.priority || 0) >= minWeight)
+            .sort((a, b) => (sortMode === 'priority' ? (b.priority || 0) - (a.priority || 0) : (a.title || '').localeCompare(b.title || '')))
+            .map((node) => renderNode(node, 0, []))}
         </div>
       </div>
       <div className="lg:col-span-2">
@@ -559,3 +612,11 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
     </div>
   )
 }
+  const renderWeightBadge = (priority: number | null | undefined) => {
+    if (priority === null || priority === undefined) return null
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+        peso {priority}
+      </span>
+    )
+  }
