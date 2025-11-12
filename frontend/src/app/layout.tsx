@@ -2,6 +2,8 @@ import './globals.css'
 import type { ReactNode } from 'react'
 import { Navigation } from '@/components/Navigation'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+// Import polyfills for compatibility
+import '../../polyfills.js'
 
 const inter = { className: '' }
 

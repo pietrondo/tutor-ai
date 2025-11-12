@@ -279,6 +279,11 @@ def rate_limit_check(identifier: str, limit: int = 100, window: int = 60) -> boo
     Returns:
         True if request is allowed
     """
+    # Trusted identifiers (local development/IPs) bypass
+    TRUSTED_IDENTIFIERS = {"127.0.0.1", "::1", "172.18.0.1"}
+    if identifier in TRUSTED_IDENTIFIERS:
+        return True
+
     # This is a simple implementation - in production, use Redis or similar
     from datetime import datetime, timedelta
     import time

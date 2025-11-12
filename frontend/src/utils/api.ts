@@ -100,25 +100,41 @@ class ApiClient {
 
   // Generic request methods
   private async request<T>(config: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    try {
-      const response: AxiosResponse = await this.client.request(config)
-      return {
-        success: true,
-        data: response.data,
-        timestamp: new Date().toISOString()
+    let attempt = 0
+    const maxAttempts = 4
+    let lastError: any = null
+    while (attempt < maxAttempts) {
+      try {
+        const response: AxiosResponse = await this.client.request(config)
+        return {
+          success: true,
+          data: response.data,
+          timestamp: new Date().toISOString()
+        }
+      } catch (error: any) {
+        lastError = error
+        const status = error?.response?.status
+        if (status === 429) {
+          const retryAfterHeader = error?.response?.headers?.['retry-after']
+          const retryAfterBody = error?.response?.data?.retry_after
+          const retrySeconds = Number.isFinite(parseInt(retryAfterHeader)) ? parseInt(retryAfterHeader) : (Number.isFinite(retryAfterBody) ? retryAfterBody : 1)
+          const delayMs = Math.min(8000, Math.max(500, (2 ** attempt) * 500, retrySeconds * 1000))
+          await new Promise((r) => setTimeout(r, delayMs))
+          attempt += 1
+          continue
+        }
+        break
       }
-    } catch (error: any) {
-      const apiError: ApiError = error.response?.data || {
-        success: false,
-        error: 'Unknown Error',
-        detail: error.message,
-        timestamp: new Date().toISOString()
-      }
-
-      return {
-        ...apiError,
-        success: false
-      }
+    }
+    const apiError: ApiError = lastError?.response?.data || {
+      success: false,
+      error: 'Unknown Error',
+      detail: lastError?.message,
+      timestamp: new Date().toISOString()
+    }
+    return {
+      ...apiError,
+      success: false
     }
   }
 

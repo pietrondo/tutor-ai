@@ -16,8 +16,13 @@
 const fs = require('fs');
 const path = require('path');
 
-// Define paths
-const nodeModulesPath = path.join(__dirname, '../node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
+// Resolve worker path from installed package to guarantee version match
+let nodeModulesPath;
+try {
+  nodeModulesPath = require.resolve('pdfjs-dist/build/pdf.worker.min.mjs', { paths: [path.join(__dirname, '..')] });
+} catch (e) {
+  nodeModulesPath = path.join(__dirname, '../node_modules/pdfjs-dist/build/pdf.worker.min.mjs');
+}
 const publicPath = path.join(__dirname, '../public/pdf.worker.min.js');
 
 console.log('🔄 PDF Worker Sync Script');
@@ -50,6 +55,15 @@ try {
   console.log(`   Target: ${publicPath}`);
   console.log(`   Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
   console.log(`   Modified: ${stats.mtime.toLocaleString()}`);
+
+  // Print installed pdfjs-dist version
+  try {
+    const pkgPath = require.resolve('pdfjs-dist/package.json', { paths: [path.join(__dirname, '..')] });
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`   pdfjs-dist version: ${pkg.version}`);
+  } catch (e) {
+    console.warn('⚠️  Unable to read pdfjs-dist version');
+  }
 
   // Verify the files are identical
   if (stats.size === sourceStats.size) {

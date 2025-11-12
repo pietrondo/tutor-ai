@@ -57,6 +57,8 @@ Modalità disponibili:
 
 Opzioni:
   --build, -b     Ricostruisce e ricrea i container (utile dopo modifiche code base)
+  --restart       Riavvio sicuro (down + up --build --force-recreate)
+  --recreate      Forza ricreazione container
   --no-health     Salta l'health check (per start rapidissimi)
   --no-logo       Nasconde il banner ASCII
   --help          Mostra questo messaggio
@@ -69,6 +71,8 @@ EOU
 }
 
 parse_args() {
+    FORCE_RESTART=false
+    FORCE_RECREATE=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             dev|development)
@@ -77,7 +81,7 @@ parse_args() {
             simple)
                 MODE="simple"
                 ;;
-            prod|production)
+            prod|production|prord)
                 MODE="prod"
                 ;;
             build)
@@ -94,6 +98,13 @@ parse_args() {
                 ;;
             --no-logo)
                 SKIP_LOGO=true
+                ;;
+            --restart)
+                FORCE_RESTART=true
+                FORCE_REBUILD=true
+                ;;
+            --recreate)
+                FORCE_RECREATE=true
                 ;;
             --help|-h)
                 print_usage
@@ -166,7 +177,7 @@ VECTOR_DB_PATH=./data/vector_db
 
 # API Configuration
 API_HOST=0.0.0.0
-API_PORT=8001
+API_PORT=8000
 EOF
         print_warning "Configura le tue API keys in backend/.env"
     fi
@@ -249,10 +260,16 @@ select_mode() {
 start_services() {
     print_info "Avvio servizi Docker..."
 
-    if $FORCE_REBUILD; then
+    if $FORCE_RESTART; then
+        print_info "Riavvio sicuro: down + up --build --force-recreate"
+        $DOCKER_COMPOSE $COMPOSE_FILES down || true
         $DOCKER_COMPOSE $COMPOSE_FILES up -d --build --force-recreate
     else
-        $DOCKER_COMPOSE $COMPOSE_FILES up -d
+        if $FORCE_REBUILD || $FORCE_RECREATE || [ "$MODE" = "prod" ]; then
+            $DOCKER_COMPOSE $COMPOSE_FILES up -d --build --force-recreate
+        else
+            $DOCKER_COMPOSE $COMPOSE_FILES up -d
+        fi
     fi
 
     if [ $? -eq 0 ]; then
@@ -308,6 +325,30 @@ health_check() {
 
     if [ $attempt -eq $max_attempts ]; then
         print_warning "Backend non risponde, ma i container sono in esecuzione"
+    fi
+
+    # Verifica frontend
+    attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s "http://localhost:${FRONTEND_PORT}" > /dev/null 2>&1; then
+            print_success "Frontend pronto!"
+            break
+        fi
+        echo -n "."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+
+    echo
+    if [ $attempt -eq $max_attempts ]; then
+        print_warning "Frontend non risponde, verifica i log"
+    fi
+
+    # Verifica worker PDF.js lato frontend
+    if curl -sI "http://localhost:${FRONTEND_PORT}/pdf.worker.min.js" | grep -q "200"; then
+        print_success "PDF worker disponibile dal frontend"
+    else
+        print_warning "PDF worker non raggiungibile su frontend"
     fi
 }
 

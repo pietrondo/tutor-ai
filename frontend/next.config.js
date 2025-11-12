@@ -39,6 +39,10 @@ const nextConfig = {
         source: '/course-files/:path*',
         destination: `${internalApiUrl}/course-files/:path*`,
       },
+      {
+        source: '/courses/:id/concepts',
+        destination: `${internalApiUrl}/courses/:id/concepts`,
+      },
     ]
   },
   async headers() {
@@ -51,10 +55,10 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: http: https:",
-              "font-src 'self' data: https:",
-              "connect-src 'self' http://localhost:8000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234",
+              "font-src 'self' data: https: https://fonts.gstatic.com https://fonts.googleapis.com",
+              "connect-src 'self' http://localhost:8000 http://localhost:3000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234 https://api.openai.com https://openrouter.ai/api https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdnjs.cloudflare.com",
               "media-src 'self'",
               "object-src 'self'",
               // Enhanced worker-src for PDF.js support in both dev and prod
@@ -108,6 +112,14 @@ const nextConfig = {
   turbopack: {},  // Empty turbopack config to silence the error
   // Configure webpack to handle polyfills properly
   webpack: (config, { isServer, dev }) => {
+    // Add polyfill for Promise.withResolvers
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'promise-withresolvers-polyfill': require.resolve('./polyfills.js'),
+      };
+    }
+
     // Development performance optimizations
     if (dev) {
       // Improve development build performance

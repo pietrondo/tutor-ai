@@ -418,11 +418,26 @@ app.add_middleware(
 )
 
 # CORS configuration - restricted to specific origins and methods
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002"
+]
+TRUSTED_IPS = {
+    "127.0.0.1",
+    "::1",
+    "172.18.0.1"  # Docker host/gateway
+}
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3002", "http://127.0.0.1:3002"],  # Frontend ports
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # Include OPTIONS for CORS preflight
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=[
         "accept",
         "accept-language",
@@ -430,7 +445,8 @@ app.add_middleware(
         "content-type",
         "authorization",
         "x-requested-with"
-    ],  # Specific headers only
+    ],
+    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"]
 )
 
 # Serve static files
@@ -466,19 +482,34 @@ async def security_middleware(request: Request, call_next):
         if x_forwarded_for:
             client_ip = x_forwarded_for.split(",")[0].strip()
 
-        # Apply rate limiting (100 requests per minute per IP)
+        path = request.url.path
+        method = request.method.upper()
+        if path.startswith("/course-files") or path.startswith("/annotations") or path == "/pdf.worker.min.js":
+            return await call_next(request)
+        if method == "HEAD":
+            return await call_next(request)
+        if client_ip in TRUSTED_IPS:
+            return await call_next(request)
         if not rate_limit_check(client_ip, limit=100, window=60):
             SecurityLogger.log_suspicious_activity(
                 "Rate limit exceeded",
                 {"ip": client_ip, "path": request.url.path},
                 client_ip
             )
+            origin = request.headers.get("origin")
+            headers = {}
+            if origin and origin in ALLOWED_ORIGINS:
+                headers["Access-Control-Allow-Origin"] = origin
+                headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Retry-After"] = "1"
             return JSONResponse(
                 status_code=429,
                 content={
                     "error_code": "RATE_LIMIT_EXCEEDED",
-                    "message": "Too many requests. Please try again later."
-                }
+                    "message": "Too many requests. Please try again later.",
+                    "retry_after": 1
+                },
+                headers=headers
             )
 
         # Log suspicious requests
@@ -2009,6 +2040,42 @@ async def get_book_materials(course_id: str, book_id: str):
             "book_id": book_id
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/courses/{course_id}/concepts")
+async def get_course_concepts(course_id: str, book_id: str = None):
+    """Get concepts for a course, optionally filtered by book"""
+    try:
+        from services.knowledge_area_service import KnowledgeAreaService
+
+        knowledge_area_service = KnowledgeAreaService()
+
+        if book_id:
+            # Get concepts for specific book
+            knowledge_area = await knowledge_area_service.extract_main_concepts_fast(
+                course_id=course_id,
+                book_id=book_id
+            )
+            main_concepts = knowledge_area.get_main_concepts()
+
+            return {
+                "concepts": [concept.name for concept in main_concepts],
+                "book_id": book_id,
+                "total_count": len(main_concepts),
+                "course_id": course_id
+            }
+        else:
+            # Get all concepts for the course
+            # This would require aggregation across all books in the course
+            # For now, return empty list
+            return {
+                "concepts": [],
+                "total_count": 0,
+                "course_id": course_id,
+                "message": "Course-wide concepts not implemented. Please specify book_id parameter."
+            }
+    except Exception as e:
+        logger.error(f"Error getting concepts for course {course_id}, book {book_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/courses/{course_id}/books/{book_id}")

@@ -27,15 +27,18 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { ensurePdfWorkerConfigured, getWorkerDiagnostics, type WorkerConfigResult } from '@/lib/pdfWorker';
 
-// PDF.js worker configuration using Next.js static files
+// PDF.js worker configuration using the centralized pdfWorker service
 if (typeof window !== 'undefined') {
-  // Use Next.js static file serving for PDF.js worker
-  const workerUrl = '/pdf.worker.min.js';
-
-  // Configure worker with local static file
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-
-  console.log('EnhancedPDFReader: Configured worker:', workerUrl);
+  // Configure worker through the centralized service
+  ensurePdfWorkerConfigured().then(config => {
+    console.log('EnhancedPDFReader: Worker configured through service:', config.strategy);
+  }).catch(error => {
+    console.warn('EnhancedPDFReader: Failed to configure worker through service, falling back to default:', error);
+    // Fallback to local static file
+    const workerUrl = '/pdf.worker.min.js';
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+    console.log('EnhancedPDFReader: Using fallback worker:', workerUrl);
+  });
 }
 import { CustomHighlight, type HighlightPosition } from './CustomHighlight';
 import {
@@ -116,7 +119,13 @@ const PDFErrorDisplay: React.FC<{
   useEffect(() => {
     // Enhanced error diagnostics with network testing
     const diagnoseError = async () => {
-      const urlObj = new URL(pdfUrl);
+      let urlObj;
+      try {
+        urlObj = new URL(pdfUrl, window.location.origin);
+      } catch (error) {
+        setErrorDetails(`Invalid PDF URL: ${pdfUrl}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return;
+      }
       const hostname = urlObj.hostname;
       const port = urlObj.port;
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

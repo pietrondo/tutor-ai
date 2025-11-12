@@ -23,12 +23,8 @@ interface WorkerCandidate {
 }
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
-const PDFJS_VERSION = process.env.NEXT_PUBLIC_PDFJS_VERSION || '3.11.174'
-
 const workerCandidates: WorkerCandidate[] = [
-  { url: '/pdf.worker.min.js', label: 'frontend-public' },
-  { url: `${API_BASE_URL}/pdf.worker.min.js`, label: 'backend-static' },
-  { url: `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`, label: 'cdn', forceBlob: true }
+  { url: '/pdf.worker.min.js', label: 'frontend-public' }
 ]
 
 let configurePromise: Promise<WorkerConfigResult> | null = null
