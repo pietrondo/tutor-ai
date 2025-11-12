@@ -98,13 +98,18 @@ interface ActiveQuizState {
   }
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const MAX_FOCUS_CONCEPTS = 3
 
-export function ChatWrapper() {
+interface ChatWrapperProps {
+  course?: string
+  book?: string
+}
+
+function ChatWrapper({ course: courseProp, book: bookProp }: ChatWrapperProps = {}) {
   const searchParams = useSearchParams()
-  const [selectedCourse, setSelectedCourse] = useState('')
-  const [selectedBook, setSelectedBook] = useState('')
+  const [selectedCourse, setSelectedCourse] = useState(courseProp || '')
+  const [selectedBook, setSelectedBook] = useState(bookProp || '')
   const [courses, setCourses] = useState<Course[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [messages, setMessages] = useState<Message[]>([])
@@ -170,8 +175,9 @@ export function ChatWrapper() {
     await loadSavedSettings()
     await checkLLMProviders()
 
-    const courseId = searchParams.get('course')
-    const bookId = searchParams.get('book')
+    // Use props first, then fallback to URL params
+    const courseId = courseProp || searchParams.get('course')
+    const bookId = bookProp || searchParams.get('book')
 
     if (courseId) {
       setSelectedCourse(courseId)
@@ -1199,17 +1205,28 @@ Caratteristiche chiave:
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[80vh]">
         {/* Main Chat Area */}
         <div className="lg:col-span-3 space-y-6">
           <div className="card">
         <div className="space-y-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <CourseSelector
-              courses={courses}
-              selectedCourse={selectedCourse}
-              onCourseChange={setSelectedCourse}
-            />
+            <div className="flex flex-col gap-2">
+              <CourseSelector
+                courses={courses}
+                selectedCourse={selectedCourse}
+                onCourseChange={setSelectedCourse}
+              />
+              {/* Book Context Indicator */}
+              {selectedCourse && selectedBook && selectedBookData && (
+                <div className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
+                  📚 Chat su: <strong>{selectedBookData.title}</strong>
+                  <span className="text-xs text-blue-500 ml-2">
+                    ({selectedBookData.materials_count || 0} materiali)
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <label className="inline-flex items-center gap-1">
@@ -1256,7 +1273,7 @@ Caratteristiche chiave:
         </div>
 
         {/* Sidebar with Enhanced Concept Map */}
-        <div className="lg:col-span-1 space-y-6 overflow-hidden">
+        <div className="lg:col-span-1 space-y-6 overflow-y-auto max-h-[80vh] lg:max-h-none lg:overflow-visible">
           {/* Concept Map Header */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -1266,9 +1283,14 @@ Caratteristiche chiave:
               </div>
               <button
                 onClick={() => setShowConceptMap(!showConceptMap)}
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showConceptMap
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                }`}
               >
-                <Target className="h-4 w-4 text-gray-600" />
+                <Target className="h-4 w-4" />
+                {showConceptMap ? 'Nascondi' : 'Mostra'}
               </button>
             </div>
 
@@ -1408,8 +1430,9 @@ Caratteristiche chiave:
         </div>
 
         {/* Back to main chat area */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="card min-h-[320px]">
+        <div className="lg:col-span-3 flex flex-col min-h-[60vh]">
+          {/* Chat Messages Area - Scrollable with proper height */}
+          <div className="card flex-1 mb-4 max-h-[50vh] overflow-y-auto">
         {messages.length === 0 && !isLoading ? (
           <div className="flex h-48 flex-col items-center justify-center text-center text-sm text-gray-500">
             <Brain className="mb-3 h-8 w-8 text-purple-500" />
@@ -1482,7 +1505,8 @@ Caratteristiche chiave:
         )}
       </div>
 
-      <div className="card">
+      {/* Sticky Chat Input - Always Visible */}
+      <div className="card sticky bottom-0 z-10 border-t border-gray-200 bg-white">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex space-x-3">
             <input
@@ -1493,6 +1517,7 @@ Caratteristiche chiave:
               placeholder={selectedCourse ? 'Fai la tua domanda...' : 'Seleziona prima un corso…'}
               disabled={!selectedCourse || isLoading}
               className="form-input flex-1"
+              data-allow-keyboard-shortcuts="false"
             />
             <button
               type="submit"
@@ -1524,3 +1549,5 @@ Caratteristiche chiave:
     </div>
   )
 }
+
+export default ChatWrapper

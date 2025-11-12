@@ -46,7 +46,7 @@ class AIExpansionService {
   private defaultPrompts: ExpansionPrompt[]
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     this.defaultPrompts = this.initializeDefaultPrompts()
   }
 

@@ -109,6 +109,30 @@ export interface StudyMindmapNode {
   priority?: number | null
   references?: string[]
   children: StudyMindmapNode[]
+  session_metadata?: NodeSessionMetadata
+  progress_data?: NodeProgressData
+}
+
+export interface NodeSessionMetadata {
+  priority_adjusted: boolean
+  mastery_level?: number
+  recently_studied: boolean
+  weak_area: boolean
+  recommended_action: 'focused_review' | 'practice_application' | 'foundational_review' | 'normal_study'
+}
+
+export interface NodeProgressData {
+  completion_percentage: number
+  last_studied?: string
+  next_review?: string
+  performance_metrics?: {
+    accuracy: number
+    time_spent: number
+    attempts: number
+  }
+  study_time_total: number
+  review_count: number
+  confidence_level: number
 }
 
 export interface StudyPlanPhase {
@@ -125,6 +149,51 @@ export interface StudyMindmap {
   nodes: StudyMindmapNode[]
   study_plan: StudyPlanPhase[]
   references?: string[]
+  session_guidance?: SessionGuidance
+  cognitive_load_level?: string
+  knowledge_type?: string
+  session_aware?: boolean
+  learning_optimizations?: LearningOptimizations
+}
+
+export interface SessionGuidance {
+  focus_on_weak_areas: boolean
+  recommended_study_order: string[]
+  estimated_study_time: {
+    total_minutes: number
+    breakdown: {
+      weak_areas: number
+      review: number
+      new_concepts: number
+    }
+    adjusted_for_fatigue: boolean
+  }
+  adaptive_suggestions: string[]
+}
+
+export interface LearningOptimizations {
+  max_branches_per_node: number
+  total_concepts: number
+  cognitive_load_level: string
+  knowledge_type: string
+  dual_coding_applied?: boolean
+  scaffolding_included?: boolean
+  metacognitive_prompts?: boolean
+  retrieval_practice?: boolean
+}
+
+export interface StudySessionContext {
+  session_id?: string
+  course_id?: string
+  book_id?: string
+  current_progress: number
+  weak_areas: string[]
+  mastery_levels: Record<string, number>
+  quiz_performance: Record<string, number>
+  study_time_today: number
+  preferred_difficulty: string
+  recently_studied: string[]
+  goals: string[]
 }
 
 export interface ExpandedStudyNode {

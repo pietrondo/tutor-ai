@@ -1,6 +1,6 @@
 """
-Centralized Error Handling for Tutor AI
-Provides consistent error responses and logging
+Enhanced Centralized Error Handling for Tutor AI
+Provides consistent error responses, advanced logging, and analytics
 """
 
 import logging
@@ -15,13 +15,27 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 import sqlite3
 import os
+import json
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Enhanced logging imports
+try:
+    from logging_config import get_logger, get_structlog_logger, SecurityLogger, PerformanceLogger
+except ImportError:
+    try:
+        # Try importing from backend directory for production mode
+        from backend.logging_config import get_logger, get_structlog_logger, SecurityLogger, PerformanceLogger
+    except ImportError:
+        # Fallback if logging_config is not available
+        import logging
+        get_logger = lambda name: logging.getLogger(name)
+        get_structlog_logger = lambda name: logging.getLogger(name)
+        SecurityLogger = lambda: None
+        PerformanceLogger = lambda: None
+
+# Setup enhanced logging
+logger = get_structlog_logger("error_handlers")
+security_logger = SecurityLogger()
+performance_logger = PerformanceLogger()
 
 class TutorAIException(Exception):
     """Base exception for Tutor AI application"""
@@ -97,6 +111,17 @@ class DatabaseException(TutorAIException):
             details={"operation": operation}
         )
 
+class EnhancedSlideGeneratorError(TutorAIException):
+    """Exception for enhanced slide generation errors"""
+
+    def __init__(self, message: str, status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=f"Enhanced slide generation error: {message}",
+            status_code=status_code,
+            error_code="ENHANCED_SLIDE_GENERATION_ERROR",
+            details=details or {}
+        )
+
 class ExternalServiceException(TutorAIException):
     """Exception for external service errors"""
 
@@ -109,11 +134,41 @@ class ExternalServiceException(TutorAIException):
         )
 
 class ErrorHandler:
-    """Centralized error handler"""
+    """Enhanced centralized error handler with analytics and logging"""
 
     def __init__(self):
         self.error_log_path = os.getenv("ERROR_LOG_PATH", "data/error_logs.db")
+
+        # Enhanced logging setup
+        self.logger = get_structlog_logger("ErrorHandler")
+        self.security_logger = SecurityLogger()
+
+        # Error tracking for analytics
+        self.error_counts: Dict[str, int] = {}
+        self.error_rates: Dict[str, float] = {}
+        self.last_error_reset = datetime.now()
+
+        # Security tracking
+        self.suspicious_activity: Dict[str, int] = {}
+
+        self.logger.info(
+            "ErrorHandler initialization started",
+            extra={
+                "error_log_path": self.error_log_path,
+                "enhanced_features": ["analytics", "security_tracking", "performance_monitoring"]
+            }
+        )
+
         self.init_error_database()
+
+        self.logger.info(
+            "ErrorHandler initialization completed",
+            extra={
+                "database_ready": True,
+                "security_tracking_enabled": True,
+                "analytics_enabled": True
+            }
+        )
 
     def init_error_database(self):
         """Initialize error logging database"""

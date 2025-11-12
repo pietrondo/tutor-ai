@@ -31,7 +31,7 @@ export default function ConceptsPage() {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/knowledge-areas/create-sub-concept?` +
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/knowledge-areas/create-sub-concept?` +
         new URLSearchParams({
           course_id: courseId,
           parent_concept_id: parentConcept.concept_id,
@@ -61,7 +61,7 @@ export default function ConceptsPage() {
     setMessage('Estrazione concetti in corso...');
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/knowledge-areas/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/extract-fast`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/knowledge-areas/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/extract-fast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

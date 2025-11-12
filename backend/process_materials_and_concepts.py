@@ -22,7 +22,7 @@ logger = structlog.get_logger()
 
 class MaterialProcessor:
     def __init__(self):
-        self.base_url = "http://localhost:8001"
+        self.base_url = "http://localhost:8000"
         self.concept_service = ConceptMapService()
 
     async def process_all_courses(self):

@@ -104,7 +104,7 @@ export default function SlidesPage() {
   const fetchPresentations = async () => {
     try {
       // Fetch new Z.AI slide generations
-      const newResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/slides/list?course_id=${courseId}&limit=20`)
+      const newResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/slides/list?course_id=${courseId}&limit=20`)
       const slidesPayload: SlidesListResponse = newResponse.ok ? await newResponse.json() : {}
       const newPresentations = Array.isArray(slidesPayload.slides) ? slidesPayload.slides : []
 
@@ -168,7 +168,7 @@ export default function SlidesPage() {
     if (currentPresentation.isZAI && currentPresentation.id) {
       try {
         // Download unified PDF from backend
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/slides/download/${currentPresentation.id}`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/slides/download/${currentPresentation.id}`)
 
         if (!response.ok) {
           throw new Error('Failed to generate PDF')

@@ -1,0 +1,39 @@
+{
+  "test_suite": "Complete Docker Test Suite",
+  "timestamp": "2025-11-11T08:15:22.574475",
+  "test_duration": "0:00:28.373196",
+  "configuration": {
+    "verbose": false,
+    "quick_mode": false,
+    "categories_tested": [
+      "health"
+    ]
+  },
+  "results": {
+    "health": {
+      "config": {
+        "name": "Container Health Tests",
+        "script": "tests/docker/container_health_test.py",
+        "description": "Container health, restart policies, resource limits",
+        "priority": 1
+      },
+      "result": {
+        "success": false,
+        "exit_code": 1,
+        "stdout": "\ud83d\udc33 Starting Docker Container Health Tests...\n",
+        "stderr": "^^^^^\n  File \"/home/pietro/.local/lib/python3.12/site-packages/requests/sessions.py\", line 703, in send\n    r = adapter.send(request, **kwargs)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/pietro/.local/lib/python3.12/site-packages/requests/adapters.py\", line 659, in send\n    raise ConnectionError(err, request=request)\nrequests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/mnt/c/Users/pietr/Documents/progetto/tutor-ai/tests/docker/container_health_test.py\", line 415, in test_07_container_network_connectivity\n    self.fail(f\"Network connectivity test failed: {e}\")\nAssertionError: Network connectivity test failed: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))\n\n----------------------------------------------------------------------\nRan 10 tests in 27.459s\n\nFAILED (failures=2)\n",
+        "script_path": "tests/docker/container_health_test.py",
+        "execution_time": "2025-11-11T08:15:22.574282"
+      },
+      "duration_seconds": 28.055138111114502,
+      "duration_formatted": "28.06s",
+      "timestamp": "2025-11-11T08:15:22.574448"
+    }
+  },
+  "statistics": {
+    "total_categories": 1,
+    "successful_categories": 0,
+    "failed_categories": 1,
+    "success_rate": 0.0
+  }
+}

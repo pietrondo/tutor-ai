@@ -14,11 +14,133 @@ import {
   MessageSquare,
   Search
 } from 'lucide-react'
+import { ensurePdfWorkerConfigured, getWorkerDiagnostics, type WorkerConfigResult } from '@/lib/pdfWorker'
 
-// Configure PDF.js worker - use local worker to avoid CORS issues
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
-}
+// Import PDF error display component
+const PDFErrorDisplay: React.FC<{
+  pdfUrl: string;
+  onRetry: () => void;
+  workerInfo?: WorkerConfigResult | null;
+  workerError?: string | null;
+}> = ({ pdfUrl, onRetry, workerInfo, workerError }) => {
+  const [errorDetails, setErrorDetails] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  useEffect(() => {
+    // Enhanced error diagnostics for PDF viewer
+    const diagnoseError = async () => {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+      let debugDetails = [];
+      debugDetails.push(`URL: ${pdfUrl}`);
+      debugDetails.push(`API Base URL: ${apiBaseUrl}`);
+      debugDetails.push(`User Agent: ${navigator.userAgent}`);
+
+      try {
+        // Test if PDF is accessible
+        console.log('PDFViewer: Testing PDF accessibility:', pdfUrl);
+        const response = await fetch(pdfUrl, { method: 'HEAD' });
+        debugDetails.push(`HTTP Status: ${response.status}`);
+        debugDetails.push(`Content-Type: ${response.headers.get('content-type')}`);
+        debugDetails.push(`Content-Length: ${response.headers.get('content-length')}`);
+
+        if (!response.ok) {
+          setErrorDetails(`Server responded with ${response.status}: ${response.statusText}\n\nIl server PDF non è raggiungibile o il file non esiste.`);
+          return;
+        }
+
+        if (!response.headers.get('content-type')?.includes('application/pdf')) {
+          setErrorDetails(`Il server non sta restituendo un file PDF.\nContent-Type: ${response.headers.get('content-type')}\n\nQuesto potrebbe indicare un problema di configurazione del backend.`);
+          return;
+        }
+
+        // Check if PDF.js worker is properly configured
+        const workerSrc = (window as any).pdfjs?.GlobalWorkerOptions?.workerSrc;
+        if (!workerSrc) {
+          setErrorDetails("PDF.js worker non configurato. Il worker è necessario per renderizzare i PDF nel browser.");
+          return;
+        }
+
+        let enhancedMessage = "Il PDF è accessibile ma react-pdf non riesce a caricarlo.\n\n";
+        if (workerError) {
+          enhancedMessage += `Configurazione worker fallita: ${workerError}\n\n`;
+        } else if (workerInfo?.workerSrc) {
+          enhancedMessage += `Worker attivo: ${workerInfo.workerSrc} (${workerInfo.strategy})\n\n`;
+        }
+
+        enhancedMessage += `Possibili cause:\n• PDF.js worker non disponibile o bloccato\n• Problemi di CORS nel browser\n• PDF troppo grande o complesso\n• Estensioni del browser che bloccano il caricamento\n\nConsigli:\n1. Ricarica la pagina (Ctrl+F5 per cache pulita)\n2. Prova un browser diverso (Chrome/Firefox)\n3. Disabilita temporaneamente estensioni\n4. Apri il PDF in una nuova scheda\n\nDebug:\n• PDF.js worker: ${workerSrc}\n• Content-Type: ${response.headers.get('content-type')}`;
+
+        if (workerInfo?.attempts?.length) {
+          const attemptsLog = workerInfo.attempts
+            .map(attempt => `  - ${attempt.url} (${attempt.via}) => ${attempt.success ? 'OK' : `ERR ${attempt.status || ''} ${attempt.error || ''}`}`)
+            .join('\n');
+          enhancedMessage += `\nTentativi worker:\n${attemptsLog}`;
+          debugDetails.push(`Worker attempts:\n${attemptsLog}`);
+        }
+
+        setErrorDetails(enhancedMessage);
+
+      } catch (error) {
+        debugDetails.push(`Network Error: ${error}`);
+        setErrorDetails(`Errore di rete durante il caricamento del PDF.\n\nErrore: ${error}`);
+      }
+
+      setDebugInfo(debugDetails.join('\n'));
+    };
+
+    diagnoseError();
+  }, [pdfUrl, workerInfo, workerError]);
+
+  return (
+    <div className="flex items-center justify-center h-96">
+      <div className="text-center max-w-md mx-auto p-6">
+        <div className="text-red-500 mb-4">
+          <FileText className="w-16 h-16 mx-auto" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Errore nel caricamento del PDF
+        </h3>
+        <p className="text-sm text-gray-600 mb-4 whitespace-pre-line">
+          {errorDetails}
+        </p>
+
+        {/* Debug information */}
+        <details className="mb-4 text-left">
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+            Informazioni di debug
+          </summary>
+          <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600 whitespace-pre-wrap text-left">
+            {debugInfo || (
+              <>
+                <p><strong>URL:</strong> {pdfUrl}</p>
+                <p><strong>Tipo:</strong> {pdfUrl.includes('.pdf') ? 'PDF' : 'Non-PDF'}</p>
+                <p><strong>Protocollo:</strong> {pdfUrl.startsWith('http') ? 'HTTP/HTTPS' : 'Altro'}</p>
+              </>
+            )}
+          </div>
+        </details>
+
+        <div className="space-y-3">
+          <button
+            onClick={onRetry}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Riprova
+          </button>
+          <button
+            onClick={() => window.open(pdfUrl, '_blank')}
+            className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          >
+            Apri PDF in nuova scheda
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-4">
+          Se il problema persiste, contatta l'amministratore del sistema.
+        </p>
+      </div>
+    </div>
+  );
+};
 
 interface PDFAnnotation {
   id: string
@@ -55,6 +177,10 @@ export function PDFViewer({ pdfUrl, title, onBack, onSave }: PDFViewerProps) {
   const [noteText, setNoteText] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [showSearch, setShowSearch] = useState<boolean>(false)
+  const existingWorkerDiagnostics = typeof window === 'undefined' ? null : getWorkerDiagnostics()
+  const [workerReady, setWorkerReady] = useState<boolean>(() => typeof window === 'undefined' || Boolean(existingWorkerDiagnostics))
+  const [workerDiagnostics, setWorkerDiagnostics] = useState<WorkerConfigResult | null>(existingWorkerDiagnostics)
+  const [workerError, setWorkerError] = useState<string | null>(null)
 
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
@@ -85,6 +211,42 @@ export function PDFViewer({ pdfUrl, title, onBack, onSave }: PDFViewerProps) {
     if (selection && selection.toString().trim()) {
       setSelectedText(selection.toString().trim())
     }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    ensurePdfWorkerConfigured()
+      .then(result => {
+        if (cancelled) return
+        setWorkerDiagnostics(result)
+        setWorkerReady(true)
+        setWorkerError(null)
+      })
+      .catch(error => {
+        if (cancelled) return
+        const message = error instanceof Error ? error.message : String(error)
+        setWorkerError(message)
+        setWorkerReady(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const retryWorkerConfiguration = useCallback(() => {
+    setWorkerReady(false)
+    setWorkerError(null)
+    ensurePdfWorkerConfigured(true)
+      .then(result => {
+        setWorkerDiagnostics(result)
+        setWorkerReady(true)
+      })
+      .catch(error => {
+        const message = error instanceof Error ? error.message : String(error)
+        setWorkerError(message)
+      })
   }, [])
 
   const addAnnotation = useCallback(() => {
@@ -340,56 +502,61 @@ export function PDFViewer({ pdfUrl, title, onBack, onSave }: PDFViewerProps) {
       {/* PDF Content */}
       <div className="flex-1 overflow-auto" ref={pdfContainerRef} onMouseUp={handleTextSelection}>
         <div className="flex justify-center p-4">
-          <div className="relative">
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center p-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <span className="ml-3 text-gray-600">Caricamento PDF...</span>
+          <div className="relative w-full min-h-[20rem]">
+            {!workerReady && !workerError && (
+              <div className="flex h-80 items-center justify-center">
+                <div className="text-center text-sm text-gray-600">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2">Inizializzo il PDF.js worker...</p>
                 </div>
-              }
-              error={
-                <div className="flex items-center justify-center h-96">
-                  <div className="text-center max-w-md mx-auto p-6">
-                    <div className="text-red-500 mb-4">
-                      <FileText className="w-16 h-16 mx-auto" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Errore nel caricamento del PDF
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Impossibile caricare il file PDF. Verifica che il file sia valido e accessibile.
-                    </p>
-                    <div className="space-y-3">
-                      <button
-                        onClick={() => window.location.reload()}
-                        className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      >
-                        Riprova
-                      </button>
-                      <button
-                        onClick={() => window.open(pdfUrl, '_blank')}
-                        className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                      >
-                        Apri in nuova scheda
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              }
-            >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                className="shadow-lg"
+              </div>
+            )}
+
+            {workerError && (
+              <PDFErrorDisplay
+                pdfUrl={pdfUrl}
+                workerInfo={workerDiagnostics}
+                workerError={workerError}
+                onRetry={() => {
+                  console.warn('PDFViewer: Worker configuration retry requested')
+                  retryWorkerConfiguration()
+                }}
               />
-              {/* Render annotations overlay */}
-              {renderAnnotations()}
-            </Document>
+            )}
+
+            {workerReady && !workerError && (
+              <Document
+                file={pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={
+                  <div className="flex items-center justify-center p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Caricamento PDF...</span>
+                  </div>
+                }
+                error={
+                  <PDFErrorDisplay
+                    pdfUrl={pdfUrl}
+                    workerInfo={workerDiagnostics}
+                    workerError={workerError}
+                    onRetry={() => {
+                      retryWorkerConfiguration()
+                      window.location.reload()
+                    }}
+                  />
+                }
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
+                  className="shadow-lg"
+                />
+                {/* Render annotations overlay */}
+                {renderAnnotations()}
+              </Document>
+            )}
           </div>
         </div>
 

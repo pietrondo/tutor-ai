@@ -24,7 +24,7 @@ services:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
-      - CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
+      - CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3001
     restart: unless-stopped
     entrypoint: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
     healthcheck:
@@ -50,18 +50,22 @@ services:
     image: tutor-ai-frontend:latest
     container_name: tutor-ai-frontend
     ports:
-      - "5000:3000"
+      - "3001:3001"
+    volumes:
+      # Mount public directory for static assets (PDF.js worker)
+      - ./frontend/public:/app/public:ro
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      - PORT=3000
+      - PORT=3001
+      - HOSTNAME=0.0.0.0
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -96,11 +100,6 @@ volumes:
     driver: local
   apt_lib_cache:
     driver: local
-
-networks:
-  tutor-ai-network:
-    driver: bridge
-    name: tutor-ai-network
 
 # Development profile
 x-dev-volumes: &dev-volumes

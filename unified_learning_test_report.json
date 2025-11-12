@@ -1,0 +1,105 @@
+{
+  "test_run": {
+    "timestamp": 1762859067.9812338,
+    "total_tests": 13,
+    "passed_tests": 7,
+    "failed_tests": 6
+  },
+  "results": [
+    {
+      "test": "Backend Health Check",
+      "success": true,
+      "message": "Status code: 200",
+      "timestamp": 1762859067.7292721,
+      "data": {
+        "status": "healthy",
+        "timestamp": "2025-11-11T11:04:27.728071"
+      }
+    },
+    {
+      "test": "Frontend Health Check",
+      "success": true,
+      "message": "Status code: 200",
+      "timestamp": 1762859067.8334854,
+      "data": null
+    },
+    {
+      "test": "Endpoint /api/unified-learning/view/course/test",
+      "success": true,
+      "message": "Status code: 404",
+      "timestamp": 1762859067.8641644,
+      "data": null
+    },
+    {
+      "test": "Endpoint /api/unified-learning/quiz/create",
+      "success": true,
+      "message": "Status code: 404",
+      "timestamp": 1762859067.8744617,
+      "data": null
+    },
+    {
+      "test": "Endpoint /api/unified-learning/quiz/course/test",
+      "success": true,
+      "message": "Status code: 404",
+      "timestamp": 1762859067.8836188,
+      "data": null
+    },
+    {
+      "test": "Endpoint /api/unified-learning/pathway/test/user/demo",
+      "success": true,
+      "message": "Status code: 404",
+      "timestamp": 1762859067.8959634,
+      "data": null
+    },
+    {
+      "test": "Endpoint /api/unified-learning/status/course/test",
+      "success": true,
+      "message": "Status code: 404",
+      "timestamp": 1762859067.9055476,
+      "data": null
+    },
+    {
+      "test": "Concept Creation with Quiz",
+      "success": false,
+      "message": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "timestamp": 1762859067.92084,
+      "data": null
+    },
+    {
+      "test": "Quiz Creation and Linking",
+      "success": false,
+      "message": "Failed to create test concept",
+      "timestamp": 1762859067.9323804,
+      "data": null
+    },
+    {
+      "test": "Unified View Retrieval",
+      "success": false,
+      "message": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "timestamp": 1762859067.9469767,
+      "data": null
+    },
+    {
+      "test": "Learning Pathway Generation",
+      "success": false,
+      "message": "HTTP 404: {\"detail\":\"Not Found\"}",
+      "timestamp": 1762859067.9605913,
+      "data": null
+    },
+    {
+      "test": "Cross-Referencing Consistency",
+      "success": false,
+      "message": "Failed to get unified view",
+      "timestamp": 1762859067.970301,
+      "data": null
+    },
+    {
+      "test": "Data Persistence",
+      "success": false,
+      "message": "Failed to create test concept",
+      "timestamp": 1762859067.981122,
+      "data": null
+    }
+  ],
+  "created_resources": []
+}

@@ -2,7 +2,7 @@
 FROM node:20-alpine AS base
 
 # Installa dipendenze base per Alpine
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat curl
 
 WORKDIR /app
 
@@ -31,12 +31,12 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY . .
 
 # Espone la porta per development
-EXPOSE 3000
+EXPOSE 3001
 
 # Imposta variabili ambiente sviluppo
 ENV NODE_ENV development
 ENV NEXT_TELEMETRY_DISABLED 1
-ENV PORT 3000
+ENV PORT 3001
 ENV HOSTNAME 0.0.0.0
 
 # Comando per development server
@@ -79,10 +79,10 @@ COPY --from=builder /app/public ./public
 USER nextjs
 
 # Espone la porta
-EXPOSE 3000
+EXPOSE 3001
 
 # Imposta variabili ambiente produzione
-ENV PORT 3000
+ENV PORT 3001
 ENV HOSTNAME "0.0.0.0"
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1

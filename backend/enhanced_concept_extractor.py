@@ -62,7 +62,7 @@ class EnhancedConceptExtractor:
 
         try:
             # Get course materials
-            response = requests.get(f"http://localhost:8001/courses/{course_id}/books")
+            response = requests.get(f"http://localhost:8000/courses/{course_id}/books")
             if response.status_code != 200:
                 logger.error(f"Failed to get course books: {response.status_code}")
                 return
@@ -190,7 +190,7 @@ Concentrati sui concetti veramente importanti e fondamentali per la comprensione
 
         # Get course info
         try:
-            response = requests.get(f"http://localhost:8001/courses/{course_id}")
+            response = requests.get(f"http://localhost:8000/courses/{course_id}")
             if response.status_code == 200:
                 course_data = response.json()
                 course_name = course_data.get("name", "").lower()
@@ -255,7 +255,7 @@ Concentrati sui concetti veramente importanti e fondamentali per la comprensione
 
         try:
             # Get course books
-            response = requests.get(f"http://localhost:8001/courses/{course_id}/books")
+            response = requests.get(f"http://localhost:8000/courses/{course_id}/books")
             if response.status_code != 200:
                 return []
 

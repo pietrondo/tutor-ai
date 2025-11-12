@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Globe, Shield, Bell, Palette, Save, RefreshCw, Key, Eye, EyeOff, CheckCircle, Sun, Moon } from 'lucide-react'
+import { Settings, Globe, Shield, Bell, Palette, Save, RefreshCw, Key, Eye, EyeOff, CheckCircle, Sun, Moon, Search, Filter, Zap, Star, AlertCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -47,6 +47,36 @@ interface AvailableModelsResponse {
   models?: Record<string, ZaiModelInfo>
 }
 
+interface OpenRouterModel {
+  id: string
+  name: string
+  context_window: number
+  max_tokens: number
+  description: string
+  use_cases: string[]
+  cost_per_1k_tokens: {
+    input: number
+    output: number
+  }
+  provider: string
+  supports_vision?: boolean
+  online_search?: boolean
+}
+
+// Model categories for better organization
+const MODEL_CATEGORIES = {
+  RECOMMENDED: { label: 'Consigliati', color: 'green', description: 'I migliori modelli per iniziare' },
+  PREMIUM: { label: 'Premium', color: 'purple', description: 'Massime performance e capacità' },
+  BALANCED: { label: 'Equilibrati', color: 'blue', description: 'Buon rapporto qualità/prezzo' },
+  ECONOMY: { label: 'Economici', color: 'yellow', description: 'Ideali per uso intensivo' },
+  VISION: { label: 'Visione', color: 'indigo', description: 'Con capacità di analisi immagini' },
+  SPECIALIZED: { label: 'Specializzati', color: 'pink', description: 'Per compiti specifici' }
+}
+
+// Import dynamic hook for OpenRouter models
+import { useOpenRouterModels, type OpenRouterModel as ImportedOpenRouterModel } from '@/hooks/useOpenRouterModels'
+import OpenRouterModelCard from '@/components/OpenRouterModelCard'
+
 export default function SettingsPage() {
   const { theme, setTheme, effectiveTheme } = useTheme()
   const [settings, setSettings] = useState({
@@ -55,7 +85,7 @@ export default function SettingsPage() {
     notifications: true,
     autoSave: true,
     language: 'it',
-    apiEndpoint: 'http://localhost:8001'
+    apiEndpoint: 'http://localhost:8000'
   })
 
   const [apiKeys, setApiKeys] = useState({
@@ -75,7 +105,62 @@ export default function SettingsPage() {
         setSettings(parsed)
         if (parsed.zaiModel) {
           setSelectedZaiModel(parsed.zaiModel)
+          // Se il provider corrente è ZAI, sincronizza il modello salvato
+          if (parsed.llmProvider === 'zai') {
+            // Asincrono per non bloccare il caricamento
+            setTimeout(async () => {
+              try {
+                const response = await fetch('/models')
+                if (response.ok) {
+                  const data = await response.json()
+                  if (data.current_model !== parsed.zaiModel) {
+                    // Aggiorna il modello nel backend se è diverso
+                    await fetch('/api/models', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({ model_name: parsed.zaiModel })
+                    })
+                    // Sincronizza il LLM Manager
+                    const { syncModelFromBackend } = await import('@/lib/llm-manager')
+                    syncModelFromBackend(parsed.zaiModel)
+                  }
+                }
+              } catch (error) {
+                console.error('Failed to sync ZAI model on load:', error)
+              }
+            }, 1000) // Ritardo di 1 secondo per permettere il caricamento completo
+          }
         }
+
+      // Load OpenRouter model from settings
+      if (parsed.openRouterModel) {
+        setSelectedOpenRouterModel(parsed.openRouterModel)
+        // Se il provider corrente è OpenRouter, sincronizza il modello salvato
+        if (parsed.llmProvider === 'openrouter') {
+          setTimeout(async () => {
+            try {
+              const response = await fetch('/models')
+              if (response.ok) {
+                const data = await response.json()
+                if (data.current_model !== parsed.openRouterModel) {
+                  // Aggiorna il modello nel backend se è diverso
+                  await fetch('/api/models', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ model_name: parsed.openRouterModel })
+                  })
+                }
+              }
+            } catch (error) {
+              console.error('Failed to sync OpenRouter model on load:', error)
+            }
+          }, 1000)
+        }
+      }
       } catch (e) {
         console.error('Failed to parse saved settings:', e)
       }
@@ -94,6 +179,9 @@ export default function SettingsPage() {
 
     // Load available models
     loadAvailableModels()
+
+    // Load OpenRouter models
+    loadOpenRouterModels()
   }, [])
 
   // Configure LLM Manager with API keys
@@ -130,7 +218,7 @@ export default function SettingsPage() {
   const loadAvailableModels = async () => {
     setModelsLoading(true)
     try {
-      const response = await fetch('/api/models')
+      const response = await fetch('/models')
       if (response.ok) {
         const data: AvailableModelsResponse = await response.json()
         if (data.model_type === 'zai' && data.models) {
@@ -166,6 +254,12 @@ export default function SettingsPage() {
 
         if (response.ok) {
           console.log('ZAI model updated successfully:', newModel)
+          // Sincronizza il LLM Manager con il nuovo modello
+          const { syncModelFromBackend } = await import('@/lib/llm-manager')
+          syncModelFromBackend(newModel)
+
+          // Validate the model works
+          validateModel('zai', newModel)
         }
       } catch (error) {
         console.error('Failed to update ZAI model:', error)
@@ -200,10 +294,105 @@ export default function SettingsPage() {
 
         if (response.ok) {
           console.log('ZAI model set on provider switch:', selectedZaiModel)
+          // Sincronizza il LLM Manager quando si passa a ZAI
+          const { syncModelFromBackend } = await import('@/lib/llm-manager')
+          syncModelFromBackend(selectedZaiModel)
         }
       } catch (error) {
         console.error('Failed to set ZAI model on provider switch:', error)
       }
+    }
+  }
+
+  // Handle OpenRouter model change
+  const handleOpenRouterModelChange = async (newModel: string) => {
+    setSelectedOpenRouterModel(newModel)
+
+    // Save immediately to localStorage
+    const updatedSettings = { ...settings, openRouterModel: newModel }
+    localStorage.setItem('app-settings', JSON.stringify(updatedSettings))
+
+    // Set the model in backend if OpenRouter is the current provider
+    if (settings.llmProvider === 'openrouter') {
+      try {
+        const response = await fetch('/api/models', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ model_name: newModel })
+        })
+
+        if (response.ok) {
+          console.log('OpenRouter model updated successfully:', newModel)
+          // Validate the model works
+          validateModel('openrouter', newModel)
+        }
+      } catch (error) {
+        console.error('Failed to update OpenRouter model:', error)
+      }
+    }
+  }
+
+  // Get filtered models from hook (already categorized and sorted by backend)
+  const getFilteredModels = () => {
+    return Object.values(openRouterModels)
+  }
+
+  // Load OpenRouter models from backend
+  const loadOpenRouterModels = async () => {
+    try {
+      const response = await fetch('/api/models?provider=openrouter')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.models) {
+          // setOpenRouterModels(data.models) // Note: Models are managed by the hook
+          console.log('OpenRouter models loaded from backend:', Object.keys(data.models).length)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load OpenRouter models:', error)
+    }
+  }
+
+  // Validate model functionality
+  const validateModel = async (provider: string, modelId: string) => {
+    setModelValidation(prev => ({
+      ...prev,
+      [modelId]: { valid: false, message: 'Test in corso...', loading: true }
+    }))
+
+    try {
+      const response = await fetch('/models/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provider, model_name: modelId })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.valid) {
+        setModelValidation(prev => ({
+          ...prev,
+          [modelId]: { valid: true, message: '✅ Modello funzionante!', loading: false }
+        }))
+        return true
+      } else {
+        setModelValidation(prev => ({
+          ...prev,
+          [modelId]: { valid: false, message: `❌ ${result.error || 'Modello non disponibile'}`, loading: false }
+        }))
+        return false
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Errore di connessione'
+      setModelValidation(prev => ({
+        ...prev,
+        [modelId]: { valid: false, message: `❌ ${errorMessage}`, loading: false }
+      }))
+      return false
     }
   }
 
@@ -214,10 +403,32 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
 
+  // Model validation state
+  const [modelValidation, setModelValidation] = useState<Record<string, { valid: boolean; message: string; loading: boolean }>>({})
+
   // Model management state
   const [modelsLoading, setModelsLoading] = useState(false)
   const [zaiModels, setZaiModels] = useState<Record<string, ZaiModelInfo>>({})
   const [selectedZaiModel, setSelectedZaiModel] = useState('glm-4.6')
+
+  // OpenRouter model management - use dynamic hook
+  const {
+    models: openRouterModels,
+    categories: openRouterCategories,
+    totalModels,
+    loading: openRouterLoading,
+    error: openRouterError,
+    connectionStatus: openRouterConnection,
+    filters,
+    searchModels,
+    filterByCategory,
+    clearFilters,
+    getFeaturedModels,
+    hasModels,
+    isConnected
+  } = useOpenRouterModels()
+
+  const [selectedOpenRouterModel, setSelectedOpenRouterModel] = useState('')
 
   // Test API key function
   const testApiKey = async (provider: string, apiKey: string) => {
@@ -225,53 +436,101 @@ export default function SettingsPage() {
     setKeyStatus(prev => ({ ...prev, [provider]: { valid: false, message: 'Test in corso...' } }))
 
     try {
-      let baseUrl = ''
+      let testUrl = ''
       let headers: Record<string, string> = {
         'Content-Type': 'application/json'
       }
 
       switch (provider) {
         case 'openai':
-          baseUrl = 'https://api.openai.com/v1'
+          // Test directly against OpenAI API
+          testUrl = 'https://api.openai.com/v1/models'
           headers['Authorization'] = `Bearer ${apiKey}`
           break
         case 'openrouter':
-          baseUrl = 'https://openrouter.ai/api/v1'
+          // Test directly against OpenRouter API
+          testUrl = 'https://openrouter.ai/api/v1/models'
           headers['Authorization'] = `Bearer ${apiKey}`
           headers['HTTP-Referer'] = window.location.origin
           headers['X-Title'] = 'AI Tutor System'
           break
-                case 'zai':
-          baseUrl = 'https://api.z.ai/api/paas/v4/'
-          headers['Authorization'] = `Bearer ${apiKey}`
-          break
+        case 'zai': {
+          // First save the API key to backend and localStorage, then test
+          const updatedKeys = { ...apiKeys, [provider]: apiKey }
+          setApiKeys(updatedKeys)
+          localStorage.setItem('api-keys', JSON.stringify(updatedKeys))
+
+          // Configure LLM Manager first
+          await configureLLMManager(updatedKeys)
+
+          // Test through backend API for ZAI to avoid CORS issues
+          try {
+            const response = await fetch('/models/zai/test', {
+              method: 'GET',
+              signal: AbortSignal.timeout(15000)
+            })
+
+            if (response.ok) {
+              const result = await response.json()
+              if (result.connected) {
+                setKeyStatus(prev => ({
+                  ...prev,
+                  [provider]: { valid: true, message: '✅ API Key Z.AI valida e funzionante!' }
+                }))
+                return
+              } else {
+                setKeyStatus(prev => ({
+                  ...prev,
+                  [provider]: { valid: false, message: `❌ Z.AI API non funzionante: ${result.error || 'Errore di configurazione'}` }
+                }))
+                return
+              }
+            } else {
+              const errorData = await response.json().catch(() => ({}))
+              setKeyStatus(prev => ({
+                ...prev,
+                [provider]: { valid: false, message: `❌ Errore ${response.status}: ${errorData.detail || response.statusText}` }
+              }))
+              return
+            }
+          } catch (error) {
+            // If backend test fails, try direct API test as fallback
+            console.warn('Backend Z.AI test failed, trying direct API...')
+            testUrl = 'https://api.z.ai/api/paas/v4/models'
+            headers['Authorization'] = `Bearer ${apiKey}`
+            break
+          }
+        }
         default:
           throw new Error('Provider non supportato')
       }
 
-      const response = await fetch(`${baseUrl}/models`, {
-        headers,
-        signal: AbortSignal.timeout(10000)
-      })
+      // Direct API test for OpenAI, OpenRouter, or ZAI fallback
+      if (testUrl) {
+        const response = await fetch(testUrl, {
+          headers,
+          signal: AbortSignal.timeout(10000)
+        })
 
-      if (response.ok) {
-        setKeyStatus(prev => ({
-          ...prev,
-          [provider]: { valid: true, message: '✅ API Key valida e funzionante!' }
-        }))
+        if (response.ok) {
+          setKeyStatus(prev => ({
+            ...prev,
+            [provider]: { valid: true, message: '✅ API Key valida e funzionante!' }
+          }))
 
-        // Auto-save the valid API key
-        const updatedKeys = { ...apiKeys, [provider]: apiKey }
-        setApiKeys(updatedKeys)
-        localStorage.setItem('api-keys', JSON.stringify(updatedKeys))
+          // Auto-save the valid API key
+          const updatedKeys = { ...apiKeys, [provider]: apiKey }
+          setApiKeys(updatedKeys)
+          localStorage.setItem('api-keys', JSON.stringify(updatedKeys))
 
-        // Configure LLM Manager
-        await configureLLMManager(updatedKeys)
-      } else {
-        setKeyStatus(prev => ({
-          ...prev,
-          [provider]: { valid: false, message: `❌ Errore ${response.status}: ${response.statusText}` }
-        }))
+          // Configure LLM Manager
+          await configureLLMManager(updatedKeys)
+        } else {
+          setKeyStatus(prev => ({
+            ...prev,
+            [provider]: { valid: false, message: `❌ Errore ${response.status}: ${response.statusText}` }
+          }))
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto'
@@ -784,53 +1043,82 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(zaiModels).map(([modelId, modelInfo]) => (
-                  <div
-                    key={modelId}
-                    onClick={() => handleZaiModelChange(modelId)}
-                    className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
-                      selectedZaiModel === modelId
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400'
-                        : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    {selectedZaiModel === modelId && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900"></div>
-                    )}
+                {Object.entries(zaiModels).map(([modelId, modelInfo]) => {
+                  const validation = modelValidation[modelId]
+                  return (
+                    <div
+                      key={modelId}
+                      onClick={() => handleZaiModelChange(modelId)}
+                      className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                        selectedZaiModel === modelId
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400'
+                          : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                      } ${validation?.loading ? 'opacity-75' : ''}`}
+                    >
+                      {selectedZaiModel === modelId && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900"></div>
+                      )}
 
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                        {modelInfo.name || modelId}
-                      </h4>
-
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                        {modelInfo.description || 'Modello GLM'}
-                      </p>
-
-                      <div className="flex flex-wrap gap-1">
-                        {modelInfo.use_cases?.slice(0, 2).map((useCase: string, index: number) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full dark:bg-indigo-900/30 dark:text-indigo-300"
-                          >
-                            {useCase}
-                          </span>
-                        ))}
+                      {/* Validation status indicator */}
+                      <div className="absolute top-2 right-2">
+                        {validation?.loading && (
+                          <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+                        )}
+                        {validation?.valid && (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        )}
+                        {validation?.valid === false && (
+                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center" title="Modello non funzionante">
+                            <span className="text-white text-xs">×</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
-                        <div>Context: {modelInfo.context_window?.toLocaleString() || 'N/A'} tokens</div>
-                        <div>Max: {modelInfo.max_tokens?.toLocaleString() || 'N/A'} tokens</div>
-                        {modelInfo.supports_thinking && (
-                          <div className="text-indigo-600 dark:text-indigo-400">✨ Thinking capabilities</div>
-                        )}
-                        {modelInfo.supports_vision && (
-                          <div className="text-purple-600 dark:text-purple-400">👁️ Vision capabilities</div>
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                          {modelInfo.name || modelId}
+                        </h4>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                          {modelInfo.description || 'Modello GLM'}
+                        </p>
+
+                        <div className="flex flex-wrap gap-1">
+                          {modelInfo.use_cases?.slice(0, 2).map((useCase: string, index: number) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full dark:bg-indigo-900/30 dark:text-indigo-300"
+                            >
+                              {useCase}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
+                          <div>Context: {modelInfo.context_window?.toLocaleString() || 'N/A'} tokens</div>
+                          <div>Max: {modelInfo.max_tokens?.toLocaleString() || 'N/A'} tokens</div>
+                          {modelInfo.supports_thinking && (
+                            <div className="text-indigo-600 dark:text-indigo-400">✨ Thinking capabilities</div>
+                          )}
+                          {modelInfo.supports_vision && (
+                            <div className="text-purple-600 dark:text-purple-400">👁️ Vision capabilities</div>
+                          )}
+                        </div>
+
+                        {/* Validation message */}
+                        {validation?.message && (
+                          <div className={`text-xs p-2 rounded ${
+                            validation.valid
+                              ? 'bg-green-50 text-green-700 border border-green-200'
+                              : 'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {validation.message}
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Fallback models if API not available */}
@@ -887,74 +1175,238 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Advanced Settings */}
-        <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 group relative overflow-hidden">
-          {/* Animated gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+        {/* OpenRouter Model Selection */}
+        {settings.llmProvider === 'openrouter' && (
+          <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-blue-200/50 transition-all duration-500 group relative overflow-hidden">
+            {/* Animated gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-pink-500/5 to-orange-500/5 opacity-50"></div>
 
-          {/* Top accent line */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700"></div>
+            {/* Top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500"></div>
 
-          <div className="relative z-10">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <Shield className="h-5 w-5 text-red-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">Impostazioni Avanzate</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Endpoint API
-              </label>
-              <input
-                type="url"
-                value={settings.apiEndpoint}
-                onChange={(e) => setSettings(prev => ({
-                  ...prev,
-                  apiEndpoint: e.target.value
-                }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                placeholder="http://localhost:8001"
-              />
-            </div>
-          </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {saveStatus && (
-              <div className={`text-sm font-medium ${
-                saveStatus.includes('success') ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {saveStatus}
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12">
+                    <Globe className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                      Modelli OpenRouter
+                    </h3>
+                    <p className="text-sm text-gray-600">Accedi a 33+ modelli da diversi provider</p>
+                  </div>
+                </div>
+                <button
+                  onClick={loadOpenRouterModels}
+                  disabled={modelsLoading}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-purple-600 hover:to-pink-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {modelsLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Caricamento...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Ricarica</span>
+                    </>
+                  )}
+                </button>
               </div>
-            )}
-          </div>
 
-          <div className="flex items-center space-x-3">
-            <button className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-all duration-200 hover-lift flex items-center space-x-2">
-              <RefreshCw className="h-4 w-4" />
-              <span>Ripristina</span>
-            </button>
+              {/* Search and Filter Controls */}
+              <div className="mb-6 space-y-4">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Cerca modelli per nome, provider o descrizione..."
+                    value={filters.search}
+                    onChange={(e) => searchModels(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  />
+                </div>
 
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium transition-all duration-200 hover-lift flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Save className="h-4 w-4" />
+                {/* Category Tabs */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => filterByCategory('ALL')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      filters.category === 'ALL'
+                        ? 'bg-purple-500 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Tutti ({totalModels})
+                  </button>
+                  {Object.entries(openRouterCategories).map(([key, category]) => {
+                    const categoryInfo = MODEL_CATEGORIES[key as keyof typeof MODEL_CATEGORIES]
+
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => filterByCategory(key)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          filters.category === key
+                            ? `bg-${categoryInfo?.color || 'gray'}-500 text-white shadow-lg`
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        title={category.description}
+                      >
+                        {categoryInfo?.label || key} ({category.count})
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Models Display */}
+              <div className="space-y-6">
+                {openRouterLoading && (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    <p className="mt-2 text-gray-600">Caricamento modelli OpenRouter...</p>
+                  </div>
+                )}
+
+                {openRouterError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                      <span className="text-red-800 font-medium">Errore nel caricamento</span>
+                    </div>
+                    <p className="text-red-700 mt-1">{openRouterError}</p>
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                      Riprova
+                    </button>
+                  </div>
+                )}
+
+                {!openRouterLoading && !openRouterError && hasModels && (
+                  <>
+                    {/* Featured Models */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
+                        <Star className="h-5 w-5 text-yellow-500" />
+                        <span>Modelli Consigliati</span>
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {getFeaturedModels(3).map((model) => (
+                          <OpenRouterModelCard
+                            key={model.id}
+                            model={model}
+                            selected={selectedOpenRouterModel === model.id}
+                            onSelect={() => handleOpenRouterModelChange(model.id)}
+                            validation={modelValidation[model.id]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* All Models */}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center space-x-2">
+                        <Globe className="h-5 w-5 text-blue-500" />
+                        <span>Tutti i Modelli ({totalModels})</span>
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {getFilteredModels().map((model) => (
+                          <OpenRouterModelCard
+                            key={model.id}
+                            model={model}
+                            selected={selectedOpenRouterModel === model.id}
+                            onSelect={() => handleOpenRouterModelChange(model.id)}
+                            validation={modelValidation[model.id]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Connection Status */}
+                    {!isConnected && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2">
+                          <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          <span className="text-yellow-800 font-medium">Connessione OpenRouter non attiva</span>
+                        </div>
+                        <p className="text-yellow-700 mt-1 text-sm">
+                          Configura una API key di OpenRouter per vedere tutti i modelli disponibili.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* No Results */}
+                {!openRouterLoading && !openRouterError && !hasModels && (
+                  <div className="text-center py-8">
+                    <div className="text-gray-500 mb-2">Nessun modello disponibile</div>
+                    <p className="text-sm text-gray-400">
+                      Assicurati che OpenRouter sia configurato correttamente.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Model Info */}
+              {selectedOpenRouterModel && openRouterModels[selectedOpenRouterModel] && (
+                <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200 dark:bg-purple-900/20 dark:border-purple-700">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-purple-600" />
+                      <span className="font-medium text-purple-900 dark:text-purple-100">
+                        Modello selezionato: {openRouterModels[selectedOpenRouterModel].display_name || openRouterModels[selectedOpenRouterModel].name}
+                      </span>
+                    </div>
+                    <div className="text-sm text-purple-700 dark:text-purple-300">
+                      {openRouterModels[selectedOpenRouterModel].provider_short || openRouterModels[selectedOpenRouterModel].provider} •
+                      ${((openRouterModels[selectedOpenRouterModel].cost_per_input_1k || 0) +
+                         (openRouterModels[selectedOpenRouterModel].cost_per_output_1k || 0)).toFixed(4)}/1K tokens
+                    </div>
+                  </div>
+                </div>
               )}
-              <span>{loading ? 'Salvataggio...' : 'Salva Impostazioni'}</span>
-            </button>
+            </div>
           </div>
+        )}
+
+        {/* Save Button */}
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                <span>Salvataggio...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                <span>Salva Impostazioni</span>
+              </>
+            )}
+          </button>
         </div>
+
+        {/* Save Status */}
+        {saveStatus && (
+          <div className={`mt-4 p-4 rounded-lg border text-center ${
+            saveStatus.includes('success')
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            {saveStatus}
+          </div>
+        )}
       </div>
     </div>
   )

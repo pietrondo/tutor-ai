@@ -28,7 +28,7 @@ class CourseService:
                 rel_path = os.path.relpath(file_path, course_dir)
                 normalized_rel_path = rel_path.replace(os.sep, '/')
                 stat = os.stat(file_path)
-                pdf_url = f"http://localhost:8001/course-files/{course_id}/{normalized_rel_path}"
+                pdf_url = f"http://localhost:8000/course-files/{course_id}/{normalized_rel_path}"
 
                 material = {
                     "filename": filename,
@@ -36,7 +36,9 @@ class CourseService:
                     "size": stat.st_size,
                     "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                     "file_path": file_path,
-                    "pdf_url": pdf_url
+                    "pdf_url": pdf_url,
+                    "read_url": f"/courses/{course_id}/materials/{filename}",
+                    "download_url": f"/course-files/{course_id}/{normalized_rel_path}"
                 }
 
                 path_parts = normalized_rel_path.split('/')
@@ -50,6 +52,20 @@ class CourseService:
                 materials.append(material)
 
         return materials, book_materials_map
+
+    def get_materials_for_book(self, course_id: str, book_id: str) -> List[Dict[str, Any]]:
+        """Get all materials for a specific book with navigation context."""
+        materials, book_materials_map = self._collect_course_materials(course_id)
+        book_materials = book_materials_map.get(book_id, [])
+
+        enhanced_materials = []
+        for material in book_materials:
+            enhanced_material = dict(material)
+            # Add book parameter to read_url for proper navigation
+            enhanced_material["read_url"] = f"{material['read_url']}?book={book_id}"
+            enhanced_materials.append(enhanced_material)
+
+        return enhanced_materials
 
     def _enrich_books_with_materials(
         self,

@@ -25,7 +25,7 @@ export default function AIProviderBadge({ className = '', showDetails = false }:
   useEffect(() => {
     const fetchProviderInfo = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
         const response = await fetch(`${apiUrl}/ai/provider`)
         const data = await response.json()
         setProvider(data)

@@ -872,3 +872,32 @@ export function syncModelFromBackend(currentModel: string) {
   }
   return false
 }
+
+// Funzione per sincronizzare tutti i provider dal backend
+export async function syncAllProvidersFromBackend() {
+  try {
+    // Recupera il provider attuale e il modello dal backend
+    const response = await fetch('/api/models')
+    if (response.ok) {
+      const data = await response.json()
+      const currentProvider = data.current_provider
+      const currentModel = data.current_model
+
+      if (currentProvider && currentModel) {
+        // Sincronizza il modello specifico del provider
+        const provider = llmManager.getProvider(currentProvider)
+        if (provider && provider.model !== currentModel) {
+          llmManager.configureProvider(currentProvider, { model: currentModel })
+          console.log(`✅ Provider ${currentProvider} sincronizzato con modello backend: ${currentModel}`)
+        }
+
+        // Imposta il provider di default
+        if (llmManager.getProvider(currentProvider)) {
+          llmManager.setDefaultProvider(currentProvider)
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to sync providers from backend:', error)
+  }
+}

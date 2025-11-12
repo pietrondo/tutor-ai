@@ -211,14 +211,15 @@ export function NavigationControls({
         }
       }
     },
-    {
-      key: 'P',
-      description: 'Toggle progress',
-      category: 'interaction',
-      action: () => {
-        // Toggle progress indicators
-      }
-    },
+    // Removed 'P' key shortcut to avoid conflicts with chat input
+    // {
+    //   key: 'P',
+    //   description: 'Toggle progress',
+    //   category: 'interaction',
+    //   action: () => {
+    //     // Toggle progress indicators
+    //   }
+    // },
     {
       key: 'H',
       description: 'Toggle AI hints',
@@ -245,6 +246,18 @@ export function NavigationControls({
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // Prevent shortcuts when typing in input, textarea, or contentEditable elements
+    const target = event.target as HTMLElement
+    const isInputElement =
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.contentEditable === 'true' ||
+      target.closest('[data-allow-keyboard-shortcuts="false"]')
+
+    if (isInputElement && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      return // Don't handle shortcuts when typing in input fields (unless modifier keys are pressed)
+    }
+
     // Find matching shortcut
     const keyCombo = []
     if (event.ctrlKey) keyCombo.push('Ctrl')

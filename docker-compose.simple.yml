@@ -7,7 +7,7 @@ services:
     image: tutor-ai-backend:simple
     container_name: tutor-ai-backend
     ports:
-      - "8001:8001"
+      - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./backend/.env:/app/.env
@@ -17,7 +17,7 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - REDIS_URL=redis://redis:6379
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3001
       - DEBUG=true
       - LOG_LEVEL=debug
       - ENVIRONMENT=development
@@ -25,6 +25,8 @@ services:
     depends_on:
       redis:
         condition: service_started
+    networks:
+      - tutor-ai-network
 
   frontend:
     build:
@@ -34,7 +36,7 @@ services:
     image: tutor-ai-frontend:simple
     container_name: tutor-ai-frontend
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -43,10 +45,19 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
-      - PORT=3000
+      - PORT=3001
+      - HOSTNAME=0.0.0.0
     restart: unless-stopped
     depends_on:
       - backend
+    networks:
+      - tutor-ai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -56,6 +67,8 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    networks:
+      - tutor-ai-network
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
 
 volumes:
@@ -63,5 +76,6 @@ volumes:
     driver: local
 
 networks:
-  default:
+  tutor-ai-network:
+    driver: bridge
     name: tutor-ai-network

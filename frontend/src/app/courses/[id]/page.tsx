@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen, Presentation, Calendar, Target } from 'lucide-react'
+import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen, Presentation, Calendar, Target, Merge, RefreshCw } from 'lucide-react'
 import { StudyProgress } from '@/components/StudyProgress'
 import BackgroundTaskProgress from '@/components/BackgroundTaskProgress'
+import BookCard from '@/components/BookCard'
 
 interface Course {
   id: string
@@ -38,6 +39,10 @@ interface Book {
   created_at: string
   chapters: BookChapter[]
   tags: string[]
+  materials?: Array<{
+    filename: string
+    size: number
+  }>
 }
 
 interface ConceptMetricAttempt {
@@ -232,6 +237,11 @@ export default function CourseDetailPage() {
   const [metricsLoading, setMetricsLoading] = useState(true)
   const [metricsError, setMetricsError] = useState('')
 
+  // Merge PDF states
+  const [isMergingCourse, setIsMergingCourse] = useState(false)
+  const [isMergingBook, setIsMergingBook] = useState<string | null>(null)
+  const [mergeResult, setMergeResult] = useState<any>(null)
+
   useEffect(() => {
     fetchCourse()
     fetchBooks()
@@ -240,7 +250,7 @@ export default function CourseDetailPage() {
 
   const fetchCourse = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -260,11 +270,13 @@ export default function CourseDetailPage() {
 
   const fetchBooks = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/books`)
+      // Fetch course data which contains books directly
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`)
       if (response.ok) {
         const data = await response.json()
-        const normalized = Array.isArray(data.books) ? data.books.map(normalizeBook) : []
-        setBooks(normalized)
+        const courseData = data.course
+        const books = courseData.books || []
+        setBooks(books)
       } else {
         console.error('Errore nel caricamento dei libri')
       }
@@ -279,7 +291,7 @@ export default function CourseDetailPage() {
     setMetricsLoading(true)
     setMetricsError('')
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/concepts/metrics`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}/concepts/metrics`)
       if (response.ok) {
         const data = await response.json()
         const metricsMap = data.metrics ?? {}
@@ -293,6 +305,66 @@ export default function CourseDetailPage() {
       setMetricsError('Errore di connessione nel recupero delle metriche')
     } finally {
       setMetricsLoading(false)
+    }
+  }
+
+  const mergeBookPDFs = async (bookId: string) => {
+    setIsMergingBook(bookId)
+    setMergeResult(null)
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}/books/${bookId}/merge-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `HTTP ${response.status}`)
+      }
+
+      const result = await response.json()
+      setMergeResult(result)
+    } catch (error) {
+      console.error('Error merging book PDFs:', error)
+      alert(`Errore nell'unione dei PDF: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+    } finally {
+      setIsMergingBook(null)
+    }
+  }
+
+  const mergeCoursePDFs = async () => {
+    setIsMergingCourse(true)
+    setMergeResult(null)
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}/merge-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `HTTP ${response.status}`)
+      }
+
+      const result = await response.json()
+      setMergeResult(result)
+    } catch (error) {
+      console.error('Error merging course PDFs:', error)
+      alert(`Errore nell'unione dei PDF del corso: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+    } finally {
+      setIsMergingCourse(false)
     }
   }
 
@@ -330,7 +402,7 @@ export default function CourseDetailPage() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`, {
         method: 'DELETE',
       })
 
@@ -349,7 +421,7 @@ export default function CourseDetailPage() {
     if (!courseId) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/study-plans/background`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/study-plans/background`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -466,6 +538,17 @@ export default function CourseDetailPage() {
               <span>Gestisci Libri</span>
             </Link>
 
+            {/* Study Button - links to first available book */}
+            {books.length > 0 && (
+              <Link
+                href={`/courses/${course.id}/study?book=${books[0].id}&pdf=${books[0].materials?.[0] || 'default.pdf'}`}
+                className="btn btn-primary flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Study</span>
+              </Link>
+            )}
+
             <Link
               href={`/courses/${course.id}/chat`}
               className="btn btn-secondary flex items-center space-x-2"
@@ -489,6 +572,27 @@ export default function CourseDetailPage() {
               <BarChart3 className="h-4 w-4" />
               <span>Crea Quiz</span>
             </Link>
+
+            {/* Course Merge PDF Button */}
+            {books.reduce((sum, book) => sum + book.materials_count, 0) > 0 && (
+              <button
+                onClick={mergeCoursePDFs}
+                disabled={isMergingCourse}
+                className="btn btn-secondary flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isMergingCourse ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Unione in corso...</span>
+                  </>
+                ) : (
+                  <>
+                    <Merge className="h-4 w-4" />
+                    <span>Unisci Tutti i PDF del Corso</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -610,67 +714,101 @@ export default function CourseDetailPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {books.map((book) => (
-                <div key={book.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-1">{book.title}</h4>
-                      <p className="text-sm text-gray-600">{book.author}</p>
-                    </div>
-                    <BookOpen className="h-5 w-5 text-blue-600" />
-                  </div>
-
-                  {book.description && (
-                    <p className="text-gray-700 text-sm mb-4 line-clamp-2">{book.description}</p>
-                  )}
-
-                  <div className="mb-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-gray-600">
-                      <span>{book.chapters.length} capitol{book.chapters.length === 1 ? 'o' : 'i'}</span>
-                      {book.chapters.length > 0 && (
-                        <span>
-                          {book.chapters.reduce((sum, chapter) => sum + (chapter.estimated_minutes || 0), 0)} min totali
-                        </span>
-                      )}
-                    </div>
-                    {book.chapters.slice(0, 2).map((chapter, index) => (
-                      <div key={index} className="text-xs text-gray-500 flex items-start space-x-2">
-                        <span className="mt-0.5 text-gray-400">•</span>
-                        <div>
-                          <span className="font-medium text-gray-600">{chapter.title}</span>
-                          {chapter.summary && (
-                            <p className="text-[11px] text-gray-500 line-clamp-1">{chapter.summary}</p>
-                          )}
-                        </div>
-                      </div>
+                <div className="space-y-6">
+                  {/* Books Grid with BookCard Components */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {books.map((book) => (
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        courseId={courseId}
+                      />
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <div className="flex items-center space-x-4">
-                      <span className="flex items-center space-x-1">
-                        <FileText className="h-4 w-4" />
-                            <span>{book.materials_count}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <MessageSquare className="h-4 w-4" />
-                            <span>{book.study_sessions}</span>
-                          </span>
+                  {/* PDF Merge Section - Maintained for legacy functionality */}
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Unione PDF</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Unisci tutti i PDF di un libro in un unico documento per una consultazione più facile.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {books.filter(book => book.materials_count > 0).map((book) => (
+                        <div key={book.id} className="flex items-center justify-between p-3 bg-white rounded border border-gray-200">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">{book.title}</h4>
+                            <p className="text-xs text-gray-500">{book.materials_count} file</p>
+                          </div>
+                          <button
+                            onClick={() => mergeBookPDFs(book.id)}
+                            disabled={isMergingBook === book.id}
+                            className="btn btn-secondary text-sm bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed px-3 py-2 ml-2"
+                            title="Unisci tutti i PDF di questo libro"
+                          >
+                            {isMergingBook === book.id ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Merge className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
-                        {book.year && <span>{book.year}</span>}
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <Link
-                          href={`/courses/${courseId}/books/${book.id}`}
-                          className="flex-1 btn btn-secondary text-sm"
-                        >
-                          Dettagli
-                        </Link>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Merge PDF Success Display */}
+              {mergeResult && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-green-800">✅ PDF Unito con Successo</h3>
+                      <p className="text-green-700 mb-2">
+                        {mergeResult.merged_pdf?.total_files || mergeResult.merged_pdf?.files_merged?.length} PDF uniti in: {mergeResult.merged_pdf?.filename}
+                      </p>
+                      <p className="text-sm text-green-600">
+                        Dimensione: {((mergeResult.merged_pdf?.size || 0) / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+
+                      {/* Course merge details */}
+                      {mergeResult.merged_pdf?.books_summary && (
+                        <div className="mt-3">
+                          <p className="text-sm text-green-600 mb-2">
+                            {mergeResult.merged_pdf.total_books} libri processati:
+                          </p>
+                          <details className="text-xs text-green-600">
+                            <summary className="cursor-pointer">Dettagli libri</summary>
+                            <ul className="mt-1 ml-4">
+                              {mergeResult.merged_pdf.books_summary.map((book: any, index: number) => (
+                                <li key={index} className="mb-1">
+                                  <strong>{book.book_title}:</strong> {book.files_count} file
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </div>
+                      )}
+
+                      {/* Book merge details */}
+                      {mergeResult.merged_pdf?.files_merged && !mergeResult.merged_pdf?.books_summary && (
+                        <details className="mt-2">
+                          <summary className="text-sm text-green-600 cursor-pointer">File uniti</summary>
+                          <ul className="text-xs text-green-600 mt-1 ml-4">
+                            {mergeResult.merged_pdf.files_merged.map((filename: string, index: number) => (
+                              <li key={index}>• {filename}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setMergeResult(null)}
+                      className="text-green-500 hover:text-green-700"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               )}
 

@@ -225,7 +225,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
 
   const fetchCourses = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${apiUrl}/courses`)
       const data = await response.json()
       setCourses(data.courses || [])
@@ -238,7 +238,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
     try {
       setLoading(true)
       const allPlans: StudyPlan[] = []
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       for (const course of courses) {
         try {
@@ -261,7 +261,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
   }
 
   const fetchMissions = async (planId: string, fallback: StudyMission[] = []) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     if (fallback.length > 0) {
       setMissions(fallback)
     }
@@ -292,7 +292,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
 
   const toggleMissionTask = async (missionId: string, taskId: string, completed: boolean) => {
     if (!selectedPlan) return
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     const updating = new Set(updatingTaskIds)
     updating.add(taskId)
     setUpdatingTaskIds(updating)
@@ -381,7 +381,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
         message: 'Inizializzazione creazione piano...'
       })
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       console.log('📡 Invio richiesta al backend:', apiUrl)
       setPlanGenerationProgress({
         stage: 'request',
@@ -472,7 +472,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
 
   const updateSessionProgress = async (planId: string, sessionId: string, completed: boolean) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${apiUrl}/study-plans/${planId}/sessions/${sessionId}`, {
         method: 'PUT',
         headers: {
@@ -503,7 +503,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
     if (!confirm('Sei sicuro di voler eliminare questo piano di studio?')) return
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${apiUrl}/study-plans/${planId}`, {
         method: 'DELETE'
       })
@@ -628,7 +628,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
     const session = selectedPlan.sessions.find(s => s.id === activeQuiz.sessionId)
     const timeSeconds = quizStartTime ? (Date.now() - quizStartTime) / 1000 : 0
     const scoreRatio = total > 0 ? correct / total : 0
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
     try {
       const response = await fetch(`${apiUrl}/courses/${courseId}/concepts/${conceptId}/quiz-results`, {

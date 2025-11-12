@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense, type KeyboardEvent } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, Brain, Zap, AlertCircle, RefreshCw, MessageSquare, BookOpen, Target } from 'lucide-react'
+import { ArrowLeft, Send, Brain, Zap, AlertCircle, RefreshCw, MessageSquare, BookOpen, Target, X, CheckCircle, Clock } from 'lucide-react'
 import { ChatMessage } from '@/components/ChatMessage'
 
 interface Course {
@@ -53,6 +53,27 @@ interface SessionMessage {
   response_time_ms: number
   is_followup: boolean
   parent_message_id?: string
+  quiz_suggestion?: QuizSuggestion
+}
+
+interface QuizSuggestion {
+  auto_detected: boolean
+  confidence: number
+  difficulty: string
+  num_questions: number
+  topic: string
+  quiz_type: string
+  suggested_quizzes?: Array<{
+    concept_id: string
+    concept_name: string
+    quiz_type: string
+    difficulty: string
+    estimated_time: number
+    description: string
+  }>
+  fallback_mode?: boolean
+  message?: string
+  error?: string
 }
 
 interface CourseSession {
@@ -86,7 +107,7 @@ interface CourseSession {
   }
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 function CourseChatContent() {
   const params = useParams()
@@ -102,6 +123,8 @@ function CourseChatContent() {
   const [sessionLoading, setSessionLoading] = useState(true)
   const [showSessionHistory, setShowSessionHistory] = useState(false)
   const [error, setError] = useState('')
+  const [showQuizModal, setShowQuizModal] = useState(false)
+  const [pendingQuiz, setPendingQuiz] = useState<QuizSuggestion | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -242,6 +265,19 @@ function CourseChatContent() {
           setSessions(prev => prev.map(session =>
             session.id === data.session.id ? data.session : session
           ))
+
+          // Check for quiz suggestion in the latest assistant message
+          const lastMessage = data.session.messages[data.session.messages.length - 1]
+          if (lastMessage && lastMessage.role === 'assistant' && data.quiz_suggestion) {
+            // Add quiz suggestion to the message
+            lastMessage.quiz_suggestion = data.quiz_suggestion
+
+            // Auto-show quiz modal if confidence is high (>= 0.8)
+            if (data.quiz_suggestion.confidence >= 0.8 && data.quiz_suggestion.auto_detected) {
+              setPendingQuiz(data.quiz_suggestion)
+              setShowQuizModal(true)
+            }
+          }
         }
       } else {
         const errorData = await response.json()
@@ -292,6 +328,41 @@ function CourseChatContent() {
         messages: []
       })
     }
+  }
+
+  const handleStartQuiz = async (quizSuggestion: QuizSuggestion) => {
+    try {
+      // Generate quiz using the existing quiz endpoint
+      const response = await fetch(`${API_BASE_URL}/quiz`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: courseId,
+          topic: quizSuggestion.topic,
+          difficulty: quizSuggestion.difficulty,
+          num_questions: quizSuggestion.num_questions
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Navigate to quiz page with the generated quiz
+        const quizData = btoa(JSON.stringify(data.quiz))
+        window.open(`/courses/${courseId}/quiz?data=${quizData}`, '_blank')
+      } else {
+        console.error('Errore nella generazione del quiz')
+      }
+    } catch (error) {
+      console.error('Errore nell\'avvio del quiz:', error)
+    }
+
+    setShowQuizModal(false)
+    setPendingQuiz(null)
+  }
+
+  const handleDismissQuiz = () => {
+    setShowQuizModal(false)
+    setPendingQuiz(null)
   }
 
   if (courseLoading || sessionLoading) {
@@ -428,7 +499,11 @@ function CourseChatContent() {
           ) : (
             <div className="space-y-4">
               {currentSession.messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  onQuizStart={handleStartQuiz}
+                />
               ))}
               {isLoading && (
                 <div className="flex justify-start">
@@ -488,6 +563,124 @@ function CourseChatContent() {
           <div className="text-xs text-blue-700">
             {books.slice(0, 3).map(book => book.title).join(', ')}
             {books.length > 3 && ` e altri ${books.length - 3} libri`}
+          </div>
+        </div>
+      )}
+
+      {/* Quiz Modal for High-Confidence Auto-Detection */}
+      {showQuizModal && pendingQuiz && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full mx-4 overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Target className="h-6 w-6" />
+                  <h3 className="text-xl font-bold">Quiz Automatico</h3>
+                </div>
+                <button
+                  onClick={handleDismissQuiz}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-blue-100 mt-2">
+                Ho rilevato che potresti voler fare un quiz su questo argomento!
+              </p>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Argomento:</h4>
+                  <div className="bg-blue-50 text-blue-800 px-3 py-2 rounded-lg text-sm font-medium">
+                    {pendingQuiz.topic}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Domande:</h4>
+                    <p className="text-gray-700">{pendingQuiz.num_questions}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Difficoltà:</h4>
+                    <p className="text-gray-700">
+                      {pendingQuiz.difficulty === 'easy' ? 'Facile' :
+                       pendingQuiz.difficulty === 'hard' ? 'Difficile' : 'Medio'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Tipo:</h4>
+                    <p className="text-gray-700">
+                      {pendingQuiz.quiz_type === 'multiple_choice' ? 'Scelta multipla' :
+                       pendingQuiz.quiz_type === 'true_false' ? 'Vero/Falso' :
+                       'Risposta aperta'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Confidenza:</h4>
+                    <div className="flex items-center space-x-1">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full"
+                          style={{ width: `${pendingQuiz.confidence * 100}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-gray-600 min-w-[40px]">
+                        {Math.round(pendingQuiz.confidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {pendingQuiz.suggested_quizzes && pendingQuiz.suggested_quizzes.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Quiz disponibili:</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {pendingQuiz.suggested_quizzes.slice(0, 3).map((quiz, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm text-gray-700">{quiz.concept_name}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>{quiz.estimated_time}min</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
+                    <strong>Nota:</strong> I risultati del quiz verranno automaticamente salvati
+                    nelle tue statistiche di studio per tracciare i tuoi progressi.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => handleStartQuiz(pendingQuiz)}
+                  className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 font-medium"
+                >
+                  <Target className="h-5 w-5" />
+                  <span>Inizia Quiz Ora</span>
+                </button>
+                <button
+                  onClick={handleDismissQuiz}
+                  className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  Forse dopo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

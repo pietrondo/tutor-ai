@@ -115,5 +115,27 @@
         "tags": []
       }
     ]
+  },
+  {
+    "id": "44a66134-5c8f-4f83-a406-b4642f24b14d",
+    "name": "ds",
+    "description": "ds",
+    "subject": "Fisica",
+    "created_at": "2025-11-11T07:35:33.283081",
+    "updated_at": "2025-11-11T07:35:33.283092",
+    "materials": [],
+    "study_sessions": 0,
+    "total_study_time": 0
+  },
+  {
+    "id": "ff1851e4-c18f-4eb7-a214-a0418100921c",
+    "name": "ds",
+    "description": "ds",
+    "subject": "Fisica",
+    "created_at": "2025-11-11T07:35:43.624521",
+    "updated_at": "2025-11-11T07:35:43.624544",
+    "materials": [],
+    "study_sessions": 0,
+    "total_study_time": 0
   }
 ]

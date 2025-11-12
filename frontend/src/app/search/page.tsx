@@ -64,7 +64,7 @@ export default function AdvancedSearchPage() {
   useEffect(() => {
     const loadCourses = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses`)
         if (!response.ok) return
 
         const payload = await response.json()
@@ -95,7 +95,7 @@ export default function AdvancedSearchPage() {
 
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/search/suggestions?q=${encodeURIComponent(query)}&limit=8`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/search/suggestions?q=${encodeURIComponent(query)}&limit=8`)
         if (!response.ok) return
         const data = await response.json()
         if (Array.isArray(data.suggestions)) {
@@ -120,7 +120,7 @@ export default function AdvancedSearchPage() {
 
     const loadBooks = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${selectedCourse}/books`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${selectedCourse}/books`)
         if (!response.ok) return
 
         const payload = await response.json()
@@ -206,7 +206,7 @@ export default function AdvancedSearchPage() {
         ...(Object.keys(filters).length > 0 ? { filters } : {})
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/search/advanced`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/search/advanced`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

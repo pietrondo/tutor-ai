@@ -51,7 +51,7 @@ export default function ProgressPage() {
   const fetchProgressData = async () => {
     try {
       console.log('Fetching progress data...')
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/study-progress/overview`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/study-progress/overview`)
       console.log('Response status:', response.status)
 
       if (!response.ok) {

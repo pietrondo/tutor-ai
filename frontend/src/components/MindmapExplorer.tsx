@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Loader2, Sparkles, Lightbulb, CheckCircle2, Flag, GitBranch } from 'lucide-react'
+import { ChevronDown, ChevronRight, Loader2, Sparkles, Lightbulb, CheckCircle2, Flag, GitBranch, Brain, TrendingUp, AlertTriangle, Target, Clock } from 'lucide-react'
 import { StudyMindmap, StudyMindmapNode, StudyPlanPhase } from '@/types/mindmap'
 
 interface MindmapExplorerProps {
@@ -74,6 +74,69 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
         {meta.shortLabel}
       </span>
     )
+  }
+
+  const getMasteryIndicator = (masteryLevel: number | undefined) => {
+    if (masteryLevel === undefined) return null
+
+    if (masteryLevel >= 0.8) {
+      return {
+        icon: <CheckCircle2 className="h-4 w-4 text-green-600" />,
+        label: 'Dominato',
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200'
+      }
+    } else if (masteryLevel >= 0.5) {
+      return {
+        icon: <TrendingUp className="h-4 w-4 text-yellow-600" />,
+        label: 'In progresso',
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200'
+      }
+    } else {
+      return {
+        icon: <AlertTriangle className="h-4 w-4 text-red-600" />,
+        label: 'Da migliorare',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50',
+        borderColor: 'border-red-200'
+      }
+    }
+  }
+
+  const getSessionActionIndicator = (action: string | undefined) => {
+    if (!action) return null
+
+    const actionMap = {
+      'focused_review': {
+        icon: <Target className="h-3 w-3 text-red-600" />,
+        label: 'Revisione focalizzata',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50'
+      },
+      'practice_application': {
+        icon: <Brain className="h-3 w-3 text-blue-600" />,
+        label: 'Pratica applicata',
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50'
+      },
+      'foundational_review': {
+        icon: <Lightbulb className="h-3 w-3 text-orange-600" />,
+        label: 'Ripasso fondamenti',
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50'
+      },
+      'normal_study': {
+        icon: <Sparkles className="h-3 w-3 text-green-600" />,
+        label: 'Studio normale',
+        color: 'text-green-600',
+        bgColor: 'bg-green-50'
+      }
+    }
+
+    return actionMap[action as keyof typeof actionMap] || actionMap.normal_study
   }
 
   useEffect(() => {
@@ -225,6 +288,31 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="font-semibold text-gray-900 truncate">{node.title}</div>
                   {renderPriorityBadge(node.priority)}
+
+                  {/* Session metadata indicators */}
+                  {node.session_metadata && (
+                    <>
+                      {node.session_metadata.weak_area && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 border border-red-200">
+                          <AlertTriangle className="h-3 w-3" />
+                          Area critica
+                        </span>
+                      )}
+
+                      {node.session_metadata.recently_studied && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                          <Clock className="h-3 w-3" />
+                          Recente
+                        </span>
+                      )}
+
+                      {node.session_metadata.mastery_level !== undefined && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                          {Math.round(node.session_metadata.mastery_level * 100)}%
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
                 {node.summary && (
                   <div className="text-sm text-gray-600 mt-1 line-clamp-2">{node.summary}</div>
@@ -236,6 +324,23 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
                       {node.study_actions.slice(0, 2).join('; ')}
                       {node.study_actions.length > 2 && '…'}
                     </span>
+                  </div>
+                )}
+
+                {/* Session action indicator */}
+                {node.session_metadata?.recommended_action && (
+                  <div className="mt-2 flex items-center gap-1 text-xs">
+                    {(() => {
+                      const action = getSessionActionIndicator(node.session_metadata.recommended_action)
+                      return action ? (
+                        <>
+                          {action.icon}
+                          <span className={action.color}>
+                            {action.label}
+                          </span>
+                        </>
+                      ) : null
+                    })()}
                   </div>
                 )}
                 <div className="mt-2 flex items-center gap-1 text-[11px] text-gray-500">
@@ -334,6 +439,43 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
       <div className="lg:col-span-3">
         <h3 className="text-xl font-semibold text-gray-900 mb-4">{mindmap.title}</h3>
         {mindmap.overview && <p className="text-gray-600 mb-6">{mindmap.overview}</p>}
+
+        {/* Session guidance for enhanced mindmaps */}
+        {mindmap.session_guidance && mindmap.session_aware && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="h-5 w-5 text-blue-600" />
+              <h4 className="text-lg font-semibold text-blue-900">Guida allo studio personalizzata</h4>
+            </div>
+
+            {mindmap.session_guidance.focus_on_weak_areas && (
+              <div className="mb-3 text-sm text-blue-800">
+                <span className="font-medium">🎯 Focus aree critiche:</span> La mappa è ottimizzata per concentrarsi sui tuoi punti di miglioramento.
+              </div>
+            )}
+
+            {mindmap.session_guidance.estimated_study_time && (
+              <div className="mb-3 text-sm text-blue-800">
+                <span className="font-medium">⏱️ Tempo stimato:</span> {mindmap.session_guidance.estimated_study_time.total_minutes} minuti
+                {mindmap.session_guidance.estimated_study_time.adjusted_for_fatigue && (
+                  <span className="text-blue-600"> (aggiustato per affaticamento)</span>
+                )}
+              </div>
+            )}
+
+            {mindmap.session_guidance.adaptive_suggestions.length > 0 && (
+              <div className="text-sm text-blue-800">
+                <span className="font-medium">💡 Suggerimenti:</span>
+                <ul className="mt-1 ml-4 list-disc space-y-1">
+                  {mindmap.session_guidance.adaptive_suggestions.slice(0, 3).map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="bg-white border border-gray-200 rounded-xl p-4 max-h-[600px] overflow-auto">
           {mindmap.nodes.map((node) => renderNode(node, 0, []))}
         </div>

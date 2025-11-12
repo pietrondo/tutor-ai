@@ -406,7 +406,7 @@ export default function CLEPracticePage({ params }: { params: { id: string } }) 
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>Cards Studied</span>
-                <Badge variant="secondary">{sessionStats.cardsStudied}/{sessionStats.totalCards}</Badge>
+                <Badge>{sessionStats.cardsStudied}/{sessionStats.totalCards}</Badge>
               </div>
               <Progress value={(sessionStats.cardsStudied / sessionStats.totalCards) * 100} className="w-full" />
             </div>

@@ -51,7 +51,7 @@ export default function WorkingBookPage() {
 
   const fetchBook = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/books/${bookId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}/books/${bookId}`)
       if (response.ok) {
         const data = await response.json()
         setBook(data.book)
@@ -67,7 +67,7 @@ export default function WorkingBookPage() {
 
   const fetchCourseInfo = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`)
       if (response.ok) {
         const data = await response.json()
         setCourseName(data.course.name)

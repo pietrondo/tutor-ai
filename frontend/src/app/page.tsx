@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useDevPerformanceMonitor, useDebounce } from '@/lib/dev-performance'
 import { BookOpen, Brain, Plus, MessageSquare, Zap, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { CourseCard } from '@/components/CourseCard'
@@ -23,13 +24,13 @@ export default function HomePage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchCourses()
-  }, [])
+  // Performance monitoring in development
+  useDevPerformanceMonitor('HomePage')
 
-  const fetchCourses = async () => {
+  // Debounced fetch to prevent excessive calls
+  const debouncedFetchCourses = useDebounce(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses`)
       const data = await response.json()
       setCourses(data.courses || [])
     } catch (error) {
@@ -37,7 +38,22 @@ export default function HomePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, 300)
+
+  // Memoized fetchCourses to prevent re-creation
+  const fetchCourses = useCallback(debouncedFetchCourses, [])
+
+  useEffect(() => {
+    fetchCourses()
+  }, [fetchCourses])
+
+  // Memoize course count text to prevent re-renders
+  const coursesText = useMemo(() => {
+    if (courses.length === 0) {
+      return "Crea il tuo primo corso per iniziare a studiare"
+    }
+    return `Hai ${courses.length} cors${courses.length === 1 ? 'o' : 'si'} attivi`
+  }, [courses.length])
 
   if (loading) {
     return (
@@ -160,10 +176,7 @@ export default function HomePage() {
                 I Tuoi Corsi
               </h2>
               <p className="text-gray-600">
-                {courses.length === 0
-                  ? "Crea il tuo primo corso per iniziare a studiare"
-                  : `Hai ${courses.length} cors${courses.length === 1 ? 'o' : 'si'} attivi`
-                }
+                {coursesText}
               </p>
             </div>
             <Link href="/courses/new">

@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Brain, RefreshCw, Loader2, Save, BookOpen, Sparkles, FileText, Lightbulb } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { MindmapExplorer } from '@/components/MindmapExplorer'
-import { StudyMindmap, StudyMindmapNode, ExpandedStudyNode } from '@/types/mindmap'
+import { StudyMindmap, StudyMindmapNode, ExpandedStudyNode, StudySessionContext } from '@/types/mindmap'
 import VisualMindmap, { type MindmapData } from '@/components/VisualMindmap'
 import { mindmapService, type MindmapStorage, type MindmapStoragePayload } from '@/services/mindmapService'
 import { fetchFromBackend } from '@/lib/api'
@@ -56,6 +56,8 @@ interface MindmapGenerationResponse {
   markdown?: string
   references?: string[]
   sources?: MindmapSource[]
+  enhanced?: boolean
+  session_aware?: boolean
 }
 
 interface MindmapExpandApiResponse {
@@ -102,6 +104,60 @@ const isMindmapGenerationResponse = (value: unknown): value is MindmapGeneration
 const isExpandedStudyNode = (value: unknown): value is ExpandedStudyNode => {
   if (!isObject(value)) return false
   return typeof value.title === 'string' && typeof value.id === 'string'
+}
+
+const collectSessionContext = async (courseId: string, bookId: string): Promise<StudySessionContext | null> => {
+  // Collect current study session context for enhanced mindmap generation
+  try {
+    // Get current progress data
+    const progressResponse = await fetchFromBackend(`/courses/${courseId}/progress`)
+    const progressData = progressResponse.ok ? await progressResponse.json() : null
+
+    // Get recent study sessions
+    const sessionsResponse = await fetchFromBackend(`/courses/${courseId}/study-sessions?limit=10`)
+    const sessionsData = sessionsResponse.ok ? await sessionsResponse.json() : { sessions: [] }
+
+    // Get quiz performance if available
+    const quizResponse = await fetchFromBackend(`/courses/${courseId}/quiz/performance`)
+    const quizData = quizResponse.ok ? await quizResponse.json() : { performance: {} }
+
+    // Get today's study time
+    const todayResponse = await fetchFromBackend(`/courses/${courseId}/study-time/today`)
+    const todayData = todayResponse.ok ? await todayResponse.json() : { minutes: 0 }
+
+    // Extract relevant data
+    const recentSessions = sessionsData.sessions || []
+    const recentlyStudied = recentSessions
+      .slice(-5)
+      .flatMap((session: any) => session.topics_studied || [])
+      .filter(Boolean)
+
+    const weakAreas = progressData?.weak_areas || []
+    const masteryLevels = progressData?.mastery_levels || {}
+    const quizPerformance = quizData.performance || {}
+
+    // Build session context
+    const sessionContext: StudySessionContext = {
+      session_id: `session_${Date.now()}`,
+      course_id: courseId,
+      book_id: bookId,
+      current_progress: progressData?.progress_percentage || 0,
+      weak_areas: weakAreas,
+      mastery_levels: masteryLevels,
+      quiz_performance: quizPerformance,
+      study_time_today: todayData.minutes || 0,
+      preferred_difficulty: 'adaptive',
+      recently_studied: recentlyStudied,
+      goals: progressData?.current_goals || []
+    }
+
+    console.log('🧠 Collected session context:', sessionContext)
+    return sessionContext
+
+  } catch (error) {
+    console.warn('⚠️ Could not collect session context, using standard generation:', error)
+    return null
+  }
 }
 
 const isMindmapExpandResponse = (value: unknown): value is MindmapExpandApiResponse => {
@@ -188,16 +244,27 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
     setError('')
 
     try {
+      // Collect session context for enhanced generation
+      const sessionContext = await collectSessionContext(effectiveCourseId, effectiveBookId)
+
+      const requestBody: any = {
+        course_id: effectiveCourseId,
+        book_id: effectiveBookId,
+        context_type: 'book'
+      }
+
+      // Add session context if available
+      if (sessionContext) {
+        requestBody.session_context = sessionContext
+        console.log('🚀 Using enhanced mindmap generation with session context')
+      }
+
       const response = await fetchFromBackend('/mindmap', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          course_id: effectiveCourseId,
-          book_id: effectiveBookId,
-          context_type: 'book'
-        })
+        body: JSON.stringify(requestBody)
       })
 
       const { payload, rawText } = await parseJsonSafely<MindmapGenerationResponse>(response)
@@ -213,7 +280,16 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
       setMarkdown(payload.markdown || '')
       setReferences(toStringArray(payload.references))
       setSources(toMindmapSources(payload.sources))
-      toast.success('Mindmap generata con successo!')
+
+      // Enhanced feedback
+      if (payload.enhanced || payload.session_aware) {
+        toast.success('🧠 Mindmap avanzata generata con contesto personalizzato!', {
+          duration: 4000,
+          icon: '🎯'
+        })
+      } else {
+        toast.success('Mindmap generata con successo!')
+      }
     } catch (err) {
       console.error('Errore generazione mindmap:', err)
       setError('Impossibile generare la mindmap. Riprova più tardi.')
@@ -232,12 +308,13 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
       const payload: MindmapStoragePayload = isStoragePayload(data)
         ? data
         : {
-            title: data.title,
+            title: 'Mindmap generata',
             structured_map: {
-              nodes: (data.nodes as StudyMindmapNode[]) || [],
-              connections: data.connections || []
+              title: 'Mindmap generata',
+              nodes: Array.from((data as any).nodes?.values() || []) as StudyMindmapNode[],
+              study_plan: []
             },
-            content_markdown: data.description || ''
+            content_markdown: (data as any).description || ''
           }
 
       await mindmapService.saveMindmap(effectiveCourseId, effectiveBookId, payload)
@@ -342,7 +419,7 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
         ) : (
           <>
             {mindmap ? (
-              <VisualMindmap data={mindmap as unknown as MindmapData} />
+              <VisualMindmap data={mindmap as any} />
             ) : (
               <div className="text-center py-16">
                 <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />

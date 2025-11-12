@@ -173,7 +173,7 @@ export default function StudyPage() {
         throw new Error('ID corso non valido');
       }
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE_URL}/courses/${courseId}`);
 
       if (response.status === 404) {

@@ -167,7 +167,7 @@ def enhance_existing_concepts(existing_concepts, course_name, course_id):
 
     # Ottieni i libri del corso per suggerimenti di lettura personalizzati
     try:
-        response = requests.get(f"http://localhost:8001/courses/{course_id}/books")
+        response = requests.get(f"http://localhost:8000/courses/{course_id}/books")
         if response.status_code == 200:
             books_data = response.json()
             books = books_data.get("books", [])
@@ -220,7 +220,7 @@ async def generate_fallback_concept_map(course_id, course_name, concept_service)
 
     # Controlla se ci sono libri per suggerimenti
     try:
-        response = requests.get(f"http://localhost:8001/courses/{course_id}/books")
+        response = requests.get(f"http://localhost:8000/courses/{course_id}/books")
         if response.status_code == 200:
             books_data = response.json()
             books = books_data.get("books", [])

@@ -190,7 +190,7 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
         formData.append('file', file)
 
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}/books/${bookId}/upload`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}/books/${bookId}/upload`, {
             method: 'POST',
             body: formData,
           })

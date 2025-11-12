@@ -24,7 +24,7 @@ logger = structlog.get_logger()
 class BookSpecificConceptGenerator:
     def __init__(self):
         self.concept_service = ConceptMapService()
-        self.base_url = "http://localhost:8001"
+        self.base_url = "http://localhost:8000"
 
     async def generate_concepts_for_all_books(self, course_id: str):
         """Genera mappe concettuali per tutti i libri di un corso."""

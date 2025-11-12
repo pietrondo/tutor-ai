@@ -79,7 +79,7 @@ export function useAnnotationsSync({
   // API helper function
   const apiCall = useCallback(async (endpoint: string, options: RequestInit = {}) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}${endpoint}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,

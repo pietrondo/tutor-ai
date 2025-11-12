@@ -41,7 +41,7 @@ export default function BackgroundTaskProgress({
 
     const fetchTaskStatus = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/tasks/${taskId}`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/tasks/${taskId}`)
         if (response.ok) {
           const taskData: Task = await response.json()
           setTask(taskData)
@@ -83,7 +83,7 @@ export default function BackgroundTaskProgress({
     if (!taskId) return
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/tasks/${taskId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/tasks/${taskId}`, {
         method: 'DELETE'
       })
 
@@ -310,7 +310,7 @@ export function useBackgroundTask(taskId: string | null) {
 
     const fetchTaskStatus = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/tasks/${taskId}`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/tasks/${taskId}`)
         if (response.ok) {
           const taskData: Task = await response.json()
           setTask(taskData)
@@ -344,7 +344,7 @@ export function useBackgroundTask(taskId: string | null) {
     if (!taskId) return false
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/tasks/${taskId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/tasks/${taskId}`, {
         method: 'DELETE'
       })
       return response.ok

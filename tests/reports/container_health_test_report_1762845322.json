@@ -1,0 +1,3796 @@
+{
+  "test_suite": "Docker Container Health Tests",
+  "timestamp": "2025-11-11T08:15:22.203272",
+  "test_duration": "0:00:27.084528",
+  "container_stats": {
+    "docker_daemon": {
+      "status": "healthy",
+      "version": "28.5.1",
+      "api_version": "1.51",
+      "total_containers": 5,
+      "total_images": 8
+    },
+    "startup_health": {
+      "status": "healthy",
+      "expected_containers": [
+        "tutor-ai-backend",
+        "tutor-ai-frontend"
+      ],
+      "running_containers": [
+        "tutor-ai-frontend-test",
+        "tutor-ai-backend",
+        "tutor-ai-redis"
+      ],
+      "wait_time": 0
+    },
+    "health_endpoints": {
+      "backend_health": {
+        "status": "healthy",
+        "response_time": 0.002311,
+        "status_code": 200
+      },
+      "frontend_root": {
+        "status": "healthy",
+        "response_time": 4.960111,
+        "status_code": 200
+      },
+      "api_docs": {
+        "status": "healthy",
+        "response_time": 0.003253,
+        "status_code": 200
+      }
+    },
+    "resource_limits": {
+      "tutor-ai-frontend-test": {
+        "cpu_usage": 0.07013599801471009,
+        "memory_usage_mb": 729.7265625,
+        "memory_limit_mb": 15843.15234375,
+        "memory_percent": 4.605942975659585
+      },
+      "tutor-ai-frontend": {
+        "error": "'system_cpu_usage'"
+      },
+      "tutor-ai-backend": {
+        "cpu_usage": 0.024526091607864862,
+        "memory_usage_mb": 758.05078125,
+        "memory_limit_mb": 15843.15234375,
+        "memory_percent": 4.784721908888575
+      },
+      "tutor-ai-redis": {
+        "cpu_usage": 0.03840227874225676,
+        "memory_usage_mb": 11.7421875,
+        "memory_limit_mb": 15843.15234375,
+        "memory_percent": 0.07411522180200585
+      },
+      "buildx_buildkit_tutor-ai-builder0": {
+        "error": "'system_cpu_usage'"
+      }
+    },
+    "log_monitoring": {
+      "tutor-ai-frontend-test": {
+        "log_lines_count": 13,
+        "error_count": 0,
+        "warning_count": 0,
+        "recent_logs": [
+          "2025-11-11T07:14:34.787285367Z  \u2713 Starting...",
+          "2025-11-11T07:14:36.125507718Z  \u2713 Ready in 1375ms",
+          "2025-11-11T07:14:58.750553786Z  \u25cb Compiling / ...",
+          "2025-11-11T07:15:00.593620429Z  \u26a0 metadataBase property in metadata export is not set for resolving social open graph or twitter images, using \"http://localhost:3001\". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase",
+          "2025-11-11T07:15:00.706643828Z  GET / 200 in 5.0s (compile: 4.8s, render: 144ms)"
+        ]
+      },
+      "tutor-ai-frontend": {
+        "log_lines_count": 20,
+        "error_count": 0,
+        "warning_count": 0,
+        "recent_logs": [
+          "2025-11-11T00:45:13.454319723Z  GET / 200 in 1127ms (compile: 50ms, render: 1077ms)",
+          "2025-11-11T00:45:30.690363679Z  GET /courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/materials/capitolo1.pdf?book=f92fed02-ecc3-48ea-b7af-7570464a2919 404 in 6.9s (compile: 237ms, render: 6.6s)",
+          "2025-11-11T00:45:36.005956103Z  GET /courses/90a903c0-4ef6-4415-ae3b-9dbc70ad69a9/materials/capitolo1.pdf?book=f92fed02-ecc3-48ea-b7af-7570464a2919 404 in 6.2s (compile: 322ms, render: 5.9s)",
+          "2025-11-11T00:45:40.379105575Z  GET /service-worker.js 404 in 2.2s (compile: 267ms, render: 1884ms)",
+          "2025-11-11T00:45:54.404874813Z  GET / 200 in 5.7s (compile: 1568ms, render: 4.1s)"
+        ]
+      },
+      "tutor-ai-backend": {
+        "log_lines_count": 20,
+        "error_count": 0,
+        "warning_count": 0,
+        "recent_logs": [
+          "2025-11-11T07:15:19.083496270Z     self.rag_service = RAGService()",
+          "2025-11-11T07:15:19.083501554Z                        ^^^^^^^^^^^^",
+          "2025-11-11T07:15:19.083502763Z   File \"/app/services/rag_service.py\", line 31, in __init__",
+          "2025-11-11T07:15:19.085192338Z     from ..logging_config import get_logger, get_structlog_logger, LoggedTimer, PerformanceLogger",
+          "2025-11-11T07:15:19.085199251Z ImportError: attempted relative import beyond top-level package"
+        ]
+      },
+      "tutor-ai-redis": {
+        "log_lines_count": 20,
+        "error_count": 0,
+        "warning_count": 0,
+        "recent_logs": [
+          "2025-11-11T06:18:28.053241528Z 1:M 11 Nov 2025 06:18:28.053 * Done loading RDB, keys loaded: 0, keys expired: 0.",
+          "2025-11-11T06:18:28.053812488Z 1:M 11 Nov 2025 06:18:28.053 * DB loaded from base file appendonly.aof.1.base.rdb: 0.001 seconds",
+          "2025-11-11T06:18:28.053830929Z 1:M 11 Nov 2025 06:18:28.053 * DB loaded from append only file: 0.002 seconds",
+          "2025-11-11T06:18:28.053842925Z 1:M 11 Nov 2025 06:18:28.053 * Opening AOF incr file appendonly.aof.1.incr.aof on server start",
+          "2025-11-11T06:18:28.053844523Z 1:M 11 Nov 2025 06:18:28.053 * Ready to accept connections tcp"
+        ]
+      },
+      "buildx_buildkit_tutor-ai-builder0": {
+        "log_lines_count": 16,
+        "error_count": 0,
+        "warning_count": 0,
+        "recent_logs": [
+          "2025-11-10T20:31:33.234844743Z time=\"2025-11-10T20:31:33Z\" level=error msg=\"/moby.buildkit.v1.Control/Solve returned error: rpc error: code = Unknown desc = process \\\"/bin/sh -c npm run build\\\" did not complete successfully: exit code: 1\" spanID=01337825044ce353 traceID=7212d89be9eed38446d429658a547277",
+          "2025-11-10T20:46:49.833569706Z time=\"2025-11-10T20:46:49Z\" level=info msg=\"fetch failed\" error=\"pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed\" host=registry-1.docker.io",
+          "2025-11-10T20:46:51.290365915Z time=\"2025-11-10T20:46:51Z\" level=info msg=\"fetch failed\" error=\"pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed\" host=registry-1.docker.io",
+          "2025-11-10T21:26:13.059803071Z time=\"2025-11-10T21:26:13Z\" level=error msg=\"/moby.buildkit.v1.Control/Solve returned error: rpc error: code = Unknown desc = process \\\"/bin/sh -c npm run build\\\" did not complete successfully: exit code: 1\" spanID=cb0c72eebc00cd36 traceID=37e5672226de384c29c293c986e3541d",
+          "2025-11-10T21:33:17.216267214Z time=\"2025-11-10T21:33:17Z\" level=error msg=\"/moby.buildkit.v1.Control/Solve returned error: rpc error: code = Unknown desc = process \\\"/bin/sh -c npm run build\\\" did not complete successfully: exit code: 1\" spanID=5c9f2007940e9cb3 traceID=20149556b2c3bf475f28aa679a1c2ada"
+        ]
+      }
+    },
+    "security_isolation": {
+      "tutor-ai-frontend-test": {
+        "user": "root",
+        "is_non_root": false,
+        "capabilities": null,
+        "read_only": false,
+        "has_security_caps": null
+      },
+      "tutor-ai-frontend": {
+        "user": "root",
+        "is_non_root": false,
+        "capabilities": null,
+        "read_only": false,
+        "has_security_caps": null
+      },
+      "tutor-ai-backend": {
+        "user": "root",
+        "is_non_root": false,
+        "capabilities": null,
+        "read_only": false,
+        "has_security_caps": null
+      },
+      "tutor-ai-redis": {
+        "user": "root",
+        "is_non_root": false,
+        "capabilities": null,
+        "read_only": false,
+        "has_security_caps": null
+      },
+      "buildx_buildkit_tutor-ai-builder0": {
+        "user": "root",
+        "is_non_root": false,
+        "capabilities": null,
+        "read_only": false,
+        "has_security_caps": null
+      }
+    },
+    "environment_variables": {
+      "tutor-ai-frontend-test": {
+        "total_env_vars": 7,
+        "present_vars": [
+          "NODE_ENV"
+        ],
+        "missing_vars": [
+          "NEXT_PUBLIC_API_URL"
+        ],
+        "env_count": 7
+      },
+      "tutor-ai-frontend": {
+        "total_env_vars": 9,
+        "present_vars": [
+          "NODE_ENV",
+          "NEXT_PUBLIC_API_URL"
+        ],
+        "missing_vars": [],
+        "env_count": 9
+      },
+      "tutor-ai-backend": {
+        "total_env_vars": 16,
+        "present_vars": [
+          "LOG_LEVEL",
+          "ENVIRONMENT"
+        ],
+        "missing_vars": [
+          "PORT"
+        ],
+        "env_count": 16
+      },
+      "tutor-ai-redis": {
+        "total_env_vars": 5,
+        "present_vars": [],
+        "missing_vars": [],
+        "env_count": 5
+      },
+      "buildx_buildkit_tutor-ai-builder0": {
+        "total_env_vars": 2,
+        "present_vars": [],
+        "missing_vars": [],
+        "env_count": 2
+      }
+    },
+    "image_integrity": {
+      "tutor-ai-frontend-test": {
+        "error": "can't subtract offset-naive and offset-aware datetimes"
+      },
+      "tutor-ai-frontend": {
+        "error": "can't subtract offset-naive and offset-aware datetimes"
+      },
+      "tutor-ai-backend": {
+        "error": "can't subtract offset-naive and offset-aware datetimes"
+      },
+      "tutor-ai-redis": {
+        "error": "can't subtract offset-naive and offset-aware datetimes"
+      },
+      "buildx_buildkit_tutor-ai-builder0": {
+        "error": "can't subtract offset-naive and offset-aware datetimes"
+      }
+    }
+  },
+  "initial_containers": {
+    "tutor-ai-frontend-test": {
+      "id": "fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d",
+      "name": "tutor-ai-frontend-test",
+      "status": "running",
+      "image": "tutor-ai-frontend:dev",
+      "ports": {
+        "3001/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "3001"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "3001"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.service": "frontend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d",
+        "Created": "2025-11-11T07:14:33.211391023Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "npm",
+          "run",
+          "dev"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 9385,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T07:14:33.289388753Z",
+          "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "ResolvConfPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/hostname",
+        "HostsPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/hosts",
+        "LogPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d-json.log",
+        "Name": "/tutor-ai-frontend-test",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "3001/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": [],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [],
+        "Config": {
+          "Hostname": "fced3346e581",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "AttachStderr": false,
+          "ExposedPorts": {
+            "3000/tcp": {},
+            "3001/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "NODE_VERSION=20.19.5",
+            "YARN_VERSION=1.22.22",
+            "NODE_ENV=development",
+            "NEXT_TELEMETRY_DISABLED=1",
+            "PORT=3000",
+            "HOSTNAME=0.0.0.0"
+          ],
+          "Cmd": [
+            "npm",
+            "run",
+            "dev"
+          ],
+          "Image": "tutor-ai-frontend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.service": "frontend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "1a84b31039f6f1f11de6d03bca225e067f84f0dd1acf13c54e4f2e8b1fef7554",
+          "SandboxKey": "/var/run/docker/netns/1a84b31039f6",
+          "Ports": {
+            "3001/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "3001"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": null,
+              "MacAddress": "82:fe:a6:d3:06:30",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "684f8d2bbbf2bb90a4a5b3ea9ee79b7489a9f176d97290e938543699f1af0247",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.4",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-frontend-test",
+                "fced3346e581"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+          "size": 2010,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-frontend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:47:49Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-frontend": {
+      "id": "b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756",
+      "name": "tutor-ai-frontend",
+      "status": "exited",
+      "image": "tutor-ai-frontend:dev",
+      "ports": {},
+      "labels": {
+        "com.docker.compose.config-hash": "f042ed493d559e486057707ab78685199c07dbe7475e929c2ef395fd7567df23",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "backend:service_healthy:false,redis:service_healthy:false",
+        "com.docker.compose.image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "frontend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756",
+        "Created": "2025-11-11T00:20:26.303674589Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "npm",
+          "run",
+          "dev"
+        ],
+        "State": {
+          "Status": "exited",
+          "Running": false,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 0,
+          "ExitCode": 127,
+          "Error": "failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error mounting \"/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fefd3c2bb141a9a9176578bf368b91c122eb0f728cfe433b09fdadb54d0b90ab\" to rootfs at \"/app/package.json\": create mountpoint for /app/package.json mount: cannot create subdirectories in \"/var/lib/docker/rootfs/overlayfs/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/app/package.json\": not a directory: unknown: Are you trying to mount a directory onto a file (or vice-versa)? Check if the specified host path exists and is the expected type",
+          "StartedAt": "2025-11-11T00:26:31.340327278Z",
+          "FinishedAt": "2025-11-11T06:18:26.71905774Z",
+          "Health": {
+            "Status": "starting",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T00:24:14.618849975Z",
+                "End": "2025-11-11T00:24:14.788548437Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              },
+              {
+                "Start": "2025-11-11T00:24:48.821804429Z",
+                "End": "2025-11-11T00:24:58.903422114Z",
+                "ExitCode": -1,
+                "Output": "Health check exceeded timeout (10s):   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0"
+              },
+              {
+                "Start": "2025-11-11T00:25:03.905229947Z",
+                "End": "2025-11-11T00:25:04.485972818Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7..."
+              },
+              {
+                "Start": "2025-11-11T00:25:34.485597576Z",
+                "End": "2025-11-11T00:25:34.601869165Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              },
+              {
+                "Start": "2025-11-11T00:26:04.602303033Z",
+                "End": "2025-11-11T00:26:04.71632927Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              }
+            ]
+          }
+        },
+        "Image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "ResolvConfPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/hostname",
+        "HostsPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/hosts",
+        "LogPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756-json.log",
+        "Name": "/tutor-ai-frontend",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/tsconfig.json:/app/tsconfig.json:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/next.config.js:/app/next.config.js:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/postcss.config.js:/app/postcss.config.js:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package.json:/app/package.json:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package-lock.json:/app/package-lock.json:rw",
+            "tutor-ai_frontend_cache:/app/.next:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fb90da2a1f9d283d5b4318c50f312e472ca5c3fa80caa8ad12633d36fc84445b:/app/src:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d2fb64302becc29ed2a3708e48e0ff552f83e1f4da630d0a4382bc0f1cf5b71f:/app/public:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/85ff93a0c0c7186da42c529a61c1e17ded244d994f11eda22055def0bffdc0fc:/app/styles:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/03c846cce21310f6ccbe46bd5c4b6e300e92a9607d780c88b5d6a3b3f12698e9:/app/tailwind.config.js:rw",
+            "tutor-ai_frontend_node_modules:/app/node_modules:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "3001/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/85ff93a0c0c7186da42c529a61c1e17ded244d994f11eda22055def0bffdc0fc",
+            "Destination": "/app/styles",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/tsconfig.json",
+            "Destination": "/app/tsconfig.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_frontend_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_frontend_cache/_data",
+            "Destination": "/app/.next",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/next.config.js",
+            "Destination": "/app/next.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package-lock.json",
+            "Destination": "/app/package-lock.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fb90da2a1f9d283d5b4318c50f312e472ca5c3fa80caa8ad12633d36fc84445b",
+            "Destination": "/app/src",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/03c846cce21310f6ccbe46bd5c4b6e300e92a9607d780c88b5d6a3b3f12698e9",
+            "Destination": "/app/tailwind.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_frontend_node_modules",
+            "Source": "/var/lib/docker/volumes/tutor-ai_frontend_node_modules/_data",
+            "Destination": "/app/node_modules",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package.json",
+            "Destination": "/app/package.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/postcss.config.js",
+            "Destination": "/app/postcss.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d2fb64302becc29ed2a3708e48e0ff552f83e1f4da630d0a4382bc0f1cf5b71f",
+            "Destination": "/app/public",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          }
+        ],
+        "Config": {
+          "Hostname": "b84ff9ed2a9c",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "3000/tcp": {},
+            "3001/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "HOSTNAME=0.0.0.0",
+            "NEXT_PUBLIC_DEBUG=true",
+            "NEXT_PUBLIC_API_URL=http://localhost:8000",
+            "NODE_ENV=development",
+            "NEXT_TELEMETRY_DISABLED=1",
+            "PORT=3001",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "NODE_VERSION=20.19.5",
+            "YARN_VERSION=1.22.22"
+          ],
+          "Cmd": [
+            "npm",
+            "run",
+            "dev"
+          ],
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "curl",
+              "-f",
+              "http://localhost:3001"
+            ],
+            "Interval": 30000000000,
+            "Timeout": 10000000000,
+            "StartPeriod": 30000000000,
+            "Retries": 3
+          },
+          "Image": "tutor-ai-frontend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "f042ed493d559e486057707ab78685199c07dbe7475e929c2ef395fd7567df23",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "backend:service_healthy:false,redis:service_healthy:false",
+            "com.docker.compose.image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "frontend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "",
+          "SandboxKey": "",
+          "Ports": {},
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-frontend",
+                "frontend"
+              ],
+              "MacAddress": "",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "",
+              "Gateway": "",
+              "IPAddress": "",
+              "IPPrefixLen": 0,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-frontend",
+                "frontend",
+                "b84ff9ed2a9c"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+          "size": 2010,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-frontend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:47:49Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-backend": {
+      "id": "767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac",
+      "name": "tutor-ai-backend",
+      "status": "running",
+      "image": "tutor-ai-backend:dev",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "8000"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "8000"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.config-hash": "b71e9c347b4fb2cd67c9333d794308df010cb471f94bf252cb1a94f645b3a7f6",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "redis:service_healthy:false",
+        "com.docker.compose.image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "backend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac",
+        "Created": "2025-11-11T00:20:26.224486167Z",
+        "Path": "/opt/venv/bin/uvicorn",
+        "Args": [
+          "main:app",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "8000"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 1019,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T06:18:32.177373487Z",
+          "FinishedAt": "2025-11-11T06:18:31.993003112Z",
+          "Health": {
+            "Status": "healthy",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T07:12:25.535693672Z",
+                "End": "2025-11-11T07:12:25.684573739Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  34957      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:12:25.677570\"}"
+              },
+              {
+                "Start": "2025-11-11T07:12:55.68277322Z",
+                "End": "2025-11-11T07:12:55.738641096Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:12:55.736688\"}\r100    61  100    61    0     0  44688      0 --:--:-- --:--:-- --:--:-- 61000\n"
+              },
+              {
+                "Start": "2025-11-11T07:13:25.737745235Z",
+                "End": "2025-11-11T07:13:25.803320743Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  50413      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:13:25.801736\"}"
+              },
+              {
+                "Start": "2025-11-11T07:13:55.801487586Z",
+                "End": "2025-11-11T07:13:55.873312305Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  56744      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:13:55.871792\"}"
+              },
+              {
+                "Start": "2025-11-11T07:14:25.871763356Z",
+                "End": "2025-11-11T07:14:25.944575765Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:14:25.943091\"}\r100    61  100    61    0     0  53934      0 --:--:-- --:--:-- --:--:-- 61000\n"
+              }
+            ]
+          }
+        },
+        "Image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+        "ResolvConfPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/hostname",
+        "HostsPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/hosts",
+        "LogPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac-json.log",
+        "Name": "/tutor-ai-backend",
+        "RestartCount": 3,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "tutor-ai_apt_lib_cache:/var/lib/apt:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/dc9a5996d23f927f5683a745961570bfabfb2e81b5e7423237e01de23d828423:/app/data:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/aee7e59029a62ee681bf60d7fd91f783cb6e2586475e844e195e9fcb9d19cdfe:/app/.env:rw",
+            "tutor-ai_rag_data:/app/rag:rw",
+            "tutor-ai_apt_cache:/var/cache/apt:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d28144761a8934177d968b4b33a458998f2b4e4cbb77b0fc50f24ae3ad0fc9b3:/app:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "8000/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "8000"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": [
+            {
+              "Driver": "nvidia",
+              "Count": -1,
+              "DeviceIDs": null,
+              "Capabilities": [
+                [
+                  "gpu"
+                ]
+              ],
+              "Options": null
+            }
+          ],
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "Mounts": [
+            {
+              "Type": "volume",
+              "Target": "/app/__pycache__",
+              "VolumeOptions": {}
+            },
+            {
+              "Type": "volume",
+              "Target": "/app/.pytest_cache",
+              "VolumeOptions": {}
+            },
+            {
+              "Type": "volume",
+              "Target": "/app/.mypy_cache",
+              "VolumeOptions": {}
+            }
+          ],
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/aee7e59029a62ee681bf60d7fd91f783cb6e2586475e844e195e9fcb9d19cdfe",
+            "Destination": "/app/.env",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "bd438f03af3621aba57d44dd14b5cbf06cf1a30339fb7e9370b087ef960be173",
+            "Source": "/var/lib/docker/volumes/bd438f03af3621aba57d44dd14b5cbf06cf1a30339fb7e9370b087ef960be173/_data",
+            "Destination": "/app/.mypy_cache",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "8c9cd96fcfdeae35d0c42cc0b032c275641e9a9b05ef087c2b77d4895964d39f",
+            "Source": "/var/lib/docker/volumes/8c9cd96fcfdeae35d0c42cc0b032c275641e9a9b05ef087c2b77d4895964d39f/_data",
+            "Destination": "/app/.pytest_cache",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_rag_data",
+            "Source": "/var/lib/docker/volumes/tutor-ai_rag_data/_data",
+            "Destination": "/app/rag",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_apt_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_apt_cache/_data",
+            "Destination": "/var/cache/apt",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_apt_lib_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_apt_lib_cache/_data",
+            "Destination": "/var/lib/apt",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d28144761a8934177d968b4b33a458998f2b4e4cbb77b0fc50f24ae3ad0fc9b3",
+            "Destination": "/app",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "90680fa9d5831fc6882a4b2b50068264291eaba8ed59a93b301c9a372e8067e5",
+            "Source": "/var/lib/docker/volumes/90680fa9d5831fc6882a4b2b50068264291eaba8ed59a93b301c9a372e8067e5/_data",
+            "Destination": "/app/__pycache__",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/dc9a5996d23f927f5683a745961570bfabfb2e81b5e7423237e01de23d828423",
+            "Destination": "/app/data",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          }
+        ],
+        "Config": {
+          "Hostname": "767eec2a61ce",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "8000/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3001",
+            "LOG_LEVEL=debug",
+            "DEBUG=true",
+            "DATA_DIR=/app/data",
+            "PYTHONDONTWRITEBYTECODE=1",
+            "ENVIRONMENT=development",
+            "PYTHONPATH=/app",
+            "PYTHONUNBUFFERED=1",
+            "REDIS_URL=redis://redis:6379",
+            "PATH=/opt/venv/bin:/opt/venv/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LANG=C.UTF-8",
+            "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+            "PYTHON_VERSION=3.11.14",
+            "PYTHON_SHA256=8d3ed8ec5c88c1c95f5e558612a725450d2452813ddad5e58fdb1a53b1209b78",
+            "DEBIAN_FRONTEND=noninteractive",
+            "VENV_PATH=/opt/venv"
+          ],
+          "Cmd": null,
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "curl",
+              "-f",
+              "http://localhost:8000/health"
+            ],
+            "Interval": 30000000000,
+            "Timeout": 10000000000,
+            "StartPeriod": 40000000000,
+            "Retries": 3
+          },
+          "Image": "tutor-ai-backend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "/opt/venv/bin/uvicorn",
+            "main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "b71e9c347b4fb2cd67c9333d794308df010cb471f94bf252cb1a94f645b3a7f6",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "redis:service_healthy:false",
+            "com.docker.compose.image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "backend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "0bdf09b6782f21ec57b99f68e52bd0285d91a457776c5b6c450ea17673c09e33",
+          "SandboxKey": "/var/run/docker/netns/0bdf09b6782f",
+          "Ports": {
+            "8000/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "8000"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "8000"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-backend",
+                "backend"
+              ],
+              "MacAddress": "26:86:92:9a:ae:88",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "df6984bac7522c6141f778ba407c07c4c7451b9425dfa2d9f7afbab658cf3be8",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.3",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-backend",
+                "backend",
+                "767eec2a61ce"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+          "size": 4281,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-backend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:46:52Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-redis": {
+      "id": "37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997",
+      "name": "tutor-ai-redis",
+      "status": "running",
+      "image": "redis:7-alpine",
+      "ports": {
+        "6379/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "6379"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "6379"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.config-hash": "da75b04a1bcfad236068a2681cd8a86b704206e0f3dc1aee7fbf3048fe6b535d",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "redis",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997",
+        "Created": "2025-11-11T00:20:26.16122678Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "redis-server",
+          "--appendonly",
+          "yes",
+          "--notify-keyspace-events",
+          "Ex"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 543,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T06:18:27.688480072Z",
+          "FinishedAt": "2025-11-11T06:18:26.719131355Z",
+          "Health": {
+            "Status": "healthy",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T07:14:14.837996304Z",
+                "End": "2025-11-11T07:14:14.899406375Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:24.900562276Z",
+                "End": "2025-11-11T07:14:24.953038519Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:34.951574046Z",
+                "End": "2025-11-11T07:14:34.999821906Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:45.000727431Z",
+                "End": "2025-11-11T07:14:45.048928135Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:55.049692284Z",
+                "End": "2025-11-11T07:14:55.115218267Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              }
+            ]
+          }
+        },
+        "Image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+        "ResolvConfPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/hostname",
+        "HostsPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/hosts",
+        "LogPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997-json.log",
+        "Name": "/tutor-ai-redis",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "tutor-ai_redis_data:/data:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "6379/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "6379"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_redis_data",
+            "Source": "/var/lib/docker/volumes/tutor-ai_redis_data/_data",
+            "Destination": "/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          }
+        ],
+        "Config": {
+          "Hostname": "37cde9e9d249",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "6379/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "GOSU_VERSION=1.17",
+            "REDIS_VERSION=7.4.7",
+            "REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-7.4.7.tar.gz",
+            "REDIS_DOWNLOAD_SHA=c97e57b0df330a9e091cacff012bebe763c275398cf36ff44cdba876814b595b"
+          ],
+          "Cmd": [
+            "redis-server",
+            "--appendonly",
+            "yes",
+            "--notify-keyspace-events",
+            "Ex"
+          ],
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "redis-cli",
+              "ping"
+            ],
+            "Interval": 10000000000,
+            "Timeout": 5000000000,
+            "StartPeriod": 10000000000,
+            "Retries": 3
+          },
+          "Image": "redis:7-alpine",
+          "Volumes": {
+            "/data": {}
+          },
+          "WorkingDir": "/data",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "da75b04a1bcfad236068a2681cd8a86b704206e0f3dc1aee7fbf3048fe6b535d",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "",
+            "com.docker.compose.image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "redis",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "6ab244df0693990004ba70b95a50bff71af822878c2dca6f6dfb66600b73c00c",
+          "SandboxKey": "/var/run/docker/netns/6ab244df0693",
+          "Ports": {
+            "6379/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "6379"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "6379"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-redis",
+                "redis"
+              ],
+              "MacAddress": "42:be:3f:13:ed:02",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "c8e6ba052ba10dac5d564c61113b7b2088d08164484abe077949fd5ecdf16b64",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.2",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-redis",
+                "redis",
+                "37cde9e9d249"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:4706ecab5371690fecfdd782268929c94ad5b5ce9ce0b35bfdfe191c4ad17851",
+          "size": 2483,
+          "annotations": {
+            "com.docker.official-images.bashbrew.arch": "amd64",
+            "org.opencontainers.image.base.digest": "sha256:41c81533144786e0beb2b148667355a6c7659aa99a14ed837ff15a98ca9d71f3",
+            "org.opencontainers.image.base.name": "alpine:3.21",
+            "org.opencontainers.image.created": "2025-11-03T17:38:49Z",
+            "org.opencontainers.image.revision": "d42d7aec93b1c54dd46f37a66a92f62478456039",
+            "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#d42d7aec93b1c54dd46f37a66a92f62478456039:7.4/alpine",
+            "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+            "org.opencontainers.image.version": "7.4.7-alpine"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "buildx_buildkit_tutor-ai-builder0": {
+      "id": "5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309",
+      "name": "buildx_buildkit_tutor-ai-builder0",
+      "status": "exited",
+      "image": "moby/buildkit:buildx-stable-1",
+      "ports": {},
+      "labels": {
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309",
+        "Created": "2025-11-10T20:25:31.526431647Z",
+        "Path": "buildkitd",
+        "Args": [
+          "--allow-insecure-entitlement",
+          "security.insecure"
+        ],
+        "State": {
+          "Status": "exited",
+          "Running": false,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 0,
+          "ExitCode": 127,
+          "Error": "failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: failed to fulfil mount request: open /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a: no such file or directory: unknown",
+          "StartedAt": "2025-11-10T20:25:31.585547559Z",
+          "FinishedAt": "2025-11-11T06:18:26.719143373Z"
+        },
+        "Image": "sha256:79cc6476ab1a3371c9afd8b44e7c55610057c43e18d9b39b68e2b0c2475cc1b6",
+        "ResolvConfPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/hostname",
+        "HostsPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/hosts",
+        "LogPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309-json.log",
+        "Name": "/buildx_buildkit_tutor-ai-builder0",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "bridge",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": true,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": [
+            "label=disable"
+          ],
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "/docker/buildx",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": [
+            {
+              "Driver": "",
+              "Count": -1,
+              "DeviceIDs": null,
+              "Capabilities": [
+                [
+                  "gpu"
+                ]
+              ],
+              "Options": {}
+            }
+          ],
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "Mounts": [
+            {
+              "Type": "volume",
+              "Source": "buildx_buildkit_tutor-ai-builder0_state",
+              "Target": "/var/lib/buildkit"
+            },
+            {
+              "Type": "bind",
+              "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a",
+              "Target": "/usr/lib/wsl",
+              "ReadOnly": true
+            }
+          ],
+          "MaskedPaths": null,
+          "ReadonlyPaths": null,
+          "Init": true
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a",
+            "Destination": "/usr/lib/wsl",
+            "Mode": "",
+            "RW": false,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "buildx_buildkit_tutor-ai-builder0_state",
+            "Source": "/var/lib/docker/volumes/buildx_buildkit_tutor-ai-builder0_state/_data",
+            "Destination": "/var/lib/buildkit",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          }
+        ],
+        "Config": {
+          "Hostname": "5123da2958d0",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "AttachStderr": false,
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "BUILDKIT_SETUP_CGROUPV2_ROOT=1"
+          ],
+          "Cmd": [
+            "--allow-insecure-entitlement",
+            "security.insecure"
+          ],
+          "Image": "moby/buildkit:buildx-stable-1",
+          "Volumes": {
+            "/var/lib/buildkit": {}
+          },
+          "WorkingDir": "/",
+          "Entrypoint": [
+            "buildkitd"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "",
+          "SandboxKey": "",
+          "Ports": {},
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "bridge": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": null,
+              "MacAddress": "",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "fa00add2e72d25c2148474a0b4a44b01e9edf51b14e83f9eceaf247610e38ce4",
+              "EndpointID": "",
+              "Gateway": "",
+              "IPAddress": "",
+              "IPPrefixLen": 0,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": null
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:dccc69dd895968c4f21aa9e43e715f25f0cedfce4b17f1014c88c307928e22fc",
+          "size": 1599,
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    }
+  },
+  "final_containers": {
+    "tutor-ai-frontend-test": {
+      "id": "fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d",
+      "name": "tutor-ai-frontend-test",
+      "status": "running",
+      "image": "tutor-ai-frontend:dev",
+      "ports": {
+        "3001/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "3001"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "3001"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.service": "frontend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d",
+        "Created": "2025-11-11T07:14:33.211391023Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "npm",
+          "run",
+          "dev"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 9385,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T07:14:33.289388753Z",
+          "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "ResolvConfPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/hostname",
+        "HostsPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/hosts",
+        "LogPath": "/var/lib/docker/containers/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d/fced3346e581b21db71bee3a1eceeb9bb8943d601326450fed2919904e1a149d-json.log",
+        "Name": "/tutor-ai-frontend-test",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "3001/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "no",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": [],
+          "BlkioDeviceReadBps": [],
+          "BlkioDeviceWriteBps": [],
+          "BlkioDeviceReadIOps": [],
+          "BlkioDeviceWriteIOps": [],
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": [],
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": [],
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [],
+        "Config": {
+          "Hostname": "fced3346e581",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "AttachStderr": false,
+          "ExposedPorts": {
+            "3000/tcp": {},
+            "3001/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "NODE_VERSION=20.19.5",
+            "YARN_VERSION=1.22.22",
+            "NODE_ENV=development",
+            "NEXT_TELEMETRY_DISABLED=1",
+            "PORT=3000",
+            "HOSTNAME=0.0.0.0"
+          ],
+          "Cmd": [
+            "npm",
+            "run",
+            "dev"
+          ],
+          "Image": "tutor-ai-frontend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.service": "frontend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "1a84b31039f6f1f11de6d03bca225e067f84f0dd1acf13c54e4f2e8b1fef7554",
+          "SandboxKey": "/var/run/docker/netns/1a84b31039f6",
+          "Ports": {
+            "3001/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "3001"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": null,
+              "MacAddress": "82:fe:a6:d3:06:30",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "684f8d2bbbf2bb90a4a5b3ea9ee79b7489a9f176d97290e938543699f1af0247",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.4",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-frontend-test",
+                "fced3346e581"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+          "size": 2010,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-frontend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:47:49Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-frontend": {
+      "id": "b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756",
+      "name": "tutor-ai-frontend",
+      "status": "exited",
+      "image": "tutor-ai-frontend:dev",
+      "ports": {},
+      "labels": {
+        "com.docker.compose.config-hash": "f042ed493d559e486057707ab78685199c07dbe7475e929c2ef395fd7567df23",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "backend:service_healthy:false,redis:service_healthy:false",
+        "com.docker.compose.image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "frontend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756",
+        "Created": "2025-11-11T00:20:26.303674589Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "npm",
+          "run",
+          "dev"
+        ],
+        "State": {
+          "Status": "exited",
+          "Running": false,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 0,
+          "ExitCode": 127,
+          "Error": "failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error mounting \"/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fefd3c2bb141a9a9176578bf368b91c122eb0f728cfe433b09fdadb54d0b90ab\" to rootfs at \"/app/package.json\": create mountpoint for /app/package.json mount: cannot create subdirectories in \"/var/lib/docker/rootfs/overlayfs/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/app/package.json\": not a directory: unknown: Are you trying to mount a directory onto a file (or vice-versa)? Check if the specified host path exists and is the expected type",
+          "StartedAt": "2025-11-11T00:26:31.340327278Z",
+          "FinishedAt": "2025-11-11T06:18:26.71905774Z",
+          "Health": {
+            "Status": "starting",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T00:24:14.618849975Z",
+                "End": "2025-11-11T00:24:14.788548437Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              },
+              {
+                "Start": "2025-11-11T00:24:48.821804429Z",
+                "End": "2025-11-11T00:24:58.903422114Z",
+                "ExitCode": -1,
+                "Output": "Health check exceeded timeout (10s):   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0"
+              },
+              {
+                "Start": "2025-11-11T00:25:03.905229947Z",
+                "End": "2025-11-11T00:25:04.485972818Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7..."
+              },
+              {
+                "Start": "2025-11-11T00:25:34.485597576Z",
+                "End": "2025-11-11T00:25:34.601869165Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              },
+              {
+                "Start": "2025-11-11T00:26:04.602303033Z",
+                "End": "2025-11-11T00:26:04.71632927Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0<!DOCTYPE html><html lang=\"it\" class=\"scroll-smooth\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"stylesheet\" href=\"/_next/static/chunks/src_app_globals_91e4631d.css\" data-precedence=\"next_static/chunks/src_app_globals_91e4631d.css\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_97d9280c._.js\"/><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-dom_1e674e59._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_a6ce9b62._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_4b2403f5._.js\" async=\"\"></script><script src=\"/_next/static/chunks/4e2c9_%40swc_helpers_cjs_0c5313ba._.js\" async=\"\"></script><script src=\"/_next/static/chunks/_a0ff3932._.js\" async=\"\"></script><script src=\"/_next/static/chunks/turbopack-_144f327e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_094231d7._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_b1ea393c.js\" async=\"\"></script><script src=\"/_next/static/chunks/_74053763._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_layout_tsx_b1ea393c._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_797f5404._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_7bb2ebd6._.js\" async=\"\"></script><script src=\"/_next/static/chunks/src_app_page_tsx_3544ed0e._.js\" async=\"\"></script><script src=\"/_next/static/chunks/node_modules_next_dist_build_polyfills_polyfill-nomodule.js\" noModule=\"\"></script></head><body class=\" antialiased\"><div hidden=\"\"><!--$?--><template id=\"B:0\"></template><!--/$--></div><div class=\"min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900\"><div class=\"absolute inset-0 overflow-hidden\"><div class=\"absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/10 via-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-float\"></div><div class=\"absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-amber-400/10 via-rose-400/10 to-purple-400/10 rounded-full blur-3xl animate-float\" style=\"animation-delay:2s\"></div><div class=\"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-emerald-400/5 via-cyan-400/5 to-blue-400/5 rounded-full blur-3xl animate-pulse\" style=\"animation-delay:4s\"></div></div><div class=\"absolute inset-0 bg-[url(&#x27;/grid.svg&#x27;)] opacity-5\"></div><div class=\"relative z-10\"><nav class=\"glass sticky top-0 z-50 backdrop-blur-xl border-b border-gray-200/50\"><div class=\"container-responsive\"><div class=\"flex justify-between items-center h-16 lg:h-20\"><div class=\"flex items-center space-x-6 lg:space-x-8\"><a class=\"flex items-center space-x-3 group hover-lift\" href=\"/\"><div class=\"relative\"><div class=\"w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-brain h-6 w-6 lg:h-7 lg:w-7 text-white\" aria-hidden=\"true\"><path d=\"M12 18V5\"></path><path d=\"M15 13a4.17 ..."
+              }
+            ]
+          }
+        },
+        "Image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+        "ResolvConfPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/hostname",
+        "HostsPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/hosts",
+        "LogPath": "/var/lib/docker/containers/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756/b84ff9ed2a9cdbb8409d51613a5744b9dcccd8ab9b4f6a79ef99242b02dc9756-json.log",
+        "Name": "/tutor-ai-frontend",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/tsconfig.json:/app/tsconfig.json:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/next.config.js:/app/next.config.js:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/postcss.config.js:/app/postcss.config.js:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package.json:/app/package.json:rw",
+            "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package-lock.json:/app/package-lock.json:rw",
+            "tutor-ai_frontend_cache:/app/.next:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fb90da2a1f9d283d5b4318c50f312e472ca5c3fa80caa8ad12633d36fc84445b:/app/src:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d2fb64302becc29ed2a3708e48e0ff552f83e1f4da630d0a4382bc0f1cf5b71f:/app/public:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/85ff93a0c0c7186da42c529a61c1e17ded244d994f11eda22055def0bffdc0fc:/app/styles:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/03c846cce21310f6ccbe46bd5c4b6e300e92a9607d780c88b5d6a3b3f12698e9:/app/tailwind.config.js:rw",
+            "tutor-ai_frontend_node_modules:/app/node_modules:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "3001/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "3001"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/tsconfig.json",
+            "Destination": "/app/tsconfig.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_frontend_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_frontend_cache/_data",
+            "Destination": "/app/.next",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/next.config.js",
+            "Destination": "/app/next.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package-lock.json",
+            "Destination": "/app/package-lock.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/fb90da2a1f9d283d5b4318c50f312e472ca5c3fa80caa8ad12633d36fc84445b",
+            "Destination": "/app/src",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/03c846cce21310f6ccbe46bd5c4b6e300e92a9607d780c88b5d6a3b3f12698e9",
+            "Destination": "/app/tailwind.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_frontend_node_modules",
+            "Source": "/var/lib/docker/volumes/tutor-ai_frontend_node_modules/_data",
+            "Destination": "/app/node_modules",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/package.json",
+            "Destination": "/app/package.json",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/frontend/postcss.config.js",
+            "Destination": "/app/postcss.config.js",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d2fb64302becc29ed2a3708e48e0ff552f83e1f4da630d0a4382bc0f1cf5b71f",
+            "Destination": "/app/public",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/85ff93a0c0c7186da42c529a61c1e17ded244d994f11eda22055def0bffdc0fc",
+            "Destination": "/app/styles",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          }
+        ],
+        "Config": {
+          "Hostname": "b84ff9ed2a9c",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "3000/tcp": {},
+            "3001/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "HOSTNAME=0.0.0.0",
+            "NEXT_PUBLIC_DEBUG=true",
+            "NEXT_PUBLIC_API_URL=http://localhost:8000",
+            "NODE_ENV=development",
+            "NEXT_TELEMETRY_DISABLED=1",
+            "PORT=3001",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "NODE_VERSION=20.19.5",
+            "YARN_VERSION=1.22.22"
+          ],
+          "Cmd": [
+            "npm",
+            "run",
+            "dev"
+          ],
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "curl",
+              "-f",
+              "http://localhost:3001"
+            ],
+            "Interval": 30000000000,
+            "Timeout": 10000000000,
+            "StartPeriod": 30000000000,
+            "Retries": 3
+          },
+          "Image": "tutor-ai-frontend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "f042ed493d559e486057707ab78685199c07dbe7475e929c2ef395fd7567df23",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "backend:service_healthy:false,redis:service_healthy:false",
+            "com.docker.compose.image": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "frontend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "",
+          "SandboxKey": "",
+          "Ports": {},
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-frontend",
+                "frontend"
+              ],
+              "MacAddress": "",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "",
+              "Gateway": "",
+              "IPAddress": "",
+              "IPPrefixLen": 0,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-frontend",
+                "frontend",
+                "b84ff9ed2a9c"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:beec1350330a7217c8880f8cd72a0180b29724cd55f75c03eefd64bade97f8df",
+          "size": 2010,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-frontend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:47:49Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-backend": {
+      "id": "767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac",
+      "name": "tutor-ai-backend",
+      "status": "running",
+      "image": "tutor-ai-backend:dev",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "8000"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "8000"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.config-hash": "b71e9c347b4fb2cd67c9333d794308df010cb471f94bf252cb1a94f645b3a7f6",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "redis:service_healthy:false",
+        "com.docker.compose.image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "backend",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac",
+        "Created": "2025-11-11T00:20:26.224486167Z",
+        "Path": "/opt/venv/bin/uvicorn",
+        "Args": [
+          "main:app",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "8000"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 10007,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T07:15:20.073639603Z",
+          "FinishedAt": "2025-11-11T07:15:20.061080896Z",
+          "Health": {
+            "Status": "starting",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T07:13:25.737745235Z",
+                "End": "2025-11-11T07:13:25.803320743Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  50413      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:13:25.801736\"}"
+              },
+              {
+                "Start": "2025-11-11T07:13:55.801487586Z",
+                "End": "2025-11-11T07:13:55.873312305Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  56744      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:13:55.871792\"}"
+              },
+              {
+                "Start": "2025-11-11T07:14:25.871763356Z",
+                "End": "2025-11-11T07:14:25.944575765Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:14:25.943091\"}\r100    61  100    61    0     0  53934      0 --:--:-- --:--:-- --:--:-- 61000\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:55.944357898Z",
+                "End": "2025-11-11T07:14:56.006146386Z",
+                "ExitCode": 0,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100    61  100    61    0     0  49836      0 --:--:-- --:--:-- --:--:-- 61000\n{\"status\":\"healthy\",\"timestamp\":\"2025-11-11T07:14:56.004520\"}"
+              },
+              {
+                "Start": "2025-11-11T07:15:15.216712511Z",
+                "End": "2025-11-11T07:15:15.300937945Z",
+                "ExitCode": 7,
+                "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\ncurl: (7) Failed to connect to localhost port 8000 after 0 ms: Could not connect to server\n"
+              }
+            ]
+          }
+        },
+        "Image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+        "ResolvConfPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/hostname",
+        "HostsPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/hosts",
+        "LogPath": "/var/lib/docker/containers/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac/767eec2a61ce1c70faddd569bb6cd1059f80eac525cf4f566f31a517a9e060ac-json.log",
+        "Name": "/tutor-ai-backend",
+        "RestartCount": 1,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "tutor-ai_apt_lib_cache:/var/lib/apt:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/dc9a5996d23f927f5683a745961570bfabfb2e81b5e7423237e01de23d828423:/app/data:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/aee7e59029a62ee681bf60d7fd91f783cb6e2586475e844e195e9fcb9d19cdfe:/app/.env:rw",
+            "tutor-ai_rag_data:/app/rag:rw",
+            "tutor-ai_apt_cache:/var/cache/apt:rw",
+            "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d28144761a8934177d968b4b33a458998f2b4e4cbb77b0fc50f24ae3ad0fc9b3:/app:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "8000/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "8000"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": [
+            {
+              "Driver": "nvidia",
+              "Count": -1,
+              "DeviceIDs": null,
+              "Capabilities": [
+                [
+                  "gpu"
+                ]
+              ],
+              "Options": null
+            }
+          ],
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "Mounts": [
+            {
+              "Type": "volume",
+              "Target": "/app/__pycache__",
+              "VolumeOptions": {}
+            },
+            {
+              "Type": "volume",
+              "Target": "/app/.pytest_cache",
+              "VolumeOptions": {}
+            },
+            {
+              "Type": "volume",
+              "Target": "/app/.mypy_cache",
+              "VolumeOptions": {}
+            }
+          ],
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/d28144761a8934177d968b4b33a458998f2b4e4cbb77b0fc50f24ae3ad0fc9b3",
+            "Destination": "/app",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "90680fa9d5831fc6882a4b2b50068264291eaba8ed59a93b301c9a372e8067e5",
+            "Source": "/var/lib/docker/volumes/90680fa9d5831fc6882a4b2b50068264291eaba8ed59a93b301c9a372e8067e5/_data",
+            "Destination": "/app/__pycache__",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/dc9a5996d23f927f5683a745961570bfabfb2e81b5e7423237e01de23d828423",
+            "Destination": "/app/data",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/aee7e59029a62ee681bf60d7fd91f783cb6e2586475e844e195e9fcb9d19cdfe",
+            "Destination": "/app/.env",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "bd438f03af3621aba57d44dd14b5cbf06cf1a30339fb7e9370b087ef960be173",
+            "Source": "/var/lib/docker/volumes/bd438f03af3621aba57d44dd14b5cbf06cf1a30339fb7e9370b087ef960be173/_data",
+            "Destination": "/app/.mypy_cache",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "8c9cd96fcfdeae35d0c42cc0b032c275641e9a9b05ef087c2b77d4895964d39f",
+            "Source": "/var/lib/docker/volumes/8c9cd96fcfdeae35d0c42cc0b032c275641e9a9b05ef087c2b77d4895964d39f/_data",
+            "Destination": "/app/.pytest_cache",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_rag_data",
+            "Source": "/var/lib/docker/volumes/tutor-ai_rag_data/_data",
+            "Destination": "/app/rag",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_apt_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_apt_cache/_data",
+            "Destination": "/var/cache/apt",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          },
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_apt_lib_cache",
+            "Source": "/var/lib/docker/volumes/tutor-ai_apt_lib_cache/_data",
+            "Destination": "/var/lib/apt",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          }
+        ],
+        "Config": {
+          "Hostname": "767eec2a61ce",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "8000/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3001",
+            "LOG_LEVEL=debug",
+            "DEBUG=true",
+            "DATA_DIR=/app/data",
+            "PYTHONDONTWRITEBYTECODE=1",
+            "ENVIRONMENT=development",
+            "PYTHONPATH=/app",
+            "PYTHONUNBUFFERED=1",
+            "REDIS_URL=redis://redis:6379",
+            "PATH=/opt/venv/bin:/opt/venv/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "LANG=C.UTF-8",
+            "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+            "PYTHON_VERSION=3.11.14",
+            "PYTHON_SHA256=8d3ed8ec5c88c1c95f5e558612a725450d2452813ddad5e58fdb1a53b1209b78",
+            "DEBIAN_FRONTEND=noninteractive",
+            "VENV_PATH=/opt/venv"
+          ],
+          "Cmd": null,
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "curl",
+              "-f",
+              "http://localhost:8000/health"
+            ],
+            "Interval": 30000000000,
+            "Timeout": 10000000000,
+            "StartPeriod": 40000000000,
+            "Retries": 3
+          },
+          "Image": "tutor-ai-backend:dev",
+          "Volumes": null,
+          "WorkingDir": "/app",
+          "Entrypoint": [
+            "/opt/venv/bin/uvicorn",
+            "main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "b71e9c347b4fb2cd67c9333d794308df010cb471f94bf252cb1a94f645b3a7f6",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "redis:service_healthy:false",
+            "com.docker.compose.image": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "backend",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "d595570e8845fc297e60e81e45acfe7ceacb0ff5de19096055c224f194a2327e",
+          "SandboxKey": "/var/run/docker/netns/d595570e8845",
+          "Ports": {
+            "8000/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "8000"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "8000"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-backend",
+                "backend"
+              ],
+              "MacAddress": "d6:fb:33:c0:e1:f6",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "5b398d454dbaeb5cab43ae06e72a1a4c946810f588c1dbe6a028f2f41966e065",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.3",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-backend",
+                "backend",
+                "767eec2a61ce"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:563c28ac1a6170d57136d3bc2814a0c68bddcfca6258d05a7ee08553842964dd",
+          "size": 4281,
+          "annotations": {
+            "io.containerd.image.name": "docker.io/library/tutor-ai-backend:dev",
+            "org.opencontainers.image.created": "2025-11-10T20:46:52Z",
+            "org.opencontainers.image.ref.name": "dev"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "tutor-ai-redis": {
+      "id": "37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997",
+      "name": "tutor-ai-redis",
+      "status": "running",
+      "image": "redis:7-alpine",
+      "ports": {
+        "6379/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "6379"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "6379"
+          }
+        ]
+      },
+      "labels": {
+        "com.docker.compose.config-hash": "da75b04a1bcfad236068a2681cd8a86b704206e0f3dc1aee7fbf3048fe6b535d",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "tutor-ai",
+        "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+        "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+        "com.docker.compose.service": "redis",
+        "com.docker.compose.version": "2.40.3",
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997",
+        "Created": "2025-11-11T00:20:26.16122678Z",
+        "Path": "docker-entrypoint.sh",
+        "Args": [
+          "redis-server",
+          "--appendonly",
+          "yes",
+          "--notify-keyspace-events",
+          "Ex"
+        ],
+        "State": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 543,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2025-11-11T06:18:27.688480072Z",
+          "FinishedAt": "2025-11-11T06:18:26.719131355Z",
+          "Health": {
+            "Status": "healthy",
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "Start": "2025-11-11T07:14:34.951574046Z",
+                "End": "2025-11-11T07:14:34.999821906Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:45.000727431Z",
+                "End": "2025-11-11T07:14:45.048928135Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:14:55.049692284Z",
+                "End": "2025-11-11T07:14:55.115218267Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:15:05.115084323Z",
+                "End": "2025-11-11T07:15:05.194448674Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              },
+              {
+                "Start": "2025-11-11T07:15:15.194961792Z",
+                "End": "2025-11-11T07:15:15.293781453Z",
+                "ExitCode": 0,
+                "Output": "PONG\n"
+              }
+            ]
+          }
+        },
+        "Image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+        "ResolvConfPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/hostname",
+        "HostsPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/hosts",
+        "LogPath": "/var/lib/docker/containers/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997/37cde9e9d24922f8b619fb317d2ce8f5ae89e1acb71d79324b7fa02bc35ca997-json.log",
+        "Name": "/tutor-ai-redis",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": [
+            "tutor-ai_redis_data:/data:rw"
+          ],
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "tutor-ai-network",
+          "PortBindings": {
+            "6379/tcp": [
+              {
+                "HostIp": "",
+                "HostPort": "6379"
+              }
+            ]
+          },
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": [],
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": false,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": null,
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": null,
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "MaskedPaths": [
+            "/proc/asound",
+            "/proc/acpi",
+            "/proc/interrupts",
+            "/proc/kcore",
+            "/proc/keys",
+            "/proc/latency_stats",
+            "/proc/timer_list",
+            "/proc/timer_stats",
+            "/proc/sched_debug",
+            "/proc/scsi",
+            "/sys/firmware",
+            "/sys/devices/virtual/powercap"
+          ],
+          "ReadonlyPaths": [
+            "/proc/bus",
+            "/proc/fs",
+            "/proc/irq",
+            "/proc/sys",
+            "/proc/sysrq-trigger"
+          ]
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "volume",
+            "Name": "tutor-ai_redis_data",
+            "Source": "/var/lib/docker/volumes/tutor-ai_redis_data/_data",
+            "Destination": "/data",
+            "Driver": "local",
+            "Mode": "rw",
+            "RW": true,
+            "Propagation": ""
+          }
+        ],
+        "Config": {
+          "Hostname": "37cde9e9d249",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": true,
+          "AttachStderr": true,
+          "ExposedPorts": {
+            "6379/tcp": {}
+          },
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "GOSU_VERSION=1.17",
+            "REDIS_VERSION=7.4.7",
+            "REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-7.4.7.tar.gz",
+            "REDIS_DOWNLOAD_SHA=c97e57b0df330a9e091cacff012bebe763c275398cf36ff44cdba876814b595b"
+          ],
+          "Cmd": [
+            "redis-server",
+            "--appendonly",
+            "yes",
+            "--notify-keyspace-events",
+            "Ex"
+          ],
+          "Healthcheck": {
+            "Test": [
+              "CMD",
+              "redis-cli",
+              "ping"
+            ],
+            "Interval": 10000000000,
+            "Timeout": 5000000000,
+            "StartPeriod": 10000000000,
+            "Retries": 3
+          },
+          "Image": "redis:7-alpine",
+          "Volumes": {
+            "/data": {}
+          },
+          "WorkingDir": "/data",
+          "Entrypoint": [
+            "docker-entrypoint.sh"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "com.docker.compose.config-hash": "da75b04a1bcfad236068a2681cd8a86b704206e0f3dc1aee7fbf3048fe6b535d",
+            "com.docker.compose.container-number": "1",
+            "com.docker.compose.depends_on": "",
+            "com.docker.compose.image": "sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba",
+            "com.docker.compose.oneoff": "False",
+            "com.docker.compose.project": "tutor-ai",
+            "com.docker.compose.project.config_files": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.yml,/mnt/c/Users/pietr/Documents/progetto/tutor-ai/docker-compose.dev.yml",
+            "com.docker.compose.project.working_dir": "/mnt/c/Users/pietr/Documents/progetto/tutor-ai",
+            "com.docker.compose.service": "redis",
+            "com.docker.compose.version": "2.40.3",
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "6ab244df0693990004ba70b95a50bff71af822878c2dca6f6dfb66600b73c00c",
+          "SandboxKey": "/var/run/docker/netns/6ab244df0693",
+          "Ports": {
+            "6379/tcp": [
+              {
+                "HostIp": "0.0.0.0",
+                "HostPort": "6379"
+              },
+              {
+                "HostIp": "::",
+                "HostPort": "6379"
+              }
+            ]
+          },
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "tutor-ai-network": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": [
+                "tutor-ai-redis",
+                "redis"
+              ],
+              "MacAddress": "42:be:3f:13:ed:02",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "7325d61847471a0ece9a94edb36084ba15ff6250856ea059eb9b0e5975d7026d",
+              "EndpointID": "c8e6ba052ba10dac5d564c61113b7b2088d08164484abe077949fd5ecdf16b64",
+              "Gateway": "172.18.0.1",
+              "IPAddress": "172.18.0.2",
+              "IPPrefixLen": 16,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": [
+                "tutor-ai-redis",
+                "redis",
+                "37cde9e9d249"
+              ]
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:4706ecab5371690fecfdd782268929c94ad5b5ce9ce0b35bfdfe191c4ad17851",
+          "size": 2483,
+          "annotations": {
+            "com.docker.official-images.bashbrew.arch": "amd64",
+            "org.opencontainers.image.base.digest": "sha256:41c81533144786e0beb2b148667355a6c7659aa99a14ed837ff15a98ca9d71f3",
+            "org.opencontainers.image.base.name": "alpine:3.21",
+            "org.opencontainers.image.created": "2025-11-03T17:38:49Z",
+            "org.opencontainers.image.revision": "d42d7aec93b1c54dd46f37a66a92f62478456039",
+            "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#d42d7aec93b1c54dd46f37a66a92f62478456039:7.4/alpine",
+            "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+            "org.opencontainers.image.version": "7.4.7-alpine"
+          },
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    },
+    "buildx_buildkit_tutor-ai-builder0": {
+      "id": "5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309",
+      "name": "buildx_buildkit_tutor-ai-builder0",
+      "status": "exited",
+      "image": "moby/buildkit:buildx-stable-1",
+      "ports": {},
+      "labels": {
+        "desktop.docker.io/wsl-distro": "Ubuntu"
+      },
+      "attrs": {
+        "Id": "5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309",
+        "Created": "2025-11-10T20:25:31.526431647Z",
+        "Path": "buildkitd",
+        "Args": [
+          "--allow-insecure-entitlement",
+          "security.insecure"
+        ],
+        "State": {
+          "Status": "exited",
+          "Running": false,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": false,
+          "Dead": false,
+          "Pid": 0,
+          "ExitCode": 127,
+          "Error": "failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: failed to fulfil mount request: open /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a: no such file or directory: unknown",
+          "StartedAt": "2025-11-10T20:25:31.585547559Z",
+          "FinishedAt": "2025-11-11T06:18:26.719143373Z"
+        },
+        "Image": "sha256:79cc6476ab1a3371c9afd8b44e7c55610057c43e18d9b39b68e2b0c2475cc1b6",
+        "ResolvConfPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/hostname",
+        "HostsPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/hosts",
+        "LogPath": "/var/lib/docker/containers/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309/5123da2958d08cb1ddc2a6003d0dba296c31c3cb8a58c78f5dbd0d9c2db90309-json.log",
+        "Name": "/buildx_buildkit_tutor-ai-builder0",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+          "Binds": null,
+          "ContainerIDFile": "",
+          "LogConfig": {
+            "Type": "json-file",
+            "Config": {}
+          },
+          "NetworkMode": "bridge",
+          "PortBindings": {},
+          "RestartPolicy": {
+            "Name": "unless-stopped",
+            "MaximumRetryCount": 0
+          },
+          "AutoRemove": false,
+          "VolumeDriver": "",
+          "VolumesFrom": null,
+          "ConsoleSize": [
+            0,
+            0
+          ],
+          "CapAdd": null,
+          "CapDrop": null,
+          "CgroupnsMode": "private",
+          "Dns": [],
+          "DnsOptions": [],
+          "DnsSearch": [],
+          "ExtraHosts": null,
+          "GroupAdd": null,
+          "IpcMode": "private",
+          "Cgroup": "",
+          "Links": null,
+          "OomScoreAdj": 0,
+          "PidMode": "",
+          "Privileged": true,
+          "PublishAllPorts": false,
+          "ReadonlyRootfs": false,
+          "SecurityOpt": [
+            "label=disable"
+          ],
+          "UTSMode": "",
+          "UsernsMode": "",
+          "ShmSize": 67108864,
+          "Runtime": "runc",
+          "Isolation": "",
+          "CpuShares": 0,
+          "Memory": 0,
+          "NanoCpus": 0,
+          "CgroupParent": "/docker/buildx",
+          "BlkioWeight": 0,
+          "BlkioWeightDevice": null,
+          "BlkioDeviceReadBps": null,
+          "BlkioDeviceWriteBps": null,
+          "BlkioDeviceReadIOps": null,
+          "BlkioDeviceWriteIOps": null,
+          "CpuPeriod": 0,
+          "CpuQuota": 0,
+          "CpuRealtimePeriod": 0,
+          "CpuRealtimeRuntime": 0,
+          "CpusetCpus": "",
+          "CpusetMems": "",
+          "Devices": null,
+          "DeviceCgroupRules": null,
+          "DeviceRequests": [
+            {
+              "Driver": "",
+              "Count": -1,
+              "DeviceIDs": null,
+              "Capabilities": [
+                [
+                  "gpu"
+                ]
+              ],
+              "Options": {}
+            }
+          ],
+          "MemoryReservation": 0,
+          "MemorySwap": 0,
+          "MemorySwappiness": null,
+          "OomKillDisable": null,
+          "PidsLimit": null,
+          "Ulimits": null,
+          "CpuCount": 0,
+          "CpuPercent": 0,
+          "IOMaximumIOps": 0,
+          "IOMaximumBandwidth": 0,
+          "Mounts": [
+            {
+              "Type": "volume",
+              "Source": "buildx_buildkit_tutor-ai-builder0_state",
+              "Target": "/var/lib/buildkit"
+            },
+            {
+              "Type": "bind",
+              "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a",
+              "Target": "/usr/lib/wsl",
+              "ReadOnly": true
+            }
+          ],
+          "MaskedPaths": null,
+          "ReadonlyPaths": null,
+          "Init": true
+        },
+        "GraphDriver": {
+          "Data": null,
+          "Name": "overlayfs"
+        },
+        "Mounts": [
+          {
+            "Type": "bind",
+            "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu/f969f076ad437ac0162d56bf356c2a910d8ddd313a6ac1d90246b6b64d06d59a",
+            "Destination": "/usr/lib/wsl",
+            "Mode": "",
+            "RW": false,
+            "Propagation": "rprivate"
+          },
+          {
+            "Type": "volume",
+            "Name": "buildx_buildkit_tutor-ai-builder0_state",
+            "Source": "/var/lib/docker/volumes/buildx_buildkit_tutor-ai-builder0_state/_data",
+            "Destination": "/var/lib/buildkit",
+            "Driver": "local",
+            "Mode": "z",
+            "RW": true,
+            "Propagation": ""
+          }
+        ],
+        "Config": {
+          "Hostname": "5123da2958d0",
+          "Domainname": "",
+          "User": "",
+          "AttachStdin": false,
+          "AttachStdout": false,
+          "AttachStderr": false,
+          "Tty": false,
+          "OpenStdin": false,
+          "StdinOnce": false,
+          "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "BUILDKIT_SETUP_CGROUPV2_ROOT=1"
+          ],
+          "Cmd": [
+            "--allow-insecure-entitlement",
+            "security.insecure"
+          ],
+          "Image": "moby/buildkit:buildx-stable-1",
+          "Volumes": {
+            "/var/lib/buildkit": {}
+          },
+          "WorkingDir": "/",
+          "Entrypoint": [
+            "buildkitd"
+          ],
+          "OnBuild": null,
+          "Labels": {
+            "desktop.docker.io/wsl-distro": "Ubuntu"
+          },
+          "StopTimeout": 1
+        },
+        "NetworkSettings": {
+          "Bridge": "",
+          "SandboxID": "",
+          "SandboxKey": "",
+          "Ports": {},
+          "HairpinMode": false,
+          "LinkLocalIPv6Address": "",
+          "LinkLocalIPv6PrefixLen": 0,
+          "SecondaryIPAddresses": null,
+          "SecondaryIPv6Addresses": null,
+          "EndpointID": "",
+          "Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "IPAddress": "",
+          "IPPrefixLen": 0,
+          "IPv6Gateway": "",
+          "MacAddress": "",
+          "Networks": {
+            "bridge": {
+              "IPAMConfig": null,
+              "Links": null,
+              "Aliases": null,
+              "MacAddress": "",
+              "DriverOpts": null,
+              "GwPriority": 0,
+              "NetworkID": "fa00add2e72d25c2148474a0b4a44b01e9edf51b14e83f9eceaf247610e38ce4",
+              "EndpointID": "",
+              "Gateway": "",
+              "IPAddress": "",
+              "IPPrefixLen": 0,
+              "IPv6Gateway": "",
+              "GlobalIPv6Address": "",
+              "GlobalIPv6PrefixLen": 0,
+              "DNSNames": null
+            }
+          }
+        },
+        "ImageManifestDescriptor": {
+          "mediaType": "application/vnd.oci.image.manifest.v1+json",
+          "digest": "sha256:dccc69dd895968c4f21aa9e43e715f25f0cedfce4b17f1014c88c307928e22fc",
+          "size": 1599,
+          "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+          }
+        }
+      }
+    }
+  }
+}

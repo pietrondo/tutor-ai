@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from .rag_service import RAGService
-from .llm_service import LLMService
+from services.rag_service import RAGService
+from services.llm_service import LLMService
 
 logger = structlog.get_logger()
 

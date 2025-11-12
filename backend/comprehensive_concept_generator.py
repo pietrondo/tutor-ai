@@ -23,7 +23,7 @@ logger = structlog.get_logger()
 class ComprehensiveConceptGenerator:
     def __init__(self):
         self.concept_service = ConceptMapService()
-        self.base_url = "http://localhost:8001"
+        self.base_url = "http://localhost:8000"
 
     async def generate_comprehensive_concepts(self, course_id: str):
         """Genera mappa concettuale completa basata su tutti i materiali del corso."""

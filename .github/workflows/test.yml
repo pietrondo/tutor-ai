@@ -1,0 +1,484 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  # Backend Tests
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      # Setup database for testing
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      # Redis for caching tests
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+        cache-dependency-path: |
+          backend/requirements.txt
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-asyncio pytest-mock
+
+    - name: Run backend linting
+      run: |
+        cd backend
+        pip install flake8 black isort
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check .
+        isort --check-only .
+
+    - name: Run backend unit tests
+      run: |
+        cd backend
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+      env:
+        DATABASE_URL: sqlite:///./test.db
+        REDIS_URL: redis://localhost:6379
+        LOG_LEVEL: ERROR
+        ENVIRONMENT: testing
+
+    - name: Run backend integration tests
+      run: |
+        cd backend
+        pytest tests/integration/ -v --tb=short
+      env:
+        DATABASE_URL: sqlite:///./test_integration.db
+        REDIS_URL: redis://localhost:6379
+        LOG_LEVEL: ERROR
+        ENVIRONMENT: testing
+
+    - name: Upload backend coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: backend/coverage.xml
+        flags: backend
+        name: backend-coverage
+
+    - name: Archive backend test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: backend-test-results
+        path: |
+          backend/htmlcov/
+          backend/test-reports/
+
+  # Frontend Tests
+  frontend-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run frontend linting
+      run: |
+        cd frontend
+        npm run lint
+        npm run type-check
+
+    - name: Run frontend unit tests
+      run: |
+        cd frontend
+        npm run test -- --coverage --watchAll=false
+      env:
+        NODE_ENV: test
+
+    - name: Run frontend integration tests
+      run: |
+        cd frontend
+        npm run test:integration
+
+    - name: Build frontend for testing
+      run: |
+        cd frontend
+        npm run build
+      env:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+
+    - name: Upload frontend coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+    - name: Archive frontend test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: frontend-test-results
+        path: |
+          frontend/coverage/
+          frontend/test-results/
+
+  # E2E Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start application stack
+      run: |
+        # Start the full application stack
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+        # Wait for services to be healthy
+        timeout 300 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+        timeout 300 bash -c 'until curl -f http://localhost:3000; do sleep 5; done'
+
+    - name: Set up Python for E2E tests
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install E2E test dependencies
+      run: |
+        pip install pytest pytest-asyncio playwright httpx
+
+    - name: Install Playwright browsers
+      run: |
+        playwright install chromium firefox webkit
+
+    - name: Run E2E tests
+      run: |
+        pytest tests/e2e/ -v --tb=short --maxfail=3
+      env:
+        BASE_URL: http://localhost:3000
+        API_URL: http://localhost:8000
+
+    - name: Run browser compatibility tests
+      run: |
+        pytest tests/e2e/ -v -m "browser_compatibility" --maxfail=2
+
+    - name: Archive E2E test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: |
+          test-results/
+          playwright-report/
+
+    - name: Cleanup Docker containers
+      if: always()
+      run: |
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+        docker system prune -f
+
+  # Performance Tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start application for performance testing
+      run: |
+        docker-compose -f docker-compose.yml -f docker-compose.optimized.yml up -d
+        sleep 30  # Wait for full startup
+
+    - name: Run load tests
+      run: |
+        # Install load testing tools
+        pip install locust
+
+        # Run load tests
+        locust --headless --users 50 --spawn-rate 5 --run-time 60s \
+          --host http://localhost:3000 \
+          -f tests/performance/locustfile.py
+
+    - name: Run performance benchmarks
+      run: |
+        cd tests/performance
+        python benchmark.py --base-url http://localhost:3000 --output benchmark-results.json
+
+    - name: Performance regression check
+      run: |
+        cd tests/performance
+        python check_regression.py --current benchmark-results.json --threshold 10
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: tests/performance/results/
+
+    - name: Cleanup performance test environment
+      if: always()
+      run: |
+        docker-compose -f docker-compose.yml -f docker-compose.optimized.yml down -v
+
+  # Security Tests
+  security-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run security scan on backend
+      run: |
+        # Install security scanning tools
+        pip install safety bandit
+
+        # Scan dependencies
+        cd backend
+        safety check --json --output safety-report.json || true
+        bandit -r . -f json -o bandit-report.json || true
+
+    - name: Run security scan on frontend
+      run: |
+        cd frontend
+        npm audit --audit-level=high --json > npm-audit.json || true
+
+    - name: Run container security scan
+      run: |
+        # Scan Docker images for vulnerabilities
+        docker build -t tutor-ai-backend:test backend/
+        docker build -t tutor-ai-frontend:test frontend/
+
+        # Install Trivy for container scanning
+        sudo apt-get update
+        sudo apt-get install wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install trivy
+
+        # Scan images
+        trivy image --format json --output backend-trivy.json tutor-ai-backend:test || true
+        trivy image --format json --output frontend-trivy.json tutor-ai-frontend:test || true
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results
+        path: |
+          backend/safety-report.json
+          backend/bandit-report.json
+          frontend/npm-audit.json
+          backend-trivy.json
+          frontend-trivy.json
+
+  # Integration Tests with External Services
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install test dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+
+    - name: Test AI provider integrations
+      run: |
+        cd backend
+        pytest tests/integration/test_ai_providers.py -v
+      env:
+        # Test with mock AI providers
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+        LOCAL_LLM_URL: http://localhost:11434/v1
+        AI_PROVIDER_MOCK: true
+
+    - name: Test file storage integrations
+      run: |
+        cd backend
+        pytest tests/integration/test_file_storage.py -v
+      env:
+        UPLOAD_DIR: ./test_uploads
+        STORAGE_TYPE: local
+
+    - name: Test database integrations
+      run: |
+        cd backend
+        pytest tests/integration/test_database.py -v
+      env:
+        DATABASE_URL: sqlite:///./test_integration.db
+        REDIS_URL: redis://localhost:6379
+
+  # Deploy to Staging (on main branch)
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests, e2e-tests, security-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push images
+      run: |
+        # Build and tag images
+        docker buildx build -t ghcr.io/${{ github.repository }}/backend:staging ./backend/ --push
+        docker buildx build -t ghcr.io/${{ github.repository }}/frontend:staging ./frontend/ --push
+
+    - name: Deploy to staging
+      run: |
+        # Deploy using docker-compose with staging configuration
+        echo "Deploying to staging environment..."
+        # This would include actual deployment commands
+        # docker-compose -f docker-compose.staging.yml up -d
+
+    - name: Run smoke tests on staging
+      run: |
+        # Wait for deployment to be ready
+        sleep 60
+
+        # Run smoke tests
+        curl -f https://staging.tutor-ai.com/health || exit 1
+        curl -f https://staging.tutor-ai.com/api/courses || exit 1
+
+    - name: Notify deployment status
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # Create Test Summary
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests, e2e-tests, performance-tests, security-tests]
+    if: always()
+
+    steps:
+    - name: Download all test results
+      uses: actions/download-artifact@v3
+      with:
+        path: all-results/
+
+    - name: Generate test summary
+      run: |
+        # Create comprehensive test summary
+        cat << EOF > test-summary.md
+        # Test Suite Summary
+
+        ## Overview
+        - **Backend Tests**: ${{ needs.backend-tests.result }}
+        - **Frontend Tests**: ${{ needs.frontend-tests.result }}
+        - **E2E Tests**: ${{ needs.e2e-tests.result }}
+        - **Performance Tests**: ${{ needs.performance-tests.result }}
+        - **Security Tests**: ${{ needs.security-tests.result }}
+
+        ## Coverage Reports
+        - Backend coverage reports are available in the artifacts
+        - Frontend coverage reports are available in the artifacts
+
+        ## Performance Metrics
+        Performance test results are available in the artifacts.
+
+        ## Security Scan Results
+        Security scan results are available in the artifacts.
+
+        EOF
+
+    - name: Comment PR with test results
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('test-summary.md', 'utf8');
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+
+    - name: Upload test summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-summary
+        path: test-summary.md

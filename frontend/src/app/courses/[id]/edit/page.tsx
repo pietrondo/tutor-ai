@@ -37,7 +37,7 @@ export default function EditCoursePage() {
 
   const fetchCourse = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`)
       const data = await response.json()
 
       if (response.ok) {
@@ -82,7 +82,7 @@ export default function EditCoursePage() {
     setError('')
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/courses/${courseId}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/courses/${courseId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

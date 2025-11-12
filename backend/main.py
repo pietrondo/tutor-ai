@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -19,6 +19,10 @@ from services.rag_service import RAGService
 from services.llm_service import LLMService
 from services.course_service import CourseService
 from services.concept_map_service import concept_map_service
+# from services.enhanced_mindmap_service import EnhancedMindmapService, StudySessionContext
+# Temporarily disabled for startup
+import PyPDF2
+from PyPDF2 import PdfMerger
 
 # Import fast book concepts API
 # from fast_book_concepts import BookConceptRequest, get_book_concepts_fast
@@ -215,7 +219,15 @@ class ProgressSummaryResponse(BaseModel):
 from app.api.slides import router as slides_router
 from app.api.mindmap_expand import router as mindmap_expand_router
 from app.api.mindmaps import router as mindmaps_router
+# Temporarily disabled enhanced APIs for startup
+# from app.api.enhanced_mindmaps import router as enhanced_mindmaps_router
+# from app.api.enhanced_study_plans import router as enhanced_study_plans_router
+# from app.api.enhanced_slides import router as enhanced_slides_router
+# from app.api.enhanced_active_recall import router as enhanced_active_recall_router
+# from app.api.ab_testing import router as ab_testing_router
+# from app.api.continuous_improvement import router as continuous_improvement_router
 from app.api.concepts import router as concepts_router
+from app.api.unified_learning import router as unified_learning_router
 
 # Import security and error handling utilities
 from utils.security import (
@@ -362,12 +374,53 @@ def _clean_node_title(title: str) -> str:
     logger.info(f"🔍 DEBUG: Length check - original: {len(title)}, cleaned: {len(cleaned)}")
     return cleaned
 
+# Initialize enhanced logging before creating the app
+try:
+    from logging_config import setup_logging, get_logger
+    # Setup centralized logging
+    setup_logging(
+        log_level=os.getenv('LOG_LEVEL', 'INFO'),
+        log_dir=os.getenv('LOG_DIR', './logs'),
+        enable_console=True,
+        enable_file=True
+    )
+except ImportError:
+    try:
+        # Try importing from backend directory for production mode
+        from backend.logging_config import setup_logging, get_logger
+        # Setup centralized logging
+        setup_logging(
+            log_level=os.getenv('LOG_LEVEL', 'INFO'),
+            log_dir=os.getenv('LOG_DIR', './logs'),
+            enable_console=True,
+            enable_file=True
+        )
+    except ImportError:
+        # Fallback if logging_config is not available
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        get_logger = lambda name: logging.getLogger(name)
+
+# Get logger for main application
+logger = get_logger(__name__)
+logger.info("Starting Tutor-AI Backend Application")
+
 app = FastAPI(title="AI Tutor Backend", version="1.0.0")
+
+# Add comprehensive API logging middleware
+from middleware.logging_middleware import APILoggingMiddleware
+app.add_middleware(
+    APILoggingMiddleware,
+    log_request_body=True,
+    log_response_body=False,  # Disabled for performance
+    excluded_paths={"/health", "/metrics", "/docs", "/openapi.json", "/favicon.ico"},
+    performance_threshold_ms=1000.0
+)
 
 # CORS configuration - restricted to specific origins and methods
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3001", "http://127.0.0.1:3001"],  # Frontend ports
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000", "http://127.0.0.1:5000", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3002", "http://127.0.0.1:3002"],  # Frontend ports
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],  # Include OPTIONS for CORS preflight
     allow_headers=[
@@ -392,7 +445,15 @@ app.mount("/course-files", StaticFiles(directory="data/courses"), name="course_f
 app.include_router(slides_router)
 app.include_router(mindmap_expand_router)
 app.include_router(mindmaps_router)
+# Temporarily disabled enhanced routers for startup
+# app.include_router(enhanced_mindmaps_router)
+# app.include_router(enhanced_study_plans_router)
+# app.include_router(enhanced_slides_router)
+# app.include_router(enhanced_active_recall_router)
+# app.include_router(ab_testing_router)
+# app.include_router(continuous_improvement_router)
 app.include_router(concepts_router)
+app.include_router(unified_learning_router)
 
 # Security and rate limiting middleware
 @app.middleware("http")
@@ -480,6 +541,8 @@ course_service = CourseService()
 book_service = BookService()
 study_tracker = StudyTracker()
 study_planner = StudyPlannerService()
+# enhanced_mindmap_service = EnhancedMindmapService()
+# Temporarily disabled for startup
 annotation_service = AnnotationService()
 
 # Initialize enhanced course chat services
@@ -575,6 +638,11 @@ class MindmapRequest(BaseModel):
     book_id: Optional[str] = None
     topic: Optional[str] = None
     focus_areas: Optional[List[str]] = []
+    session_context: Optional[Dict[str, Any]] = None
+    learner_profile: Optional[Dict[str, Any]] = None
+    cognitive_load_level: Optional[str] = None
+    knowledge_type: Optional[str] = None
+    previous_mindmaps: Optional[List[Dict[str, Any]]] = None
 
 
 def _slugify_text(text: str, fallback: str = "node") -> str:
@@ -1907,6 +1975,42 @@ async def get_book(course_id: str, book_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/courses/{course_id}/materials")
+async def get_course_materials(course_id: str):
+    """Get all materials for a course with direct reading URLs"""
+    try:
+        materials, book_materials_map = course_service._collect_course_materials(course_id)
+
+        # Enhance materials with navigation context
+        enhanced_materials = []
+        for material in materials:
+            enhanced_material = dict(material)
+            if material.get("book_id"):
+                # Add book parameter to read_url for proper navigation
+                enhanced_material["read_url"] = f"{material['read_url']}?book={material['book_id']}"
+            enhanced_materials.append(enhanced_material)
+
+        return {
+            "materials": enhanced_materials,
+            "total_count": len(enhanced_materials),
+            "book_materials_map": book_materials_map
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/courses/{course_id}/books/{book_id}/materials")
+async def get_book_materials(course_id: str, book_id: str):
+    """Get all materials for a specific book with direct reading URLs"""
+    try:
+        materials = course_service.get_materials_for_book(course_id, book_id)
+        return {
+            "materials": materials,
+            "total_count": len(materials),
+            "book_id": book_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.put("/courses/{course_id}/books/{book_id}")
 async def update_book(course_id: str, book_id: str, book_update: BookUpdate):
     try:
@@ -1982,6 +2086,205 @@ async def upload_book_material(course_id: str, book_id: str, file: UploadFile = 
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/courses/{course_id}/books/{book_id}/merge-pdf")
+async def merge_book_pdfs(course_id: str, book_id: str):
+    """Create a unified PDF from all PDFs in a book"""
+    try:
+        # Check if book exists
+        book = book_service.get_book(course_id, book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+
+        # Get book directory
+        book_dir = f"data/courses/{course_id}/books/{book_id}"
+        if not os.path.exists(book_dir):
+            raise HTTPException(status_code=404, detail="Book directory not found")
+
+        # Find all PDF files in the book directory
+        pdf_files = []
+        for filename in os.listdir(book_dir):
+            if filename.lower().endswith('.pdf'):
+                pdf_path = os.path.join(book_dir, filename)
+                pdf_files.append((filename, pdf_path))
+
+        if len(pdf_files) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Book must contain at least 2 PDFs to merge"
+            )
+
+        # Sort PDFs by filename for consistent ordering
+        pdf_files.sort(key=lambda x: x[0])
+
+        # Create merged PDF
+        merger = PdfMerger()
+
+        for filename, pdf_path in pdf_files:
+            try:
+                merger.append(pdf_path)
+                logger.info(f"Added {filename} to merge")
+            except Exception as e:
+                logger.warning(f"Failed to add {filename} to merge: {e}")
+                # Continue with other files even if one fails
+                continue
+
+        # Generate output filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        book_title = book.get('title', 'book').replace(' ', '_').replace('/', '_')
+        output_filename = f"{book_title}_completo_{timestamp}.pdf"
+        output_path = os.path.join(book_dir, output_filename)
+
+        # Write the merged PDF
+        merger.write(output_path)
+        merger.close()
+
+        # Index the new PDF if RAG is available
+        try:
+            await rag_service.index_pdf(output_path, course_id, book_id)
+            indexing_status = "PDF merged and indexed successfully"
+        except Exception as indexing_error:
+            logger.warning(f"RAG indexing failed for merged PDF: {indexing_error}")
+            indexing_status = "PDF merged successfully (indexing temporarily disabled)"
+
+        logger.info(f"Successfully created merged PDF: {output_filename}")
+
+        return {
+            "success": True,
+            "message": indexing_status,
+            "merged_pdf": {
+                "filename": output_filename,
+                "path": output_path,
+                "size": os.path.getsize(output_path),
+                "files_merged": [filename for filename, _ in pdf_files],
+                "total_files": len(pdf_files)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error merging PDFs for book {book_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to merge PDFs: {str(e)}")
+
+@app.post("/courses/{course_id}/merge-pdf")
+async def merge_course_pdfs(course_id: str):
+    """Create a unified PDF from all PDFs in a course, organized by book"""
+    try:
+        # Check if course exists
+        response = await course_service.get_course(course_id)
+        if not response:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        course = response['course']
+        materials = course.get('materials', [])
+
+        if not materials:
+            raise HTTPException(status_code=400, detail="Course has no PDF materials to merge")
+
+        # Group materials by book_id
+        books_map = {}
+        for material in materials:
+            if material.get('filename', '').lower().endswith('.pdf'):
+                book_id = material.get('book_id', 'unknown')
+                if book_id not in books_map:
+                    books_map[book_id] = {
+                        'book_id': book_id,
+                        'title': f'Book {book_id[:8]}...',
+                        'materials': []
+                    }
+                books_map[book_id]['materials'].append({
+                    'filename': material['filename'],
+                    'relative_path': material['relative_path'],
+                    'file_path': material['file_path']
+                })
+
+        if len(books_map) == 0:
+            raise HTTPException(status_code=400, detail="No valid books with PDFs found")
+
+        if len(books_map) == 1:
+            # If only one book, use existing book merge endpoint
+            book_id = list(books_map.keys())[0]
+            return await merge_book_pdfs(course_id, book_id)
+
+        # Create course-wide merged PDF with book separation
+        merger = PdfMerger()
+        total_files_merged = 0
+        book_contents = []
+
+        # Sort books by title for consistent ordering
+        sorted_books = sorted(books_map.values(), key=lambda x: x['title'])
+
+        for book in sorted_books:
+            book_materials = book['materials']
+            if not book_materials:
+                continue
+
+            book_files = []
+            # Sort materials by filename
+            book_materials_sorted = sorted(book_materials, key=lambda x: x['filename'])
+
+            for material in book_materials_sorted:
+                pdf_path = material['file_path']
+                if os.path.exists(pdf_path):
+                    try:
+                        merger.append(pdf_path)
+                        book_files.append(material['filename'])
+                        total_files_merged += 1
+                        logger.info(f"Added {material['filename']} from book {book['title']} to course merge")
+                    except Exception as e:
+                        logger.warning(f"Failed to add {material['filename']} to merge: {e}")
+                        continue
+
+            if book_files:
+                book_contents.append({
+                    'book_title': book['title'],
+                    'book_id': book['book_id'],
+                    'files_merged': book_files,
+                    'files_count': len(book_files)
+                })
+
+        if total_files_merged == 0:
+            raise HTTPException(status_code=400, detail="No valid PDF files could be merged")
+
+        # Generate output filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        course_title = course.get('name', 'course').replace(' ', '_').replace('/', '_')
+        output_filename = f"{course_title}_completo_{timestamp}.pdf"
+        output_path = f"data/courses/{course_id}/{output_filename}"
+
+        # Write the merged PDF
+        merger.write(output_path)
+        merger.close()
+
+        # Try to index the new PDF if RAG is available
+        try:
+            await rag_service.index_pdf(output_path, course_id, None)  # No specific book_id for course merge
+            indexing_status = "Course PDF merged and indexed successfully"
+        except Exception as indexing_error:
+            logger.warning(f"RAG indexing failed for merged course PDF: {indexing_error}")
+            indexing_status = "Course PDF merged successfully (indexing temporarily disabled)"
+
+        logger.info(f"Successfully created merged course PDF: {output_filename}")
+
+        return {
+            "success": True,
+            "message": indexing_status,
+            "merged_pdf": {
+                "filename": output_filename,
+                "path": output_path,
+                "size": os.path.getsize(output_path),
+                "total_files": total_files_merged,
+                "total_books": len(book_contents),
+                "books_summary": book_contents
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error merging course PDFs for course {course_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to merge course PDFs: {str(e)}")
 
 @app.post("/chat")
 async def chat(chat_message: ChatMessage):
@@ -2091,6 +2394,9 @@ async def course_chat(chat_request: EnhancedChatMessage):
             context
         )
 
+        # Detect quiz intent in user message
+        quiz_intent = _detect_quiz_intent(chat_request.message)
+
         # Generate response
         response = await llm_service.generate_response(
             enhanced_prompt["message"],
@@ -2136,7 +2442,8 @@ async def course_chat(chat_request: EnhancedChatMessage):
             response
         )
 
-        return {
+        # Prepare response with quiz suggestion if detected
+        response_data = {
             "response": response,
             "session_id": session.id,
             "message_id": message_record.id,
@@ -2163,10 +2470,188 @@ async def course_chat(chat_request: EnhancedChatMessage):
             }
         }
 
+        # Add quiz suggestion if intent detected with high confidence
+        if quiz_intent["wants_quiz"] and quiz_intent["confidence"] >= 0.7:
+            try:
+                # Generate quiz suggestions
+                from services.knowledge_area_service import knowledge_area_service
+
+                # Use detected topic or fallback to context-based recommendations
+                quiz_topic = quiz_intent["topic"] if quiz_intent["topic"] else chat_request.message
+
+                recommendations = await knowledge_area_service.get_recommended_quizzes(
+                    chat_request.course_id,
+                    user_id=chat_request.user_id or session.id,
+                    topic_filter=quiz_topic,
+                    max_quizzes=quiz_intent["num_questions"]
+                )
+
+                if recommendations:
+                    response_data["quiz_suggestion"] = {
+                        "auto_detected": True,
+                        "confidence": quiz_intent["confidence"],
+                        "difficulty": quiz_intent["difficulty"],
+                        "num_questions": quiz_intent["num_questions"],
+                        "topic": quiz_topic,
+                        "quiz_type": quiz_intent["quiz_type"],
+                        "suggested_quizzes": [
+                            {
+                                "concept_id": rec.concept_id,
+                                "concept_name": rec.concept_name,
+                                "quiz_type": rec.quiz_type,
+                                "difficulty": rec.difficulty or quiz_intent["difficulty"],
+                                "estimated_time": rec.estimated_time or 5,
+                                "description": f"Quiz su {rec.concept_name}"
+                            }
+                            for rec in recommendations[:quiz_intent["num_questions"]]
+                        ]
+                    }
+                else:
+                    # Fallback: basic quiz generation suggestion
+                    response_data["quiz_suggestion"] = {
+                        "auto_detected": True,
+                        "confidence": quiz_intent["confidence"],
+                        "difficulty": quiz_intent["difficulty"],
+                        "num_questions": quiz_intent["num_questions"],
+                        "topic": quiz_topic,
+                        "quiz_type": quiz_intent["quiz_type"],
+                        "fallback_mode": True,
+                        "message": f"Posso generare un quiz su '{quiz_topic}' con {quiz_intent['num_questions']} domande di difficoltà {quiz_intent['difficulty']}"
+                    }
+
+            except Exception as e:
+                # Log error but don't break the chat response
+                import logging
+                logging.warning(f"Error generating quiz suggestion: {e}")
+
+                # Still provide basic quiz suggestion
+                response_data["quiz_suggestion"] = {
+                    "auto_detected": True,
+                    "confidence": quiz_intent["confidence"],
+                    "difficulty": quiz_intent["difficulty"],
+                    "num_questions": quiz_intent["num_questions"],
+                    "topic": quiz_intent["topic"] or chat_request.message,
+                    "quiz_type": quiz_intent["quiz_type"],
+                    "fallback_mode": True,
+                    "error": "quiz_generation_failed"
+                }
+
+        return response_data
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Helper methods for enhanced chat endpoint
+def _detect_quiz_intent(message: str) -> dict:
+    """
+    Detect if user is requesting a quiz and extract quiz parameters
+
+    Returns:
+        dict: {
+            "wants_quiz": bool,
+            "confidence": float,
+            "difficulty": str,
+            "num_questions": int,
+            "topic": str,
+            "quiz_type": str
+        }
+    """
+    import re
+
+    # Normalize message for analysis
+    message_lower = message.lower().strip()
+
+    # Quiz request patterns (Italian)
+    quiz_patterns = [
+        r'proponi.*quiz',
+        r'voglio.*quiz',
+        r'metti.*quiz',
+        r'facciamo.*quiz',
+        r'quiz.*su',
+        r'test.*su',
+        r'domand.*test',
+        r'esercizi.*su',
+        r'verifica.*',
+        r'valutazione.*',
+        r'controlla.*',
+        r'quiz.*argomento',
+        r'.*quiz\?$',
+        r'.*test\?$',
+        r'chiedimi.*domand',
+        r'fammi.*domand',
+        r'interrogami.*su'
+    ]
+
+    # Check if any pattern matches
+    wants_quiz = any(re.search(pattern, message_lower) for pattern in quiz_patterns)
+
+    if not wants_quiz:
+        return {"wants_quiz": False, "confidence": 0.0}
+
+    # Calculate confidence based on pattern strength
+    confidence = 0.7  # Base confidence
+
+    # Strong indicators increase confidence
+    strong_patterns = [
+        r'^proponi.*quiz',
+        r'^voglio.*quiz',
+        r'^facciamo.*quiz',
+        r'metti.*quiz',
+        r'interrogami',
+        r'chiedimi.*domand'
+    ]
+
+    if any(re.search(pattern, message_lower) for pattern in strong_patterns):
+        confidence = 0.9
+
+    # Extract difficulty
+    difficulty = "medium"  # default
+    if re.search(r'facil|semplic|base', message_lower):
+        difficulty = "easy"
+    elif re.search(r'difficil|avanzat|compless', message_lower):
+        difficulty = "hard"
+    elif re.search(r'med|intermed', message_lower):
+        difficulty = "medium"
+
+    # Extract number of questions
+    num_questions = 5  # default
+    number_match = re.search(r'(\d+).*domand', message_lower)
+    if number_match:
+        try:
+            num_questions = min(int(number_match.group(1)), 10)  # Max 10 questions
+        except ValueError:
+            pass
+
+    # Extract topic/subject
+    topic = ""
+    topic_patterns = [
+        r'su\s+(.+?)(?:\s|$)',  # "su [topic]"
+        r'argomento\s+(.+?)(?:\s|$)',  # "argomento [topic]"
+        r'tema\s+(.+?)(?:\s|$)',  # "tema [topic]"
+    ]
+
+    for pattern in topic_patterns:
+        match = re.search(pattern, message_lower)
+        if match:
+            topic = match.group(1).strip()
+            break
+
+    # Determine quiz type based on context
+    quiz_type = "multiple_choice"  # default
+    if re.search(r'vero\s*falso|vf|true\s*false', message_lower):
+        quiz_type = "true_false"
+    elif re.search(r'apert|rispost\s*liber|scrivi', message_lower):
+        quiz_type = "open_ended"
+
+    return {
+        "wants_quiz": True,
+        "confidence": confidence,
+        "difficulty": difficulty,
+        "num_questions": num_questions,
+        "topic": topic,
+        "quiz_type": quiz_type
+    }
+
 async def _prepare_enhanced_prompt(chat_request: EnhancedChatMessage, session, context):
     """Prepare enhanced prompt with session context"""
     from services.course_chat_session import SessionContextType
@@ -2701,12 +3186,207 @@ async def get_study_insights(course_id: str):
 
 # Model management endpoints
 @app.get("/models")
-async def get_available_models():
-    """Get available models and their characteristics"""
+async def get_available_models(
+    provider: Optional[str] = Query(None, description="Filter by provider (openrouter, openai, zai, local)"),
+    category: Optional[str] = Query(None, description="Filter by category (RECOMMENDED, PREMIUM, BALANCED, ECONOMY, VISION, SPECIALIZED)"),
+    search: Optional[str] = Query(None, description="Search models by name or description"),
+    capabilities: Optional[str] = Query(None, description="Filter by capabilities (vision, reasoning, coding)"),
+    min_context: Optional[int] = Query(None, description="Minimum context window size")
+):
+    """Get available models with advanced filtering and complete metadata"""
     try:
-        return await llm_service.get_available_models()
+        # Get all models from LLM service
+        all_models = await llm_service.get_available_models()
+
+        # Start building enhanced response
+        response = {
+            "provider": provider,
+            "total_models": 0,
+            "models": {},
+            "categories": {},
+            "filters_applied": {
+                "provider": provider,
+                "category": category,
+                "search": search,
+                "capabilities": capabilities,
+                "min_context": min_context
+            }
+        }
+
+        # Filter by provider if specified
+        if provider and provider in all_models:
+            provider_models = all_models[provider]
+            if isinstance(provider_models, dict) and "models" in provider_models:
+                models_data = provider_models["models"]
+            else:
+                models_data = provider_models
+        else:
+            # Use all models from current provider
+            models_data = all_models.get("models", {})
+
+        # Enhanced model categorization and filtering
+        filtered_models = {}
+        category_counts = {}
+
+        for model_id, model_info in models_data.items():
+            # Skip if model_info is not a dict
+            if not isinstance(model_info, dict):
+                continue
+
+            # Create enhanced model info
+            enhanced_model = model_info.copy()
+
+            # Determine category
+            model_category = categorize_openrouter_model(model_id, model_info)
+            enhanced_model["category"] = model_category
+
+            # Initialize category count
+            if model_category not in category_counts:
+                category_counts[model_category] = 0
+
+            # Apply filters
+            if category and model_category != category:
+                continue
+
+            if search:
+                search_lower = search.lower()
+                name_match = search_lower in enhanced_model.get("name", "").lower()
+                desc_match = search_lower in enhanced_model.get("description", "").lower()
+                provider_match = search_lower in enhanced_model.get("provider", "").lower()
+                if not (name_match or desc_match or provider_match):
+                    continue
+
+            if capabilities:
+                capabilities_lower = capabilities.lower()
+                use_cases = enhanced_model.get("use_cases", [])
+                supports_vision = enhanced_model.get("supports_vision", False)
+
+                capability_match = False
+                for use_case in use_cases:
+                    if capabilities_lower in use_case.lower():
+                        capability_match = True
+                        break
+
+                if capabilities_lower == "vision" and not supports_vision:
+                    continue
+                elif capabilities_lower != "vision" and not capability_match:
+                    continue
+
+            if min_context:
+                context_window = enhanced_model.get("context_window", 0)
+                if context_window < min_context:
+                    continue
+
+            # Add additional metadata for better UI
+            enhanced_model.update({
+                "display_name": enhanced_model.get("name", model_id.split("/")[-1] if "/" in model_id else model_id),
+                "provider_short": enhanced_model.get("provider", "Unknown").split()[0],
+                "cost_per_input_1k": enhanced_model.get("cost_per_1k_tokens", {}).get("input", 0),
+                "cost_per_output_1k": enhanced_model.get("cost_per_1k_tokens", {}).get("output", 0),
+                "total_cost_per_1k": (
+                    enhanced_model.get("cost_per_1k_tokens", {}).get("input", 0) +
+                    enhanced_model.get("cost_per_1k_tokens", {}).get("output", 0)
+                ),
+                "recommended_for": enhanced_model.get("use_cases", [])[:3],  # Top 3 use cases
+                "is_premium": enhanced_model.get("cost_per_1k_tokens", {}).get("input", 0) > 0.01,
+                "supports_streaming": True,  # Most OpenRouter models support streaming
+            })
+
+            filtered_models[model_id] = enhanced_model
+            category_counts[model_category] += 1
+
+        # Build category descriptions
+        category_descriptions = {
+            "RECOMMENDED": {"count": category_counts.get("RECOMMENDED", 0), "description": "I migliori modelli per iniziare"},
+            "PREMIUM": {"count": category_counts.get("PREMIUM", 0), "description": "Massime performance e capacità"},
+            "BALANCED": {"count": category_counts.get("BALANCED", 0), "description": "Equilibrio tra performance e costo"},
+            "ECONOMY": {"count": category_counts.get("ECONOMY", 0), "description": "Opzioni economiche per uso intensivo"},
+            "VISION": {"count": category_counts.get("VISION", 0), "description": "Modelli con capacità di visione"},
+            "SPECIALIZED": {"count": category_counts.get("SPECIALIZED", 0), "description": "Modelli specializzati per compiti specifici"}
+        }
+
+        # Sort models by recommendation and cost
+        sorted_models = dict(sorted(
+            filtered_models.items(),
+            key=lambda x: (
+                0 if x[1].get("category") == "RECOMMENDED" else
+                1 if x[1].get("category") == "PREMIUM" else
+                2 if x[1].get("category") == "BALANCED" else
+                3,
+                x[1].get("total_cost_per_1k", 0)  # Lower cost first within categories
+            )
+        ))
+
+        response.update({
+            "total_models": len(sorted_models),
+            "models": sorted_models,
+            "categories": {k: v for k, v in category_descriptions.items() if v["count"] > 0},
+            "current_provider": all_models.get("model_type", "unknown"),
+            "current_model": all_models.get("current_model", "unknown"),
+            "connection_status": get_connection_status(all_models, provider)
+        })
+
+        return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get models: {str(e)}")
+
+def get_connection_status(all_models: dict, provider: Optional[str]) -> dict:
+    """Get connection status for the requested provider"""
+    if provider == "openrouter":
+        return {
+            "connected": all_models.get("openrouter_connection", False),
+            "available_models_count": len(all_models.get("available_models", [])),
+            "error": all_models.get("error")
+        }
+    elif provider == "zai":
+        return {
+            "connected": all_models.get("zai_connection", False),
+            "available_models_count": len(all_models.get("available_models", [])),
+            "error": all_models.get("error")
+        }
+    elif provider == "local":
+        return {
+            "connected": all_models.get("local_connection", False),
+            "available_models_count": len(all_models.get("available_models", [])),
+            "error": all_models.get("error")
+        }
+    else:
+        return {"connected": True, "provider": "openai"}
+
+def categorize_openrouter_model(model_id: str, model_info: dict) -> str:
+    """Enhanced categorization for OpenRouter models"""
+    name = model_info.get("name", "").lower()
+    provider = model_info.get("provider", "").lower()
+    cost_input = model_info.get("cost_per_1k_tokens", {}).get("input", 0)
+    supports_vision = model_info.get("supports_vision", False)
+    use_cases = model_info.get("use_cases", [])
+
+    # Vision models
+    if supports_vision or "vision" in name or "gpt-4o" in model_id:
+        return "VISION"
+
+    # Premium models (high cost or flagship)
+    if "gpt-5" in model_id or "claude-3.5" in model_id or cost_input > 0.02:
+        return "PREMIUM"
+
+    # Recommended models (good balance)
+    if any(rec_model in model_id for rec_model in ["gpt-4o", "claude-3.5-sonnet", "gpt-4-turbo"]):
+        return "RECOMMENDED"
+
+    # Economy models (low cost)
+    if cost_input < 0.005 or "mini" in name or "haiku" in model_id:
+        return "ECONOMY"
+
+    # Specialized models
+    if any(spec in name for spec in ["coding", "math", "reasoning"]) or "deepseek" in model_id:
+        return "SPECIALIZED"
+
+    # Balanced models (middle ground)
+    if 0.005 <= cost_input <= 0.02:
+        return "BALANCED"
+
+    # Default to RECOMMENDED for unknown models
+    return "RECOMMENDED"
 
 @app.post("/models/{model_name}")
 async def set_model(model_name: str):
@@ -3378,10 +4058,54 @@ async def validate_book_concept_map(request: BookConceptValidationRequest):
 
 @app.post("/mindmap")
 async def generate_mindmap(request: MindmapRequest):
-    """Generate a mindmap using RAG system"""
+    """Generate a mindmap using RAG system with optional session context enhancement"""
     try:
         topic = request.topic or "Contenuti del corso"
         focus_description = ", ".join(request.focus_areas) if request.focus_areas else "tutti i contenuti rilevanti"
+
+        # Use Enhanced Mindmap Service if session context is provided
+        if request.session_context:
+            logger.info(f"🧠 Generating enhanced mindmap with session context for course {request.course_id}, book {request.book_id}")
+
+            # Create session context
+            session_context = StudySessionContext(request.session_context)
+
+            # Get RAG context for enhanced service
+            rag_context_prompt = f"Genera materiali per la mappa concettuale su {topic}. Focus: {focus_description}."
+            rag_response = await rag_service.retrieve_context(
+                rag_context_prompt,
+                course_id=request.course_id,
+                book_id=request.book_id,
+                k=8  # Get more context for enhanced generation
+            )
+
+            context_text = rag_response.get("text", "")
+
+            # Generate enhanced mindmap
+            enhanced_result = await enhanced_mindmap_service.generate_enhanced_mindmap(
+                topic=topic,
+                context_text=context_text,
+                course_id=request.course_id,
+                book_id=request.book_id,
+                learner_profile=request.learner_profile,
+                cognitive_load_level=request.cognitive_load_level,
+                knowledge_type=request.knowledge_type,
+                focus_areas=request.focus_areas,
+                previous_mindmaps=request.previous_mindmaps,
+                session_context=session_context
+            )
+
+            # Convert enhanced result to match expected format
+            return {
+                "success": True,
+                "mindmap": enhanced_result,
+                "enhanced": True,
+                "session_aware": True,
+                "sources": rag_response.get("sources", [])
+            }
+
+        # Original implementation for backward compatibility
+        logger.info(f"🗺️ Generating standard mindmap for course {request.course_id}, book {request.book_id}")
 
         instructions = f"""
 Sei un pedagogo universitario esperto. Genera una mappa di studio altamente strutturata basata sui materiali forniti.
@@ -5946,6 +6670,72 @@ async def get_learning_profile(user_id: str, course_id: str):
         logger.error(f"Error getting learning profile: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# PDF Worker endpoint for serving PDF.js worker with proper CORS
+@app.get("/pdf.worker.min.js")
+async def get_pdf_worker():
+    """Serve PDF.js worker file with proper CORS headers for production"""
+    from fastapi.responses import FileResponse
+    import os
+
+    # Look for worker in multiple possible locations
+    worker_paths = [
+        # Frontend public directory (when running with volume mount)
+        "/app/frontend/public/pdf.worker.min.js",
+        "/app/public/pdf.worker.min.js",
+        # Next.js static directories
+        "/app/frontend/.next/static/pdf.worker.min.js",
+        "/app/frontend/.next/static/chunks/pdf.worker.min.js",
+        "/app/frontend/.next/static/worker/pdf.worker.min.js",
+        # Standalone build directory
+        "/app/frontend/.next/standalone/public/pdf.worker.min.js",
+    ]
+
+    for worker_path in worker_paths:
+        if os.path.exists(worker_path):
+            return FileResponse(
+                worker_path,
+                media_type="application/javascript",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET",
+                    "Access-Control-Allow-Headers": "*",
+                    "Cache-Control": "public, max-age=31536000, immutable",
+                    "Cross-Origin-Resource-Policy": "cross-origin",
+                    "Cross-Origin-Embedder-Policy": "require-corp"
+                }
+            )
+
+    # If no worker found, return 404 with helpful error
+    raise HTTPException(
+        status_code=404,
+        detail="PDF.js worker file not found. Please ensure the frontend is built properly."
+    )
+
+# PDF Worker health check endpoint
+@app.get("/health/pdf-worker")
+async def check_pdf_worker():
+    """Check if PDF.js worker is accessible"""
+    from fastapi.responses import JSONResponse
+    import os
+
+    worker_paths = [
+        "/app/frontend/public/pdf.worker.min.js",
+        "/app/public/pdf.worker.min.js",
+        "/app/frontend/.next/static/pdf.worker.min.js",
+        "/app/frontend/.next/static/chunks/pdf.worker.min.js",
+        "/app/frontend/.next/standalone/public/pdf.worker.min.js",
+    ]
+
+    found_paths = [path for path in worker_paths if os.path.exists(path)]
+
+    return JSONResponse({
+        "status": "healthy" if found_paths else "unhealthy",
+        "pdf_worker_accessible": len(found_paths) > 0,
+        "found_paths": found_paths,
+        "worker_url": "http://localhost:8000/pdf.worker.min.js",
+        "timestamp": datetime.now().isoformat()
+    })
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -158,7 +158,7 @@ REDIS_URL=redis://redis:6379
 DATABASE_URL=sqlite:///./data/app.db
 
 # CORS
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ORIGINS=http://localhost:3001,http://127.0.0.1:3001
 
 # File Storage
 UPLOAD_DIR=./data/uploads
@@ -178,24 +178,27 @@ EOF
 select_mode() {
     case "$MODE" in
         "dev"|"development")
-            print_info "Modalità SVILUPPO con hot reload"
+            print_info "Modalità SVILUPPO con hot reload e ottimizzazioni performance"
+            print_info "✅ Include ottimizzazioni INP e memory management"
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
-            FRONTEND_PORT=3000
+            FRONTEND_PORT=3001
             ;;
         "simple")
             print_info "Modalità SEMPLIFICATA"
             COMPOSE_FILES="-f docker-compose.simple.yml"
-            FRONTEND_PORT=3000
+            FRONTEND_PORT=3001
             ;;
         "prod"|"production")
-            print_info "Modalità PRODUZIONE"
+            print_info "Modalità PRODUZIONE (PREVENZIONE COMPILAZIONE CONTINUA)"
+            print_info "✅ Usa immagini pre-build con 'node server.js' - nessuna compilazione runtime"
+            print_info "✅ Frontend esegue build standalone senza hot reload"
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.optimized.yml"
-            FRONTEND_PORT=3000
+            FRONTEND_PORT=3001
             ;;
         "build")
             print_info "Compilazione immagini (stack dev)"
             COMPOSE_FILES="-f docker-compose.yml -f docker-compose.dev.yml"
-            FRONTEND_PORT=3000
+            FRONTEND_PORT=3001
             ;;
         "stop")
             print_info "Arresto servizi..."
@@ -221,9 +224,9 @@ select_mode() {
             $DOCKER_COMPOSE ps
             echo
             echo "URL di accesso:"
-            echo "  • Frontend: http://localhost:3000"
-            echo "  • Backend:  http://localhost:8001"
-            echo "  • API Docs: http://localhost:8001/docs"
+            echo "  • Frontend: http://localhost:3001"
+            echo "  • Backend:  http://localhost:8000"
+            echo "  • API Docs: http://localhost:8000/docs"
             exit 0
             ;;
         *)
@@ -291,7 +294,7 @@ health_check() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://localhost:8001/health > /dev/null 2>&1; then
+        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
             print_success "Backend pronto!"
             break
         fi
@@ -317,8 +320,8 @@ show_info() {
     echo "║                     🌐 ACCESS URLS                          ║"
     echo "╠═══════════════════════════════════════════════════════════════╣"
     echo "║  • Frontend:      http://localhost:$FRONTEND_PORT              ║"
-    echo "║  • Backend API:   http://localhost:8001                       ║"
-    echo "║  • API Docs:      http://localhost:8001/docs                  ║"
+    echo "║  • Backend API:   http://localhost:8000                       ║"
+    echo "║  • API Docs:      http://localhost:8000/docs                  ║"
     echo "║  • Redis:         localhost:6379                             ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo
@@ -334,7 +337,13 @@ show_info() {
     echo
 
     if [ "$MODE" = "dev" ]; then
-        print_info "💡 Hot reload attivo - I cambiamenti si applicano automaticamente"
+        print_info "💡 Hot reload attivo con ottimizzazioni performance INP"
+        print_info "💡 Per debug performance: usa npm run dev:turbo o npm run dev:fast nel container"
+    fi
+
+    if [ "$MODE" = "prod" ]; then
+        print_info "🚀 Modalità produzione attiva - nessuna compilazione continua"
+        print_info "📊 Performance ottimali con standalone build"
     fi
 
     if [ ! -f "./backend/.env" ] || grep -q "your_.*_key_here" "./backend/.env"; then

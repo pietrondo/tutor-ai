@@ -1,0 +1,17 @@
+{
+  "course_id": "test",
+  "course_name": "Course test",
+  "book_id": null,
+  "concepts": {},
+  "quizzes": {},
+  "mindmaps": {},
+  "concept_to_quizzes": {},
+  "concept_to_mindmaps": {},
+  "quiz_to_concepts": {},
+  "mindmap_to_concepts": {},
+  "recommended_sequences": [],
+  "prerequisite_chains": {},
+  "metadata": {},
+  "created_at": "2025-11-11 11:05:08.353095",
+  "updated_at": "2025-11-11 11:05:08.355898"
+}

@@ -23,7 +23,7 @@ logger = structlog.get_logger()
 class APIConceptGenerator:
     def __init__(self):
         self.concept_service = ConceptMapService()
-        self.base_url = "http://localhost:8001"
+        self.base_url = "http://localhost:8000"
 
     async def generate_concepts_from_api(self, course_id: str):
         """Genera concetti usando l'API del backend."""

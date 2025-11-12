@@ -1,28 +1,42 @@
+'use client';
+
 /**
  * Enhanced PDF Reader
  * Componente avanzato per lettura PDF con annotazioni, note integrate e chat tutor
  */
 
-'use client';
-
-// Ensure Promise.withResolvers polyfill is loaded before PDF.js
-if (typeof Promise !== 'undefined' && !Promise.withResolvers) {
-  Promise.withResolvers = function <T>() {
-    let resolve: (value: T | PromiseLike<T>) => void;
-    let reject: (reason?: any) => void;
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve: resolve!, reject: reject! };
-  };
+// Promise.withResolvers polyfill - must be loaded before any PDF.js imports
+if (typeof window !== 'undefined') {
+  (window as any).Promise = (window as any).Promise || {};
+  if (!(window as any).Promise.withResolvers) {
+    (window as any).Promise.withResolvers = function <T>() {
+      let resolve: (value: T | PromiseLike<T>) => void;
+      let reject: (reason?: any) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve: resolve!, reject: reject! };
+    };
+  }
 }
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { ensurePdfWorkerConfigured, getWorkerDiagnostics, type WorkerConfigResult } from '@/lib/pdfWorker';
+
+// PDF.js worker configuration using Next.js static files
+if (typeof window !== 'undefined') {
+  // Use Next.js static file serving for PDF.js worker
+  const workerUrl = '/pdf.worker.min.js';
+
+  // Configure worker with local static file
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+  console.log('EnhancedPDFReader: Configured worker:', workerUrl);
+}
 import { CustomHighlight, type HighlightPosition } from './CustomHighlight';
 import {
   HighlighterIcon,
@@ -36,10 +50,7 @@ import {
   DownloadIcon
 } from 'lucide-react';
 
-// Configura PDF.js - usa CDN per evitare problemi di worker locali
-if (typeof window !== 'undefined' && pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
-}
+// PDF.js worker configuration handled above with local import
 
 type AnnotationMode = 'highlight' | 'underline' | 'note';
 
@@ -94,21 +105,113 @@ const COLORS = [
 const PDFErrorDisplay: React.FC<{
   pdfUrl: string;
   onRetry: () => void;
-}> = ({ pdfUrl, onRetry }) => {
+  workerInfo?: WorkerConfigResult | null;
+  workerError?: string | null;
+}> = ({ pdfUrl, onRetry, workerInfo, workerError }) => {
   const [errorDetails, setErrorDetails] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
-    // Try to identify common PDF errors
-    if (pdfUrl.includes('.pdf')) {
-      if (pdfUrl.startsWith('http')) {
-        setErrorDetails('Possibile problema di rete o file PDF corrotto.');
-      } else {
-        setErrorDetails('File PDF non trovato o percorso non valido.');
+    // Enhanced error diagnostics with network testing
+    const diagnoseError = async () => {
+      const urlObj = new URL(pdfUrl);
+      const hostname = urlObj.hostname;
+      const port = urlObj.port;
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+      let debugDetails = [];
+      debugDetails.push(`URL: ${pdfUrl}`);
+      debugDetails.push(`API Base URL: ${apiBaseUrl}`);
+      debugDetails.push(`Hostname: ${hostname}:${port}`);
+      debugDetails.push(`User Agent: ${navigator.userAgent}`);
+
+      try {
+        // Test if PDF is accessible
+        console.log('Testing PDF accessibility:', pdfUrl);
+        const response = await fetch(pdfUrl, { method: 'HEAD' });
+        debugDetails.push(`HTTP Status: ${response.status}`);
+        debugDetails.push(`Content-Type: ${response.headers.get('content-type')}`);
+        debugDetails.push(`Content-Length: ${response.headers.get('content-length')}`);
+
+        if (!response.ok) {
+          setErrorDetails(`Server responded with ${response.status}: ${response.statusText}\n\nIl server PDF non è raggiungibile o il file non esiste.`);
+          return;
+        }
+
+        if (!response.headers.get('content-type')?.includes('application/pdf')) {
+          setErrorDetails(`Il server non sta restituendo un file PDF.\nContent-Type: ${response.headers.get('content-type')}\n\nQuesto potrebbe indicare un problema di configurazione del backend.`);
+          return;
+        }
+
+        // If we get here, the PDF is accessible but react-pdf couldn't load it
+        // Let's check for specific PDF.js worker issues
+        const checkPdfJsWorker = async () => {
+          try {
+            // Check if PDF.js worker is properly configured
+            const workerSrc = (window as any).pdfjs?.GlobalWorkerOptions?.workerSrc;
+            if (!workerSrc) {
+              return "PDF.js worker non configurato";
+            }
+
+            // Test worker accessibility
+            const workerResponse = await fetch(workerSrc, { method: 'HEAD' });
+            if (!workerResponse.ok) {
+              return `PDF.js worker non raggiungibile: ${workerResponse.status}`;
+            }
+
+            // Check if worker is from different origin (CORS issue)
+            const workerUrl = new URL(workerSrc, window.location.origin);
+            if (workerUrl.origin !== window.location.origin && !workerUrl.hostname.includes('cdnjs') && !workerUrl.hostname.includes('unpkg')) {
+              return "Possibile problema CORS con il PDF.js worker";
+            }
+
+            return null; // Worker seems OK
+          } catch (error) {
+            return `Errore verifica PDF.js worker: ${error}`;
+          }
+        };
+
+        const workerIssue = await checkPdfJsWorker();
+
+        let enhancedMessage = "Il PDF è accessibile ma react-pdf non riesce a caricarlo.\n\n";
+
+        if (workerIssue) {
+          enhancedMessage += `Problema identificato: ${workerIssue}\n\n`;
+        }
+
+        if (workerError) {
+          enhancedMessage += `Configurazione worker fallita: ${workerError}\n\n`;
+        } else if (workerInfo?.workerSrc) {
+          enhancedMessage += `Worker attivo: ${workerInfo.workerSrc} (${workerInfo.strategy})\n\n`;
+        }
+
+        enhancedMessage += `Possibili cause:\n• PDF.js worker non disponibile o bloccato dal CSP\n• Problemi di CORS nel browser\n• PDF troppo grande o complesso (${Math.round(parseInt(response.headers.get('content-length') || '0') / 1024 / 1024)}MB)\n• Estensioni del browser che bloccano il caricamento\n• Problemi di cache del browser\n\nConsigli:\n1. Ricarica la pagina (Ctrl+F5 per cache pulita)\n2. Prova un browser diverso (Chrome/Firefox)\n3. Disabilita temporaneamente estensioni\n4. Apri il PDF in una nuova scheda\n5. Svuota la cache del browser\n\nDebug informazione:\n• PDF.js worker: ${(window as any).pdfjs?.GlobalWorkerOptions?.workerSrc || 'Non configurato'}\n• Content-Type: ${response.headers.get('content-type')}\n• Dimensione: ${Math.round(parseInt(response.headers.get('content-length') || '0') / 1024 / 1024)}MB`;
+
+        if (workerInfo?.attempts?.length) {
+          const attemptsOutput = workerInfo.attempts
+            .map(attempt => `  - ${attempt.url} (${attempt.via}) => ${attempt.success ? 'OK' : `ERR ${attempt.status || ''} ${attempt.error || ''}`}`)
+            .join('\n');
+          enhancedMessage += `\nTentativi worker:\n${attemptsOutput}`;
+          debugDetails.push(`Worker Attempts:\n${attemptsOutput}`);
+        }
+
+        setErrorDetails(enhancedMessage);
+
+      } catch (error) {
+        debugDetails.push(`Network Error: ${error}`);
+        if (hostname === 'localhost' && (port === '8000' || port === '8001')) {
+          setErrorDetails(`Impossibile connettersi al backend (${hostname}:${port}).\n\nVerifica che:\n• Il backend sia in esecuzione\n• Non ci siano firewall che bloccano la connessione\n• La porta sia corretta\n\nErrore: ${error}`);
+        } else {
+          setErrorDetails(`Errore di rete durante il caricamento del PDF.\n\nErrore: ${error}`);
+        }
       }
-    } else {
-      setErrorDetails('Il file specificato non sembra essere un PDF valido.');
-    }
-  }, [pdfUrl]);
+
+      setDebugInfo(debugDetails.join('\n'));
+      console.log('PDF Error Diagnostics:', debugDetails);
+    };
+
+    diagnoseError();
+  }, [pdfUrl, workerInfo, workerError]);
 
   return (
     <div className="flex items-center justify-center h-96">
@@ -121,9 +224,26 @@ const PDFErrorDisplay: React.FC<{
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
           Errore nel caricamento del PDF
         </h3>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-gray-600 mb-4 whitespace-pre-line">
           {errorDetails}
         </p>
+
+        {/* Debug information */}
+        <details className="mb-4 text-left">
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+            Informazioni di debug
+          </summary>
+          <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600 whitespace-pre-wrap text-left">
+            {debugInfo || (
+              <>
+                <p><strong>URL:</strong> {pdfUrl}</p>
+                <p><strong>Tipo:</strong> {pdfUrl.includes('.pdf') ? 'PDF' : 'Non-PDF'}</p>
+                <p><strong>Protocollo:</strong> {pdfUrl.startsWith('http') ? 'HTTP/HTTPS' : 'Altro'}</p>
+              </>
+            )}
+          </div>
+        </details>
+
         <div className="space-y-3">
           <button
             onClick={onRetry}
@@ -131,11 +251,12 @@ const PDFErrorDisplay: React.FC<{
           >
             Riprova
           </button>
+
           <button
             onClick={() => window.open(pdfUrl, '_blank')}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+            className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
           >
-            Apri in nuova scheda
+            Apri PDF in nuova scheda
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-4">
@@ -157,7 +278,55 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   onAnnotationUpdate,
   onChatWithContext
 }) => {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const existingWorkerDiagnostics = typeof window === 'undefined' ? null : getWorkerDiagnostics();
+
+  const [workerReady, setWorkerReady] = useState<boolean>(() => typeof window === 'undefined' || Boolean(existingWorkerDiagnostics));
+  const [workerDiagnostics, setWorkerDiagnostics] = useState<WorkerConfigResult | null>(existingWorkerDiagnostics);
+  const [workerError, setWorkerError] = useState<string | null>(null);
+
+  // Log PDF URL for debugging
+  useEffect(() => {
+    console.log('EnhancedPDFReader: PDF URL:', pdfUrl);
+    console.log('EnhancedPDFReader: API_BASE_URL:', API_BASE_URL);
+  }, [pdfUrl, API_BASE_URL]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    ensurePdfWorkerConfigured()
+      .then(result => {
+        if (cancelled) return;
+        setWorkerDiagnostics(result);
+        setWorkerReady(true);
+        setWorkerError(null);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setWorkerError(message);
+        setWorkerReady(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const retryWorkerConfiguration = useCallback(() => {
+    setWorkerReady(false);
+    setWorkerError(null);
+    ensurePdfWorkerConfigured(true)
+      .then(result => {
+        setWorkerDiagnostics(result);
+        setWorkerReady(true);
+      })
+      .catch(error => {
+        const message = error instanceof Error ? error.message : String(error);
+        setWorkerError(message);
+      });
+  }, []);
+
   // Stati PDF
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -182,14 +351,14 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
 
   
   const mapAnnotationFromBackend = useCallback((annotation: BackendAnnotation): ViewerAnnotation => {
-    const position = annotation?.position || {};
+    const position = annotation?.position || {} as any;
     const page = position.pageNumber || annotation?.page_number || 1;
 
     return {
-      id: annotation.id,
+      id: String(annotation.id),
       type: (annotation.type || 'highlight') as AnnotationMode,
-      selectedText: annotation.selected_text || annotation.text || '',
-      note: annotation.content || '',
+      selectedText: String(annotation.selected_text || annotation.text || ''),
+      note: String(annotation.content || ''),
       position: {
         x: position.x ?? 0,
         y: position.y ?? 0,
@@ -198,10 +367,10 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
         pageNumber: page
       },
       pageNumber: page,
-      color: annotation.style?.color || '#FFEB3B',
-      shareWithAI: annotation.share_with_ai ?? annotation.is_public ?? false,
-      tags: annotation.tags || [],
-      createdAt: annotation.created_at
+      color: String((annotation.style as any)?.color || '#FFEB3B'),
+      shareWithAI: Boolean(annotation.share_with_ai ?? annotation.is_public ?? false),
+      tags: (annotation.tags as string[]) || [],
+      createdAt: String(annotation.created_at)
     };
   }, []);
 
@@ -651,37 +820,90 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
           )}
 
           <div className="flex justify-center p-8">
-            <div className="relative">
-              <Document
-                file={pdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                loading={
-                  <div className="flex items-center justify-center h-96">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                      <p className="mt-2 text-sm text-gray-600">Caricamento PDF...</p>
-                    </div>
+            <div className="relative min-h-[24rem] w-full">
+              {!workerReady && !workerError && (
+                <div className="flex h-96 items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                    <p className="mt-2 text-sm text-gray-600">Inizializzo il PDF.js worker...</p>
                   </div>
-                }
-                error={
-                  <PDFErrorDisplay
-                    pdfUrl={pdfUrl}
-                    onRetry={() => window.location.reload()}
-                  />
-                }
-              >
-                <Page
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  className="shadow-lg"
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
+                </div>
+              )}
+
+              {workerError && (
+                <PDFErrorDisplay
+                  pdfUrl={pdfUrl}
+                  workerInfo={workerDiagnostics}
+                  workerError={workerError}
+                  onRetry={() => {
+                    console.warn('EnhancedPDFReader: Worker configuration retry requested');
+                    retryWorkerConfiguration();
+                  }}
                 />
-                {/* Render annotazioni */}
-                {annotations
-                  .filter(ann => ann.pageNumber === pageNumber)
-                  .map(renderAnnotation)}
-              </Document>
+              )}
+
+              {workerReady && !workerError && (
+                <Document
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={(error) => {
+                    console.error('EnhancedPDFReader: Document loading error:', error);
+                    console.error('EnhancedPDFReader: PDF URL that failed:', pdfUrl);
+                    console.error('EnhancedPDFReader: Error details:', {
+                      message: error.message,
+                      name: error.name,
+                      stack: error.stack
+                    });
+
+                    // Test if the PDF is actually accessible
+                    fetch(pdfUrl, { method: 'HEAD' })
+                      .then(response => {
+                        console.log('EnhancedPDFReader: PDF accessibility test:', {
+                          status: response.status,
+                          statusText: response.statusText,
+                          contentType: response.headers.get('content-type'),
+                          contentLength: response.headers.get('content-length')
+                        });
+                      })
+                      .catch(networkError => {
+                        console.error('EnhancedPDFReader: Network test failed:', networkError);
+                      });
+                  }}
+                  loading={
+                    <div className="flex items-center justify-center h-96">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                        <p className="mt-2 text-sm text-gray-600">Caricamento PDF...</p>
+                        <p className="text-xs text-gray-500 mt-1">URL: {pdfUrl}</p>
+                      </div>
+                    </div>
+                  }
+                  error={
+                    <PDFErrorDisplay
+                      pdfUrl={pdfUrl}
+                      workerInfo={workerDiagnostics}
+                      workerError={workerError}
+                      onRetry={() => {
+                        console.log('EnhancedPDFReader: User requested retry for:', pdfUrl);
+                        retryWorkerConfiguration();
+                        window.location.reload();
+                      }}
+                    />
+                  }
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    className="shadow-lg"
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                  />
+                  {/* Render annotazioni */}
+                  {annotations
+                    .filter(ann => ann.pageNumber === pageNumber)
+                    .map(renderAnnotation)}
+                </Document>
+              )}
             </div>
           </div>
         </div>

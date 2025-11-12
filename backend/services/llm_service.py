@@ -15,6 +15,21 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Import enhanced logging
+try:
+    from logging_config import get_logger, get_structlog_logger, LoggedTimer, SecurityLogger
+except ImportError:
+    try:
+        # Try importing from backend directory for production mode
+        from backend.logging_config import get_logger, get_structlog_logger, LoggedTimer, SecurityLogger
+    except ImportError:
+        # Fallback if logging_config is not available
+        import logging
+        get_logger = lambda name: logging.getLogger(name)
+        get_structlog_logger = lambda name: logging.getLogger(name)
+        LoggedTimer = lambda operation, logger=None, **metadata: None
+        SecurityLogger = lambda: None
+
 # Modelli ZAI (GLM) disponibili con le loro caratteristiche
 ZAI_MODELS = {
     "glm-4.6": {
@@ -1002,6 +1017,14 @@ class ModelSelector:
 
 class LLMService:
     def __init__(self):
+        # Initialize enhanced logging
+        try:
+            self.logger = get_structlog_logger("LLMService")
+            self.security_logger = SecurityLogger()
+        except Exception:
+            self.logger = logger
+            self.security_logger = None
+
         self.client = None
         self.model_type = os.getenv("LLM_TYPE", "zai")  # "openai", "zai", "openrouter", "ollama", "lmstudio"
         self.default_model = os.getenv("ZAI_MODEL", "glm-4.6")
@@ -1009,7 +1032,29 @@ class LLMService:
         self.local_manager = None
         self.zai_manager = None
         self.openrouter_manager = None
-        self.setup_client()
+
+        # Enhanced logging setup
+        self.logger = get_structlog_logger("LLMService")
+        self.security_logger = SecurityLogger()
+
+        # Performance tracking
+        self.request_count = 0
+        self.total_tokens_used = 0
+        self.total_cost = 0.0
+        self.last_request_time = None
+
+        self.logger.info(
+            "LLMService initialization started",
+            extra={
+                "model_type": self.model_type,
+                "default_model": self.default_model,
+                "budget_mode": self.budget_mode,
+                "service_version": "enhanced_logging_v1.0"
+            }
+        )
+
+        with LoggedTimer("llm_service_initialization", logger=self.logger):
+            self.setup_client()
 
         # Setup model info based on type
         if self.model_type == "zai":
@@ -1021,12 +1066,43 @@ class LLMService:
         else:
             self.model_info = LOCAL_MODELS.get(self.default_model, {"name": self.default_model})
 
+        self.logger.info(
+            "LLMService initialization completed",
+            extra={
+                "configured_model": self.model_info.get("name", self.default_model),
+                "context_window": self.model_info.get("context_window"),
+                "max_tokens": self.model_info.get("max_tokens"),
+                "supports_agents": self.model_info.get("supports_agents", False)
+            }
+        )
+
     def setup_client(self):
         if self.model_type == "openai":
             api_key = os.getenv("OPENAI_API_KEY")
             base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
+            self.logger.info(
+                "Setting up OpenAI client",
+                extra={
+                    "provider": "openai",
+                    "base_url": base_url,
+                    "has_api_key": bool(api_key),
+                    "timeout": 30.0,
+                    "max_retries": 3
+                }
+            )
+
             if not api_key:
+                self.logger.error(
+                    "OpenAI API key not found",
+                    extra={"provider": "openai", "error_type": "missing_credentials"}
+                )
+                self.security_logger.log_security_event(
+                    event_type="missing_api_credentials",
+                    description="OpenAI API key not configured",
+                    severity="ERROR",
+                    provider="openai"
+                )
                 raise ValueError("Chiave API OpenAI non trovata nelle variabili d'ambiente")
 
             try:
@@ -1036,9 +1112,24 @@ class LLMService:
                     timeout=30.0,  # Timeout di 30 secondi
                     max_retries=3  # Massimo 3 tentativi
                 )
-                logger.info(f"Client OpenAI inizializzato con base URL: {base_url}")
+                self.logger.info(
+                    "OpenAI client initialized successfully",
+                    extra={
+                        "provider": "openai",
+                        "base_url": base_url,
+                        "client_configured": True
+                    }
+                )
             except Exception as e:
-                logger.error(f"Errore nell'inizializzazione del client OpenAI: {e}")
+                self.logger.error(
+                    "Failed to initialize OpenAI client",
+                    extra={
+                        "provider": "openai",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
                 raise
 
         elif self.model_type == "zai":
@@ -1046,8 +1137,31 @@ class LLMService:
             api_key = os.getenv("ZAI_API_KEY", "53a0e2804093424e97a175b54a289f5f.ZMphW59IaVT7eAya")
             base_url = os.getenv("ZAI_BASE_URL", ZAI_CONFIG["base_url"])
 
+            self.logger.info(
+                "Setting up ZAI manager",
+                extra={
+                    "provider": "zai",
+                    "base_url": base_url,
+                    "has_api_key": bool(api_key)
+                }
+            )
+
             if not api_key:
-                logger.warning("Chiave API ZAI non trovata. Il servizio ZAI non sarà disponibile.")
+                self.logger.warning(
+                    "ZAI API key not found, falling back to OpenAI",
+                    extra={
+                        "provider": "zai",
+                        "fallback_provider": "openai",
+                        "error_type": "missing_credentials"
+                    }
+                )
+                self.security_logger.log_security_event(
+                    event_type="missing_api_credentials",
+                    description="ZAI API key not configured, falling back to OpenAI",
+                    severity="WARNING",
+                    provider="zai",
+                    fallback_provider="openai"
+                )
                 self.model_type = "openai"  # Fallback
                 self.setup_client()  # Retry con OpenAI
                 return
@@ -1056,9 +1170,24 @@ class LLMService:
                 self.zai_manager = ZAIModelManager(api_key, base_url)
                 # Imposta il modello di default per ZAI
                 self.default_model = os.getenv("ZAI_MODEL", "glm-4.6")
-                logger.info(f"Manager ZAI inizializzato con modello: {self.default_model}")
+                self.logger.info(
+                    "ZAI manager initialized successfully",
+                    extra={
+                        "provider": "zai",
+                        "model": self.default_model,
+                        "manager_configured": True
+                    }
+                )
             except Exception as e:
-                logger.error(f"Errore nell'inizializzazione del manager ZAI: {e}")
+                self.logger.error(
+                    "Failed to initialize ZAI manager",
+                    extra={
+                        "provider": "zai",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
                 raise
 
         elif self.model_type == "openrouter":

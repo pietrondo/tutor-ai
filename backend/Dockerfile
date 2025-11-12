@@ -83,6 +83,7 @@ ARG APP_HOME
 # 1. File di configurazione (cambiano raramente)
 COPY main.py ./
 COPY requirements*.py ./
+COPY logging_config.py ./
 
 # 2. Struttura directory applicative
 COPY app/ ./app/
@@ -90,14 +91,16 @@ COPY services/ ./services/
 COPY models/ ./models/
 COPY utils/ ./utils/
 COPY rag/ ./rag/
+COPY middleware/ ./middleware/
+COPY database/ ./database/
 
 # 3. Inizializzazione directory dati
 RUN mkdir -p data/courses data/vector_db data/uploads data/tracking && \
     chmod -R 755 data/
 
-EXPOSE 8001
+EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 ########################
 # Stage: production
@@ -110,6 +113,12 @@ ARG APP_HOME
 # 1. File di configurazione
 COPY main.py ./
 COPY requirements*.py ./
+COPY logging_config.py ./
+# Create backend directory structure to match import expectations
+RUN mkdir -p backend
+COPY logging_config.py ./backend/
+# Create __init__.py to make backend a proper Python package
+RUN echo "# Backend package" > ./backend/__init__.py
 
 # 2. Codice applicativo
 COPY app/ ./app/
@@ -117,6 +126,8 @@ COPY services/ ./services/
 COPY models/ ./models/
 COPY utils/ ./utils/
 COPY rag/ ./rag/
+COPY middleware/ ./middleware/
+COPY database/ ./database/
 
 # 3. Inizializzazione directory dati e configurazione security
 RUN mkdir -p data/courses data/vector_db data/uploads data/tracking && \
@@ -126,6 +137,6 @@ RUN mkdir -p data/courses data/vector_db data/uploads data/tracking && \
 
 USER appuser
 
-EXPOSE 8001
+EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

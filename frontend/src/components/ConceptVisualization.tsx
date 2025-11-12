@@ -24,14 +24,16 @@ interface Connection {
 
 interface ConceptVisualizationProps {
   courseId: string;
-  userId: string;
+  userId?: string;
+  bookId?: string;
   onConceptClick?: (concept: Concept) => void;
   onSubConceptRequest?: (parentConcept: Concept, context: string) => void;
 }
 
 const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
   courseId,
-  userId,
+  userId = "demo_user",
+  bookId,
   onConceptClick,
   onSubConceptRequest
 }) => {
@@ -41,17 +43,20 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
   const [stats, setStats] = useState<any>(null);
+  const [unifiedView, setUnifiedView] = useState<any>(null);
+  const [generatingQuiz, setGeneratingQuiz] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     fetchVisualizationData();
-  }, [courseId, userId]);
+    fetchUnifiedView();
+  }, [courseId, userId, bookId]);
 
   const fetchVisualizationData = async () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/knowledge-areas/${courseId}/visualization/${userId}`
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/knowledge-areas/${courseId}/visualization/${userId}`
       );
 
       if (!response.ok) {
@@ -74,6 +79,66 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchUnifiedView = async () => {
+    try {
+      const viewUrl = bookId
+        ? `/api/unified-learning/view/course/${courseId}?book_id=${bookId}&user_id=${userId}`
+        : `/api/unified-learning/view/course/${courseId}?user_id=${userId}`;
+
+      const response = await fetch(viewUrl);
+      if (response.ok) {
+        const data = await response.json();
+        setUnifiedView(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching unified view:', error);
+    }
+  };
+
+  const handleGenerateQuiz = async (conceptId: string, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
+    try {
+      setGeneratingQuiz(conceptId);
+
+      const response = await fetch('/api/unified-learning/quiz/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: courseId,
+          topic: concepts.find(c => c.concept_id === conceptId)?.name || "Concept",
+          difficulty,
+          num_questions: 5,
+          linked_concept_ids: [conceptId],
+          book_id: bookId,
+          user_id: userId
+        })
+      });
+
+      if (response.ok) {
+        // Refresh both views
+        await fetchVisualizationData();
+        await fetchUnifiedView();
+      } else {
+        throw new Error('Failed to generate quiz');
+      }
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      alert('Impossibile generare il quiz. Riprova più tardi.');
+    } finally {
+      setGeneratingQuiz(null);
+    }
+  };
+
+  const handleTakeQuiz = (quizId: string) => {
+    window.location.href = `/courses/${courseId}/quiz/${quizId}${bookId ? `?book=${bookId}` : ''}`;
+  };
+
+  const getAvailableQuizzesForConcept = (conceptId: string) => {
+    if (!unifiedView) return [];
+    return unifiedView.quizzes ? Object.values(unifiedView.quizzes).filter(
+      (quiz: any) => quiz.linked_concept_ids?.includes(conceptId)
+    ) : [];
   };
 
   const getMasteryColor = (masteryLevel: number): string => {
@@ -150,7 +215,7 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="mb-4 flex items-center space-x-6 text-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 bg-green-500 rounded-full"></div>
           <span>Maestro (&gt;80%)</span>
@@ -166,6 +231,16 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
         <div className="flex items-center space-x-2">
           <div className="w-4 h-4 bg-red-500 rounded-full"></div>
           <span>Da iniziare (&lt;40%)</span>
+        </div>
+        <div className="border-l border-gray-300 pl-4 flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-yellow-400 rounded-full border border-white"></div>
+            <span>Sotto-concetti</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white"></div>
+            <span>Quiz disponibili</span>
+          </div>
         </div>
       </div>
 
@@ -271,6 +346,42 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
                   />
                 )}
 
+                {/* Quiz indicator */}
+                {(() => {
+                  const availableQuizzes = getAvailableQuizzesForConcept(concept.concept_id);
+                  if (availableQuizzes.length > 0) {
+                    return (
+                      <motion.g
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: index * 0.1 + 0.35, duration: 0.3 }}
+                      >
+                        <circle
+                          cx={concept.x - concept.size + 5}
+                          cy={concept.y - concept.size + 5}
+                          r="10"
+                          fill="#3b82f6"
+                          stroke="#ffffff"
+                          strokeWidth="2"
+                        />
+                        <text
+                          x={concept.x - concept.size + 5}
+                          y={concept.y - concept.size + 5}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          fill="white"
+                          fontSize="10"
+                          fontWeight="bold"
+                        >
+                          {availableQuizzes.length}
+                        </text>
+                        <title>{availableQuizzes.length} quiz disponibili</title>
+                      </motion.g>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Mastery indicator */}
                 <motion.text
                   x={concept.x}
@@ -298,7 +409,7 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="font-semibold text-blue-900 text-lg">{selectedConcept.name}</h3>
               <p className="text-blue-700 mt-1">Padronanza: {(selectedConcept.mastery_level * 100).toFixed(1)}%</p>
@@ -306,47 +417,129 @@ const ConceptVisualization: React.FC<ConceptVisualizationProps> = ({
                 {selectedConcept.has_sub_concepts ? 'Ha sotto-concetti' : 'Nessun sotto-concetto'}
               </p>
             </div>
-            <div className="flex space-x-2">
+            <button
+              onClick={() => setSelectedConcept(null)}
+              className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              Chiudi
+            </button>
+          </div>
+
+          {/* Quiz Section */}
+          <div className="border-t border-blue-200 pt-4 mt-4">
+            <h4 className="font-medium text-blue-900 mb-3">Quiz Disponibili</h4>
+            {(() => {
+              const availableQuizzes = getAvailableQuizzesForConcept(selectedConcept.concept_id);
+              if (availableQuizzes.length > 0) {
+                return (
+                  <div className="space-y-2">
+                    {availableQuizzes.slice(0, 3).map((quiz: any) => (
+                      <div key={quiz.id} className="flex items-center justify-between p-2 bg-white rounded border border-blue-200">
+                        <div>
+                          <div className="font-medium text-sm text-gray-900">{quiz.title}</div>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              quiz.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                              quiz.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {quiz.difficulty}
+                            </span>
+                            <span className="text-xs text-gray-500">{quiz.question_count || 5} domande</span>
+                            {quiz.average_score && (
+                              <span className="text-xs text-blue-600">
+                                Media: {Math.round(quiz.average_score * 100)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleTakeQuiz(quiz.id)}
+                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          {quiz.average_score ? 'Rifai' : 'Inizia'}
+                        </button>
+                      </div>
+                    ))}
+                    {availableQuizzes.length > 3 && (
+                      <div className="text-sm text-gray-600 text-center">
+                        {availableQuizzes.length - 3} altri quiz disponibili
+                      </div>
+                    )}
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="text-center py-4">
+                    <p className="text-gray-600 mb-4">Nessun quiz disponibile per questo concetto</p>
+                    <div className="flex justify-center space-x-2">
+                      <button
+                        onClick={() => handleGenerateQuiz(selectedConcept.concept_id, 'easy')}
+                        disabled={generatingQuiz === selectedConcept.concept_id}
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {generatingQuiz === selectedConcept.concept_id ? 'Generazione...' : 'Quiz Facile'}
+                      </button>
+                      <button
+                        onClick={() => handleGenerateQuiz(selectedConcept.concept_id, 'medium')}
+                        disabled={generatingQuiz === selectedConcept.concept_id}
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {generatingQuiz === selectedConcept.concept_id ? 'Generazione...' : 'Quiz Medio'}
+                      </button>
+                      <button
+                        onClick={() => handleGenerateQuiz(selectedConcept.concept_id, 'hard')}
+                        disabled={generatingQuiz === selectedConcept.concept_id}
+                        className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {generatingQuiz === selectedConcept.concept_id ? 'Generazione...' : 'Quiz Difficile'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+
+          {/* Actions */}
+          <div className="border-t border-blue-200 pt-4 mt-4 flex justify-end space-x-2">
+            {onSubConceptRequest && (
               <button
-                onClick={() => setSelectedConcept(null)}
-                className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                onClick={handleAddSubConcept}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
-                Chiudi
+                + Sotto-concetto
               </button>
-              {onSubConceptRequest && (
-                <button
-                  onClick={handleAddSubConcept}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  + Sotto-concetto
-                </button>
-              )}
-            </div>
+            )}
           </div>
         </motion.div>
       )}
 
       {/* Stats Summary */}
-      {stats && (
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <div className="text-2xl font-bold text-gray-800">{stats.total_concepts}</div>
-            <div className="text-sm text-gray-600">Concetti totali</div>
-          </div>
-          <div className="text-center p-3 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{stats.main_concepts}</div>
-            <div className="text-sm text-gray-600">Concetti principali</div>
-          </div>
-          <div className="text-center p-3 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{stats.sub_concepts}</div>
-            <div className="text-sm text-gray-600">Sotto-concetti</div>
-          </div>
-          <div className="text-center p-3 bg-amber-50 rounded-lg">
-            <div className="text-2xl font-bold text-amber-600">{(stats.average_mastery * 100).toFixed(1)}%</div>
-            <div className="text-sm text-gray-600">Padronanza media</div>
-          </div>
+      <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="text-center p-3 bg-gray-50 rounded-lg">
+          <div className="text-2xl font-bold text-gray-800">{stats?.total_concepts || concepts.length}</div>
+          <div className="text-sm text-gray-600">Concetti totali</div>
         </div>
-      )}
+        <div className="text-center p-3 bg-blue-50 rounded-lg">
+          <div className="text-2xl font-bold text-blue-600">
+            {unifiedView ? Object.keys(unifiedView.quizzes || {}).length : 0}
+          </div>
+          <div className="text-sm text-gray-600">Quiz disponibili</div>
+        </div>
+        <div className="text-center p-3 bg-purple-50 rounded-lg">
+          <div className="text-2xl font-bold text-purple-600">
+            {unifiedView ? Object.keys(unifiedView.mindmaps || {}).length : 0}
+          </div>
+          <div className="text-sm text-gray-600">Mappe mentali</div>
+        </div>
+        <div className="text-center p-3 bg-amber-50 rounded-lg">
+          <div className="text-2xl font-bold text-amber-600">
+            {stats ? (stats.average_mastery * 100).toFixed(1) : '0'}%
+          </div>
+          <div className="text-sm text-gray-600">Padronanza media</div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -22,6 +22,19 @@ import numpy as np
 
 from services.course_service import CourseService
 from services.annotation_service import AnnotationService
+try:
+    from logging_config import get_logger, get_structlog_logger, LoggedTimer, PerformanceLogger
+except ImportError:
+    try:
+        # Try importing from backend directory for production mode
+        from backend.logging_config import get_logger, get_structlog_logger, LoggedTimer, PerformanceLogger
+    except ImportError:
+        # Fallback if logging_config is not available
+        import logging
+        get_logger = lambda name: logging.getLogger(name)
+        get_structlog_logger = lambda name: logging.getLogger(name)
+        LoggedTimer = lambda operation, logger=None, **metadata: None
+        PerformanceLogger = lambda: None
 
 logger = structlog.get_logger()
 
@@ -36,16 +49,51 @@ class RAGService:
         self.chunk_overlap = 0.25  # 25% overlap per coerenza semantica
         self.max_chunk_length = 1024  # Massimo token per chunk
 
-        # Disable ChromaDB for now to prevent hanging
-        self.chroma_client = None
-        self.collection = None
-        # self.setup_collection()  # Commented out for faster startup
+        # Enable ChromaDB for book-specific content retrieval
+        try:
+            self.chroma_client = chromadb.PersistentClient(path="./data/vector_db")
+            self.setup_collection()
+            logger.info("ChromaDB initialized successfully for RAG service")
+        except Exception as e:
+            logger.warning(f"Failed to initialize ChromaDB: {e}. Falling back to local retrieval.")
+            self.chroma_client = None
+            self.collection = None
 
         # Inizializza HybridSearchService
         self.hybrid_search = None
 
         # Inizializza Cache Service (lazy loading)
         self.cache_service = None
+
+        # Enhanced logging setup - with fallback
+        try:
+            self.logger = get_structlog_logger("RAGService")
+            self.performance_logger = PerformanceLogger()
+            self._has_enhanced_logging = True
+        except Exception:
+            # Fallback to basic logging if enhanced logging is not available
+            self.logger = logger
+            self.performance_logger = None
+            self._has_enhanced_logging = False
+            print("Warning: Enhanced logging not available, using basic logging")
+
+        # Performance tracking
+        self.retrieval_count = 0
+        self.total_documents_processed = 0
+        self.average_retrieval_time = 0.0
+        self.cache_hit_rate = 0.0
+
+        self.logger.info(
+            "RAGService initialization completed",
+            extra={
+                "model_name": self.model_name,
+                "chunk_size": self.chunk_size,
+                "chunk_overlap": self.chunk_overlap,
+                "max_chunk_length": self.max_chunk_length,
+                "chromadb_enabled": self.chroma_client is not None,
+                "service_version": "enhanced_logging_v1.0"
+            }
+        )
 
         # Course/material helpers
         self.course_service = CourseService()
@@ -881,6 +929,12 @@ class RAGService:
                                include_annotations: bool = True) -> Dict[str, Any]:
         """Retrieve relevant context for a query"""
         try:
+            # Log book-specific context for debugging
+            logger.info("Retrieving context",
+                        course_id=course_id,
+                        book_id=book_id,
+                        query_preview=query[:100] + "..." if len(query) > 100 else query,
+                        chroma_available=self.collection is not None)
             vector_result = None
             if self.collection is not None:
                 try:
