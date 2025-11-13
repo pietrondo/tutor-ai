@@ -26,6 +26,11 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
   const [sortMode, setSortMode] = useState<'priority' | 'alpha'>('priority')
   const [minWeight, setMinWeight] = useState<number>(0)
   const [showMainOnly, setShowMainOnly] = useState<boolean>(false)
+  const [tooltipNodeId, setTooltipNodeId] = useState<string | null>(null)
+  const [tooltipSynonyms, setTooltipSynonyms] = useState<string[]>([])
+  const [tooltipRefs, setTooltipRefs] = useState<string[]>([])
+  const [showTooltip, setShowTooltip] = useState(false)
+  const tooltipTTL = 3600_000
 
   // Log dettagliati per debugging
   console.log('🔍 MindmapExplorer - Dati ricevuti:', {
@@ -77,6 +82,54 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
         {meta.shortLabel}
       </span>
     )
+  }
+
+  const renderWeightBadge = (priority: number | null | undefined) => {
+    if (priority === null || priority === undefined) return null
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+        peso {priority}
+      </span>
+    )
+  }
+
+  const renderRecurrenceBadge = (recurrence: number | null | undefined) => {
+    if (!recurrence || recurrence < 2) return null
+    return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">
+        ricorrenza {recurrence}
+      </span>
+    )
+  }
+
+  const onTitleHover = (node: StudyMindmapNode) => {
+    try {
+      const key = `mm_syn_${node.id}`
+      const raw = localStorage.getItem(key)
+      const now = Date.now()
+      if (raw) {
+        const obj = JSON.parse(raw)
+        if (obj.ts && (now - obj.ts) < tooltipTTL) {
+          setTooltipSynonyms(obj.synonyms || [])
+          setTooltipRefs(obj.refs || [])
+          setTooltipNodeId(node.id)
+          setShowTooltip(true)
+          return
+        }
+      }
+      const synonyms = Array.isArray((node as any).synonyms) ? (node as any).synonyms : []
+      const refs = Array.isArray(node.references) ? node.references : []
+      localStorage.setItem(key, JSON.stringify({ ts: now, synonyms, refs }))
+      setTooltipSynonyms(synonyms)
+      setTooltipRefs(refs)
+      setTooltipNodeId(node.id)
+      setShowTooltip(true)
+    } catch {}
+  }
+
+  const onTitleLeave = () => {
+    setShowTooltip(false)
+    setTooltipNodeId(null)
   }
 
   const getMasteryIndicator = (masteryLevel: number | undefined) => {
@@ -298,9 +351,26 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0 pr-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="font-semibold text-gray-900 truncate">{node.title}</div>
+                  <div className="font-semibold text-gray-900 truncate" onMouseEnter={() => onTitleHover(node)} onMouseLeave={onTitleLeave}>{node.title}</div>
                   {renderPriorityBadge(node.priority)}
                   {renderWeightBadge(node.priority)}
+                  {renderRecurrenceBadge((node as any).recurrence)}
+                  {showTooltip && tooltipNodeId === node.id && (
+                    <div className="absolute left-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg p-2 w-64 z-20">
+                      <div className="text-xs text-gray-700 font-semibold mb-1">Sinonimi fusi</div>
+                      <ul className="text-xs text-gray-600 space-y-1 max-h-24 overflow-auto">
+                        {tooltipSynonyms.length ? tooltipSynonyms.map((s, i) => (
+                          <li key={i}>• {s}</li>
+                        )) : (<li>Nessun sinonimo</li>)}
+                      </ul>
+                      <div className="text-xs text-gray-700 font-semibold mt-2 mb-1">Origine ricorrenza</div>
+                      <ul className="text-[10px] text-gray-500 space-y-1 max-h-16 overflow-auto">
+                        {tooltipRefs.length ? tooltipRefs.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        )) : (<li>Nessun riferimento</li>)}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Session metadata indicators */}
                   {node.session_metadata && (
@@ -328,13 +398,18 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
                   )}
                 </div>
                 {node.summary && (
-                  <div className="text-sm text-gray-600 mt-1 line-clamp-2">{node.summary}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {node.summary.length > 160 ? `${node.summary.slice(0, 160)}…` : node.summary}
+                  </div>
                 )}
                 {node.study_actions.length > 0 && (
                   <div className="mt-2 text-xs text-gray-500">
                     <span className="font-medium text-gray-700">Attività:</span>{' '}
-                    <span className="line-clamp-1">
-                      {node.study_actions.slice(0, 2).join('; ')}
+                    <span>
+                      {(() => {
+                        const txt = node.study_actions.slice(0, 2).join('; ')
+                        return txt.length > 80 ? `${txt.slice(0, 80)}…` : txt
+                      })()}
                       {node.study_actions.length > 2 && '…'}
                     </span>
                   </div>
@@ -408,8 +483,8 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
     )
   }
 
-  const renderStudyPlan = (plan: StudyPlanPhase[]) => {
-    if (!plan.length) return null
+  const renderStudyPlan = (plan?: StudyPlanPhase[]) => {
+    if (!plan || !plan.length) return null
 
     return (
       <div className="mt-6">
@@ -529,7 +604,11 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
           </div>
           {[...mindmap.nodes]
             .filter((n) => (n.priority || 0) >= minWeight)
-            .sort((a, b) => (sortMode === 'priority' ? (b.priority || 0) - (a.priority || 0) : (a.title || '').localeCompare(b.title || '')))
+            .sort((a, b) => (
+              sortMode === 'priority'
+                ? ((((b.priority || 0) - (a.priority || 0)) || (((b as any).recurrence || 0) - ((a as any).recurrence || 0))))
+                : (a.title || '').localeCompare(b.title || '')
+            ))
             .map((node) => renderNode(node, 0, []))}
         </div>
       </div>
@@ -538,6 +617,26 @@ export function MindmapExplorer({ mindmap, onExpandNode, onEditNode }: MindmapEx
           {selectedNode ? (
             <>
               <h4 className="text-lg font-semibold text-gray-900 mb-2">{selectedNode.title}</h4>
+              {Array.isArray((selectedNode as any).synonyms) && (selectedNode as any).synonyms.length > 0 && (
+                <div className="mb-3 text-xs">
+                  <div className="font-semibold text-gray-800 mb-1">Sinonimi fusi</div>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600">
+                    {((selectedNode as any).synonyms as string[]).map((s, idx) => (
+                      <li key={idx}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {Array.isArray(selectedNode.references) && selectedNode.references.length > 0 && (
+                <div className="mb-3 text-xs">
+                  <div className="font-semibold text-gray-800 mb-1">Origine ricorrenza</div>
+                  <ul className="list-disc list-inside space-y-1 text-gray-500">
+                    {selectedNode.references.map((r, idx) => (
+                      <li key={idx}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {selectedPriorityMeta && (
                 <div className="mb-3 flex items-center gap-2 text-xs text-gray-600">
                   <Flag className="h-3 w-3 text-amber-600" />

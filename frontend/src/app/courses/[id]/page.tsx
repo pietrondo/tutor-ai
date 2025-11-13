@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, FileText, MessageSquare, BarChart3, Trash2, BookOpen, Presentation, Calendar, Target, Merge, RefreshCw } from 'lucide-react'
 import { StudyProgress } from '@/components/StudyProgress'
 import BackgroundTaskProgress from '@/components/BackgroundTaskProgress'
+import toast from 'react-hot-toast'
 import BookCard from '@/components/BookCard'
 
 interface Course {
@@ -332,7 +333,7 @@ export default function CourseDetailPage() {
       setMergeResult(result)
     } catch (error) {
       console.error('Error merging book PDFs:', error)
-      alert(`Errore nell'unione dei PDF: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+      toast.error(`Errore nell'unione dei PDF: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
     } finally {
       setIsMergingBook(null)
     }
@@ -362,7 +363,7 @@ export default function CourseDetailPage() {
       setMergeResult(result)
     } catch (error) {
       console.error('Error merging course PDFs:', error)
-      alert(`Errore nell'unione dei PDF del corso: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+      toast.error(`Errore nell'unione dei PDF del corso: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
     } finally {
       setIsMergingCourse(false)
     }
@@ -407,13 +408,14 @@ export default function CourseDetailPage() {
       })
 
       if (response.ok) {
+        toast.success('Corso eliminato')
         router.push('/')
       } else {
-        alert('Errore nell\'eliminazione del corso')
+        toast.error('Errore nell\'eliminazione del corso')
       }
     } catch (error) {
       console.error('Errore nell\'eliminazione del corso:', error)
-      alert('Errore nell\'eliminazione del corso')
+      toast.error('Errore nell\'eliminazione del corso')
     }
   }
 
@@ -437,19 +439,22 @@ export default function CourseDetailPage() {
         setCurrentTaskId(data.task_id)
         setShowTaskForm(false)
         setActiveTab('plans')
+        toast.success('Piano di studio avviato')
       } else {
-        alert('Errore nella creazione del piano di studio')
+        toast.error('Errore nella creazione del piano di studio')
       }
     } catch (error) {
       console.error('Errore nella creazione del piano di studio:', error)
-      alert('Errore nella creazione del piano di studio')
+      toast.error('Errore nella creazione del piano di studio')
     }
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex justify-center items-center min-h-screen" role="status" aria-busy="true" aria-live="polite">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600">
+          <span className="sr-only">Caricamento corso…</span>
+        </div>
       </div>
     )
   }
@@ -600,7 +605,7 @@ export default function CourseDetailPage() {
       {/* Tabs */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6" aria-label="Tabs">
+          <nav className="flex space-x-8 px-6" aria-label="Tabs" role="tablist">
             <button
               onClick={() => setActiveTab('books')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -608,6 +613,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'books'}
             >
               Libri del Corso
             </button>
@@ -619,6 +626,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'progress'}
             >
               Progressi di Studio
             </button>
@@ -630,6 +639,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'quiz'}
             >
               Quiz e Test
             </button>
@@ -641,6 +652,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'slides'}
             >
               Generatore Slide
             </button>
@@ -652,6 +665,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'chat'}
             >
               Chat Tutor AI
             </button>
@@ -663,6 +678,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'practice'}
             >
               Practice SRS
             </button>
@@ -674,6 +691,8 @@ export default function CourseDetailPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
+              role="tab"
+              aria-selected={activeTab === 'plans'}
             >
               Piani di Studio
             </button>

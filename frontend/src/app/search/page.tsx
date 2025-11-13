@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search as SearchIcon, SlidersHorizontal, Sparkles, Filter, BookOpen, Tag, Clock3, UserCircle, Compass, Database, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Skeleton } from '@/components/ui/Skeleton'
+import toast from 'react-hot-toast'
 import { cn, formatDateTime, truncateText } from '@/lib/utils'
 import type { AdvancedSearchResponse, SearchFacets, SearchResult, SearchType, SortOrder } from '@/types/search'
 
@@ -227,7 +229,9 @@ export default function AdvancedSearchPage() {
       setShowSuggestions(false)
     } catch (searchError) {
       console.error('Errore durante la ricerca:', searchError)
-      setError(searchError instanceof Error ? searchError.message : 'Errore inatteso durante la ricerca')
+      const message = searchError instanceof Error ? searchError.message : 'Errore inatteso durante la ricerca'
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -591,7 +595,19 @@ export default function AdvancedSearchPage() {
         )}
 
         <div className="grid gap-4">
-          {results.map((result) => {
+          {loading && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {[...Array(6)].map((_, idx) => (
+                <div key={idx} className="rounded-3xl border border-white/60 bg-white/90 p-6 shadow-lg dark:border-gray-800/70 dark:bg-gray-900/70">
+                  <Skeleton className="h-5 w-24 mb-3" />
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-2/3 mb-2" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!loading && results.map((result) => {
             const highlights = result.metadata?.highlights ?? []
             const matchedTerms = Array.isArray(result.metadata?.matched_terms) ? result.metadata?.matched_terms : []
             const annotationType = typeof result.metadata?.annotation_type === 'string' ? result.metadata?.annotation_type : undefined

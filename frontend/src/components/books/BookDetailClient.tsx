@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, FileText, MessageSquare, Brain, Upload, Edit, Clock, Play, Eye, Highlighter } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import toast from 'react-hot-toast'
 import { fetchFromBackend } from '@/lib/api'
 
 const StudyIcon = BookOpen
@@ -172,13 +173,14 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
 
     // Validate all files are PDFs
     for (let i = 0; i < files.length; i++) {
-      if (!files[i].name.endsWith('.pdf')) {
-        alert('Sono ammessi solo file PDF')
+      if (!files[i].name.toLowerCase().endsWith('.pdf')) {
+        toast.error('Sono ammessi solo file PDF')
         return
       }
     }
 
     setUploading(true)
+    const toastId = toast.loading('Caricamento materiali in corso…')
     let successCount = 0
     let errorCount = 0
 
@@ -210,14 +212,14 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
 
       // Show results
       if (successCount > 0 && errorCount === 0) {
-        alert(`${successCount} materiale/i caricato con successo!`)
+        toast.success(`${successCount} materiale/i caricati`, { id: toastId })
       } else if (successCount > 0 && errorCount > 0) {
-        alert(`${successCount} materiale/i caricato con successo, ${errorCount} fallito/i`)
+        toast(`Caricati: ${successCount} • Falliti: ${errorCount}`, { id: toastId })
       } else {
-        alert('Errore durante il caricamento dei materiali')
+        toast.error('Errore durante il caricamento', { id: toastId })
       }
     } catch {
-      alert('Errore durante il caricamento dei materiali')
+      toast.error('Errore durante il caricamento dei materiali')
     } finally {
       setUploading(false)
       // Clear the file input
@@ -425,6 +427,20 @@ export default function BookDetailClient({ courseId, bookId }: BookDetailClientP
                   {uploading ? 'Caricamento...' : 'Carica PDF'}
                 </Button>
               </div>
+
+              {uploading && (
+                <div className="grid gap-3 md:grid-cols-2 mb-4">
+                  {[...Array(4)].map((_, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white">
+                      <div className="space-y-2">
+                        <div className="relative overflow-hidden bg-neutral-200 rounded-md h-5 w-2/3"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div>
+                        <div className="relative overflow-hidden bg-neutral-200 rounded-md h-4 w-1/2"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div>
+                        <div className="relative overflow-hidden bg-neutral-200 rounded-md h-3 w-1/3"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {book.materials && book.materials.length > 0 ? (
                 <div className="space-y-4">

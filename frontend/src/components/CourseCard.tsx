@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { BookOpen, Clock, FileText, MessageSquare, Trash2, Edit, Library } from 'lucide-react'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
+import { Typography } from '@/components/ui/Typography'
 
 interface Course {
   id: string
@@ -35,13 +37,14 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
       })
 
       if (response.ok) {
+        toast.success('Corso eliminato')
         onUpdate()
       } else {
-        alert('Errore nell\'eliminazione del corso')
+        toast.error('Errore nell\'eliminazione del corso')
       }
     } catch (error) {
       console.error('Errore nell\'eliminazione del corso:', error)
-      alert('Errore nell\'eliminazione del corso')
+      toast.error('Errore nell\'eliminazione del corso')
     } finally {
       setIsDeleting(false)
     }
@@ -69,14 +72,16 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-2 mb-2">
-              <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+              <Typography as="h3" variant="h3" className="text-neutral-900 group-hover:text-primary-600 transition-colors">
                 {course.name}
-              </h3>
+              </Typography>
               <div className="px-2 py-1 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full">
-                <span className="text-xs font-semibold text-blue-700">{course.subject}</span>
+                <span className="text-xs font-semibold text-primary-700">{course.subject}</span>
               </div>
             </div>
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{course.description || 'Nessuna descrizione disponibile'}</p>
+            <Typography variant="body" muted className="text-sm line-clamp-2 leading-relaxed">
+              {course.description || 'Nessuna descrizione disponibile'}
+            </Typography>
           </div>
 
           <div className="flex space-x-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -116,7 +121,7 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
             <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               {course.materials_count}
             </div>
-            <p className="text-xs text-gray-500 font-medium mt-1">Materiali</p>
+            <p className="text-xs text-neutral-500 font-medium mt-1">Materiali</p>
           </div>
 
           <div className="text-center group-hover:scale-110 transition-all duration-300" style={{ transitionDelay: '50ms' }}>
@@ -131,7 +136,7 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
             <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
               {course.study_sessions}
             </div>
-            <p className="text-xs text-gray-500 font-medium mt-1">Sessioni</p>
+            <p className="text-xs text-neutral-500 font-medium mt-1">Sessioni</p>
           </div>
 
           <div className="text-center group-hover:scale-110 transition-all duration-300" style={{ transitionDelay: '100ms' }}>
@@ -146,7 +151,7 @@ export function CourseCard({ course, onUpdate }: CourseCardProps) {
             <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               {formatStudyTime(course.total_study_time)}
             </div>
-            <p className="text-xs text-gray-500 font-medium mt-1">Studio</p>
+            <p className="text-xs text-neutral-500 font-medium mt-1">Studio</p>
           </div>
         </div>
 

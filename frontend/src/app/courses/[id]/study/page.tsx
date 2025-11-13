@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { useParams, useSearchParams, useRouter, usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
@@ -250,12 +251,12 @@ export default function StudyPage() {
 
   const handleAnnotationCreate = (annotation: any) => {
     console.log('Annotazione creata:', annotation);
-    // Potrebbe aggiornare contesto chat o mostrare notifica
+    toast.success('Annotazione salvata');
   };
 
   const handleNoteCreate = (note: any) => {
     console.log('Nota creata:', note);
-    // Potrebbe mostrare notifica o aggiornare conteggi
+    toast.success('Nota aggiunta');
   };
 
   const handleProfileUpdate = (profile: any) => {

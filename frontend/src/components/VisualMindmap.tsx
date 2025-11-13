@@ -54,6 +54,7 @@ interface VisualMindmapProps {
   editable?: boolean
   className?: string
   onExpandNode?: (path: StudyMindmapNode[], prompt?: string) => Promise<void>
+  onRegenerate?: () => void
 }
 
 export default function VisualMindmap({
@@ -62,13 +63,15 @@ export default function VisualMindmap({
   onExport,
   editable = true,
   className = '',
-  onExpandNode
+  onExpandNode,
+  onRegenerate
 }: VisualMindmapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const clickNodeRef = useRef<string | null>(null)
   const nodeClickStartRef = useRef<{ x: number; y: number } | null>(null)
   const nodeDragMovedRef = useRef(false)
+  const autoLayoutAppliedRef = useRef<boolean>(false)
   const [mindmapData, setMindmapData] = useState<MindmapData | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
@@ -380,13 +383,14 @@ export default function VisualMindmap({
 
     const structured = getStructuredMindmap(inputData)
     if (!structured || !Array.isArray(structured.nodes) || structured.nodes.length === 0) {
-      console.warn('⚠️ No valid structured data found, creating default mindmap')
+      console.warn('⚠️ No valid structured data found, keeping canvas empty')
       console.log('🔍 Structured data check:', {
         structured: !!structured,
         isArray: Array.isArray(structured?.nodes),
         nodesLength: structured?.nodes?.length || 0
       })
-      createDefaultMindmap()
+      setIsPlaceholderData(false)
+      setMindmapData(null)
       return
     }
 
@@ -728,6 +732,19 @@ export default function VisualMindmap({
       expandedCount: expandedNodes.length,
       zoomLevel: Math.round(mindmapData.scale * 100)
     })
+  }, [mindmapData])
+
+  // Auto layout once when data becomes available
+  useEffect(() => {
+    if (mindmapData && mindmapData.nodes.size > 0 && !autoLayoutAppliedRef.current) {
+      try {
+        performAutoLayout()
+        handleZoomToFit()
+        autoLayoutAppliedRef.current = true
+      } catch (e) {
+        console.warn('Auto layout failed:', e)
+      }
+    }
   }, [mindmapData])
 
   // Render function
@@ -1724,6 +1741,7 @@ export default function VisualMindmap({
   }
 
   const handleForceRefresh = () => {
+    autoLayoutAppliedRef.current = false
     if (data) {
       console.log('🔄 Force refresh triggered')
       createMindmapFromData(data)
@@ -2127,13 +2145,28 @@ export default function VisualMindmap({
         </div>
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="absolute inset-0 mt-16">
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full"
-        />
-      </div>
+      {/* Canvas or empty CTA */}
+      {mindmapData && mindmapData.nodes.size > 0 ? (
+        <div ref={containerRef} className="absolute inset-0 mt-16">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full"
+          />
+        </div>
+      ) : (
+        <div className="absolute inset-0 mt-16 flex items-center justify-center">
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 border border-gray-200 text-center max-w-md">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Nessuna mappa disponibile</h3>
+            <p className="text-sm text-gray-600 mb-4">Genera una mappa concettuale per iniziare a visualizzare i concetti principali.</p>
+            <button
+              onClick={onRegenerate ? onRegenerate : handleForceRefresh}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Rigenera Mindmap
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Instructions */}
       <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 border border-gray-200 z-10 max-w-xs">

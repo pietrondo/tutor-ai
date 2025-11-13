@@ -2,10 +2,14 @@ import './globals.css'
 import type { ReactNode } from 'react'
 import { Navigation } from '@/components/Navigation'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { AppShell } from '@/components/layout/AppShell'
+import { Toaster } from 'react-hot-toast'
 // Import polyfills for compatibility
 import '../../polyfills.js'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 
-const inter = { className: '' }
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains', display: 'swap' })
 
 export const metadata = {
   title: {
@@ -85,8 +89,8 @@ export default function RootLayout({
   children: ReactNode
 }) {
   return (
-    <html lang="it" className="scroll-smooth">
-      <body className={`${inter.className} antialiased`} suppressHydrationWarning={true}>
+    <html lang="it" className={`scroll-smooth ${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className={`antialiased`} suppressHydrationWarning={true}>
         <ThemeProvider>
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-rose-50 relative overflow-hidden dark:from-gray-900 dark:via-blue-900 dark:to-purple-900">
           {/* Animated background elements */}
@@ -100,9 +104,9 @@ export default function RootLayout({
           <div className="relative z-10">
             <Navigation />
             <main className="container-responsive py-6 sm:py-8 lg:py-12">
-              <div className="fade-in">
-                {children}
-              </div>
+              <AppShell>
+                <div className="col-span-12 fade-in cv-auto">{children}</div>
+              </AppShell>
             </main>
             <footer className="border-t border-gray-200/30 bg-white/40 backdrop-blur-sm mt-12">
               <div className="container-responsive py-8">
@@ -131,6 +135,7 @@ export default function RootLayout({
           </div>
         </div>
       </ThemeProvider>
+      <Toaster position="bottom-right" />
       </body>
     </html>
   )

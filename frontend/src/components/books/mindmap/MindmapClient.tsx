@@ -242,6 +242,7 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
 
     setGenerating(true)
     setError('')
+    toast.loading('Generazione mindmap…', { id: 'mindmap-gen' })
 
     try {
       // Collect session context for enhanced generation
@@ -259,7 +260,7 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
         console.log('🚀 Using enhanced mindmap generation with session context')
       }
 
-      const response = await fetchFromBackend('/mindmap', {
+      const response = await fetchFromBackend('/mindmap/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -267,33 +268,31 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
         body: JSON.stringify(requestBody)
       })
 
-      const { payload, rawText } = await parseJsonSafely<MindmapGenerationResponse>(response)
-
-      if (!response.ok || !payload?.success) {
-        console.error('Errore generazione mindmap:', rawText || payload)
+      const data = await response.json()
+      const structured = Array.isArray(data?.nodes) ? data : data?.mindmap
+      if (!response.ok || !structured || !hasMindmapNodes(structured)) {
+        console.error('Errore generazione mindmap:', data)
         throw new Error('Generazione mindmap fallita')
       }
-
-      if (payload.mindmap && hasMindmapNodes(payload.mindmap)) {
-        setMindmap(payload.mindmap)
-      }
-      setMarkdown(payload.markdown || '')
-      setReferences(toStringArray(payload.references))
-      setSources(toMindmapSources(payload.sources))
+      setMindmap(structured)
+      setMarkdown(data.markdown || '')
+      setReferences(toStringArray(data.references))
+      setSources(toMindmapSources(data.sources))
 
       // Enhanced feedback
-      if (payload.enhanced || payload.session_aware) {
+      if (data?.enhanced || data?.session_aware) {
         toast.success('🧠 Mindmap avanzata generata con contesto personalizzato!', {
           duration: 4000,
           icon: '🎯'
         })
+        toast.dismiss('mindmap-gen')
       } else {
-        toast.success('Mindmap generata con successo!')
+        toast.success('Mindmap generata con successo!', { id: 'mindmap-gen' })
       }
     } catch (err) {
       console.error('Errore generazione mindmap:', err)
       setError('Impossibile generare la mindmap. Riprova più tardi.')
-      toast.error('Errore durante la generazione')
+      toast.error('Errore durante la generazione', { id: 'mindmap-gen' })
     } finally {
       setGenerating(false)
     }
@@ -419,7 +418,7 @@ export default function MindmapClient({ courseId, bookId }: MindmapClientProps) 
         ) : (
           <>
             {mindmap ? (
-              <VisualMindmap data={mindmap as any} />
+              <VisualMindmap data={mindmap as any} onRegenerate={handleGenerateMindmap} />
             ) : (
               <div className="text-center py-16">
                 <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />

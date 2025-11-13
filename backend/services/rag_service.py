@@ -17,8 +17,13 @@ import uuid
 import json
 import structlog
 from pathlib import Path
+from services.metrics import metrics
 import hashlib
 import numpy as np
+try:
+    import faiss as _faiss
+except Exception:
+    _faiss = None
 
 from services.course_service import CourseService
 from services.annotation_service import AnnotationService
@@ -104,6 +109,9 @@ class RAGService:
         self.embedding_fallback_enabled = False
         self._tokenizer_pattern = re.compile(r"\w+", re.UNICODE)
         self._hf_available: Optional[bool] = None
+        self.query_cache: Dict[str, Dict[str, Any]] = {}
+        self.query_cache_ttl = 600
+        self.query_cache_max = 128
 
         logger.info("RAG Service initialized with Italian-optimized settings",
                    model=self.model_name,
@@ -135,6 +143,29 @@ class RAGService:
 
         if oldest_key is not None:
             self.book_chunk_cache.pop(oldest_key, None)
+
+    def _get_query_cache(self, key: str) -> Optional[Dict[str, Any]]:
+        entry = self.query_cache.get(key)
+        if not entry:
+            return None
+        ts = entry.get("ts")
+        if not ts or (time.time() - ts) > self.query_cache_ttl:
+            self.query_cache.pop(key, None)
+            return None
+        return entry.get("data")
+
+    def _set_query_cache(self, key: str, data: Dict[str, Any]):
+        if len(self.query_cache) >= self.query_cache_max:
+            oldest_k = None
+            oldest_ts = time.time()
+            for k, v in self.query_cache.items():
+                t = v.get("ts", 0)
+                if t <= oldest_ts:
+                    oldest_k = k
+                    oldest_ts = t
+            if oldest_k:
+                self.query_cache.pop(oldest_k, None)
+        self.query_cache[key] = {"ts": time.time(), "data": data}
 
     def _resolve_scope_entities(self, course_id: str, book_id: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
         try:
@@ -408,19 +439,33 @@ class RAGService:
         if chunk_embeddings.size == 0:
             return self._rank_with_lexical_similarity(query, chunks, k)
 
-        scores = np.dot(chunk_embeddings, query_embedding)
-        top_indices = np.argsort(scores)[::-1][:k]
-
-        ranked: List[Dict[str, Any]] = []
-        for idx in top_indices:
+        if _faiss is not None:
+            try:
+                index = _faiss.IndexFlatIP(chunk_embeddings.shape[1])
+                index.add(chunk_embeddings.astype('float32'))
+                distances, indices = index.search(query_embedding.reshape(1, -1).astype('float32'), min(len(chunks), max(k * 4, 50)))
+                pre_idx = indices.ravel()
+            except Exception:
+                scores = np.dot(chunk_embeddings, query_embedding)
+                pre_idx = np.argsort(scores)[::-1][:int(min(len(chunks), max(k * 4, 50)))]
+        else:
+            scores = np.dot(chunk_embeddings, query_embedding)
+            pre_idx = np.argsort(scores)[::-1][:int(min(len(chunks), max(k * 4, 50)))]
+        alpha = 0.7
+        combined: List[Tuple[int, float]] = []
+        for idx in pre_idx:
             if idx >= len(chunks):
                 continue
-            ranked.append({
-                "chunk": chunks[idx],
-                "score": float(scores[idx])
-            })
-
-        return ranked
+            sem = float(scores[idx])
+            sem_n = (sem + 1.0) / 2.0
+            lex = self._simple_similarity(query, chunks[idx].get("text", ""))
+            sc = alpha * sem_n + (1.0 - alpha) * lex
+            combined.append((idx, sc))
+        combined.sort(key=lambda x: x[1], reverse=True)
+        out: List[Dict[str, Any]] = []
+        for idx, sc in combined[:k]:
+            out.append({"chunk": chunks[idx], "score": sc})
+        return out
 
     def _tokenize_for_similarity(self, text: str) -> List[str]:
         return self._tokenizer_pattern.findall(text.lower())
@@ -477,6 +522,11 @@ class RAGService:
 
     async def _retrieve_context_local(self, query: str, course_id: str,
                                       book_id: Optional[str], k: int) -> Dict[str, Any]:
+        start_t = time.perf_counter()
+        cache_key = f"local:{course_id}:{book_id or 'all'}:{k}:{hash(query)}"
+        cached = self._get_query_cache(cache_key)
+        if cached:
+            return cached
         materials, scope_meta = self._get_scope_materials_and_meta(course_id, book_id)
 
         if not materials:
@@ -511,15 +561,26 @@ class RAGService:
                 "material_path": metadata.get("material_relative_path") or metadata.get("material_path")
             })
 
+        sources = self._dedupe_sources(sources)
         scope = self._attach_scope_usage(chunk_entry.get("scope", scope_meta), sources, "local_fallback")
 
-        return {
+        result = {
             "text": combined_text,
+            "segments": self.build_segments(combined_text, max_segments=32),
             "sources": sources,
             "course_id": course_id,
             "book_id": book_id,
             "scope": scope
         }
+        self._set_query_cache(cache_key, result)
+        dur_ms = int((time.perf_counter() - start_t) * 1000)
+        try:
+            self.retrieval_count += 1
+            n = self.retrieval_count
+            self.average_retrieval_time = ((self.average_retrieval_time * (n - 1)) + dur_ms) / n
+        except Exception:
+            pass
+        return result
 
     async def _retrieve_context_vector(self, query: str, course_id: str,
                                         book_id: Optional[str], k: int) -> Dict[str, Any]:
@@ -563,11 +624,13 @@ class RAGService:
                 "book_id": metadata.get('book_id') or book_id
             })
 
+        sources = self._dedupe_sources(sources)
         scope_meta = self._build_scope_metadata(course_id, book_id)
         scope = self._attach_scope_usage(scope_meta, sources, "vector_db")
 
         return {
             "text": context_text,
+            "segments": self.build_segments(context_text, max_segments=32),
             "sources": sources,
             "course_id": course_id,
             "book_id": book_id,
@@ -850,6 +913,10 @@ class RAGService:
             chunk_size = self.chunk_size
         if overlap_ratio is None:
             overlap_ratio = self.chunk_overlap
+
+        if len(text or "") > 500000:
+            chunk_size = int(chunk_size * 1.25)
+            overlap_ratio = max(overlap_ratio - 0.05, 0.1)
 
         overlap = int(chunk_size * overlap_ratio)
 

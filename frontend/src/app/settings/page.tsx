@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Settings, Globe, Shield, Bell, Palette, Save, RefreshCw, Key, Eye, EyeOff, CheckCircle, Sun, Moon, Search, Filter, Zap, Star, AlertCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Typography } from '@/components/ui/Typography'
+import toast from 'react-hot-toast'
 
 interface SelectFieldOption {
   value: string
@@ -560,12 +562,14 @@ export default function SettingsPage() {
       await configureLLMManager(apiKeys)
 
       setSaveStatus('Impostazioni salvate con successo!')
+      toast.success('Impostazioni salvate')
 
       // Clear status after 3 seconds
       setTimeout(() => setSaveStatus(''), 3000)
     } catch (error) {
       console.error('Error saving settings:', error)
       setSaveStatus('Errore nel salvataggio delle impostazioni')
+      toast.error('Errore nel salvataggio impostazioni')
     } finally {
       setLoading(false)
     }
@@ -643,10 +647,10 @@ export default function SettingsPage() {
               <Settings className="h-8 w-8 text-white relative z-10 group-hover:rotate-12 transition-transform duration-300" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-500 dark:from-gray-100 dark:to-gray-300 dark:group-hover:from-blue-400 dark:group-hover:to-purple-400">
+              <Typography as="h1" variant="h1" className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-neutral-100 dark:to-neutral-300">
                 Impostazioni
-              </h1>
-              <p className="text-gray-600 mt-1 text-lg dark:text-gray-400">Personalizza la tua esperienza di apprendimento</p>
+              </Typography>
+              <Typography variant="body" muted className="mt-1 text-lg">Personalizza la tua esperienza di apprendimento</Typography>
             </div>
           </div>
         </div>
@@ -664,9 +668,9 @@ export default function SettingsPage() {
               <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12 dark:from-purple-900/50 dark:to-pink-900/50">
                 <Palette className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent dark:from-gray-100 dark:to-gray-300">
+              <Typography as="h3" variant="h3" className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700 dark:from-neutral-100 dark:to-neutral-300">
                 Aspetto
-              </h3>
+              </Typography>
             </div>
 
             <div className="space-y-6">
@@ -738,7 +742,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg dark:bg-gray-800/50">
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400">
                     {theme === 'auto'
                       ? `Tema automatico: Attualmente ${effectiveTheme === 'dark' ? 'scuro' : 'chiaro'} basato sulle impostazioni di sistema`
                       : `Tema ${theme === 'dark' ? 'scuro' : 'chiaro'} selezionato manualmente`
@@ -770,15 +774,15 @@ export default function SettingsPage() {
                   }`}>
                     <section.icon className={`h-5 w-5`} />
                   </div>
-                  <h3 className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-500">
+                  <Typography as="h3" variant="h3" className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700">
                     {section.title}
-                  </h3>
+                  </Typography>
                 </div>
 
               <div className="space-y-4">
                 {section.fields.map((field) => (
                   <div key={field.name}>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
                       {field.label}
                     </label>
 
@@ -815,7 +819,7 @@ export default function SettingsPage() {
                           }))}
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-all duration-200"
                         />
-                        <label htmlFor={field.name} className="ml-2 text-sm text-gray-600">
+                        <label htmlFor={field.name} className="ml-2 text-sm text-neutral-600">
                           {field.label}
                         </label>
                       </div>
@@ -841,9 +845,9 @@ export default function SettingsPage() {
               <div className="p-3 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 hover:rotate-12">
                 <Key className="h-6 w-6 text-yellow-600" />
               </div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              <Typography as="h3" variant="h3" className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 to-neutral-700">
                 Chiavi API
-              </h3>
+              </Typography>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -1266,9 +1270,25 @@ export default function SettingsPage() {
               {/* Models Display */}
               <div className="space-y-6">
                 {openRouterLoading && (
-                  <div className="text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
-                    <p className="mt-2 text-gray-600">Caricamento modelli OpenRouter...</p>
+                  <div className="py-8 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <div className="h-24"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-4 w-2/3"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-3 w-1/2"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                      </div>
+                      <div className="space-y-2 hidden md:block">
+                        <div className="h-24"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-4 w-2/3"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-3 w-1/2"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                      </div>
+                      <div className="space-y-2 hidden lg:block">
+                        <div className="h-24"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-4 w-2/3"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                        <div className="h-3 w-1/2"><div className="relative overflow-hidden bg-neutral-200 rounded-md"><div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_linear_infinite]"></div></div></div>
+                      </div>
+                    </div>
+                    <p className="text-neutral-600">Caricamento modelli OpenRouter...</p>
                   </div>
                 )}
 

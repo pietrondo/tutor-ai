@@ -8,6 +8,8 @@ import {
   type KeyboardEventHandler,
   type FormEvent
 } from 'react'
+import toast from 'react-hot-toast'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useSearchParams } from 'next/navigation'
 import {
   Send,
@@ -876,6 +878,7 @@ Caratteristiche chiave:
       }
 
       setMessages(prev => [...prev, errorResponse])
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -1488,18 +1491,32 @@ Caratteristiche chiave:
               )}
           </div>
         ) : (
-          <div className="space-y-4">
-            {messages.map(message => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            {isLoading && (
-              <div className="flex justify-start text-sm text-gray-500">
-                <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  Generazione risposta…
+      <div className="space-y-4 cv-auto">
+        {messages.map(message => (
+          <ChatMessage key={message.id} message={message} />
+        ))}
+        {messages.length === 0 && isLoading && (
+          <div className="space-y-3">
+                <div className="max-w-xl">
+                  <Skeleton className="h-4 w-1/2 mb-2" />
+                  <Skeleton className="h-4 w-2/3 mb-2" />
+                  <Skeleton className="h-4 w-1/3" />
+                </div>
+                <div className="max-w-lg ml-auto">
+                  <Skeleton className="h-4 w-3/5 mb-2" />
+                  <Skeleton className="h-4 w-2/5 mb-2" />
+                  <Skeleton className="h-4 w-1/2" />
                 </div>
               </div>
             )}
+        {isLoading && (
+          <div className="flex justify-start text-sm text-gray-500">
+            <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <RefreshCw className="h-3 w-3 animate-spin" />
+              Generazione risposta…
+            </div>
+          </div>
+        )}
             <div ref={messagesEndRef} />
           </div>
         )}

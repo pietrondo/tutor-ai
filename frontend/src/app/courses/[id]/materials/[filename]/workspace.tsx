@@ -337,7 +337,7 @@ export default function MaterialWorkspace() {
         {/* PDF Panel */}
         <div className={`${layoutMode === 'chat-focus' ? 'hidden md:hidden' : ''} ${
           layoutMode === 'pdf-focus' ? 'flex-1' : layoutMode === 'split' ? 'w-1/2' : 'w-1/2'
-        } bg-white border-r border-gray-200 overflow-auto`}>
+        } bg-white border-r border-gray-200 overflow-auto cv-auto`}>
           {pdfUrl && bookId && (
             <EnhancedPDFReader
               pdfUrl={pdfUrl}
@@ -410,7 +410,7 @@ export default function MaterialWorkspace() {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto cv-auto">
             {rightPanelTab === 'chat' ? (
               <ChatWrapper course={courseId} book={bookId} />
             ) : (

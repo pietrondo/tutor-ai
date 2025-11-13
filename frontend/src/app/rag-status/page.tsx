@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { Database, FileText, Search, Brain, Activity, CheckCircle, AlertCircle, Clock, Server, HardDrive, Zap, BarChart, RefreshCw, Settings } from 'lucide-react'
 
 interface RAGStatus {
@@ -56,6 +57,7 @@ export default function RAGStatusPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reindexing, setReindexing] = useState(false)
+  const [progressUi, setProgressUi] = useState(0)
   const [showModelSettings, setShowModelSettings] = useState(false)
   const availableModels = [
     'paraphrase-multilingual-MiniLM-L12-v2',
@@ -143,7 +145,9 @@ export default function RAGStatusPage() {
     if (!selectedCourse) return
 
     setReindexing(true)
+    setProgressUi(5)
     try {
+      toast.loading('Reindicizzazione in corso…', { id: 'reindex' })
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/rag/reindex`, {
         method: 'POST',
         headers: {
@@ -160,6 +164,8 @@ export default function RAGStatusPage() {
         console.log('Reindex completed:', data)
         await fetchRAGStatus()
         await fetchDocumentStats()
+        setProgressUi(100)
+        toast.success('Reindicizzazione completata', { id: 'reindex' })
       } else {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Reindexing failed')
@@ -167,8 +173,10 @@ export default function RAGStatusPage() {
     } catch (error) {
       console.error('Error reindexing:', error)
       setError(`Reindicizzazione fallita: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+      toast.error('Reindicizzazione fallita', { id: 'reindex' })
     } finally {
       setReindexing(false)
+      setTimeout(() => setProgressUi(0), 1200)
     }
   }
 
@@ -180,7 +188,9 @@ export default function RAGStatusPage() {
     }
 
     setReindexing(true)
+    setProgressUi(5)
     try {
+      toast.loading('Pulizia indice…', { id: 'clear-index' })
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/rag/clear-index/${selectedCourse}`, {
         method: 'DELETE'
       })
@@ -189,14 +199,18 @@ export default function RAGStatusPage() {
         console.log('Index cleared successfully')
         await fetchRAGStatus()
         await fetchDocumentStats()
+        setProgressUi(100)
+        toast.success('Indice pulito', { id: 'clear-index' })
       } else {
         throw new Error('Failed to clear index')
       }
     } catch (error) {
       console.error('Error clearing index:', error)
       setError(`Eliminazione indice fallita: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+      toast.error('Eliminazione indice fallita', { id: 'clear-index' })
     } finally {
       setReindexing(false)
+      setTimeout(() => setProgressUi(0), 1200)
     }
   }
 
@@ -250,6 +264,14 @@ export default function RAGStatusPage() {
       </div>
 
       {/* System Status Cards */}
+      {reindexing && (
+        <div className="w-full">
+          <div className="h-2 w-full rounded-full bg-neutral-200 overflow-hidden">
+            <div className="h-full bg-primary-600 transition-all" style={{ width: `${progressUi}%` }} />
+          </div>
+          <p className="mt-2 text-sm text-neutral-600">Operazione in corso…</p>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Vector Database Status */}
         <div className="glass-card rounded-xl p-6 border border-gray-200/50">
@@ -620,3 +642,11 @@ export default function RAGStatusPage() {
     </div>
   )
 }
+  useEffect(() => {
+    if (!reindexing) return
+    const id = setInterval(() => {
+      setProgressUi((p) => (p < 95 ? p + 5 : p))
+      fetchRAGStatus()
+    }, 1200)
+    return () => clearInterval(id)
+  }, [reindexing])

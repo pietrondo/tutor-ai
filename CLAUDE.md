@@ -79,6 +79,120 @@ Tutor-AI includes comprehensive Docker testing infrastructure for system validat
 - **Materials Available**: 48 PDF files (100% accessible)
 - **API Endpoints**: Fully functional with 3 courses and 5 books
 
+## 🆕 What’s New (RAG & Mindmap Enhancements)
+
+- RAG Retrieval (Local‑Only)
+  - Hybrid ranking (semantic + lexical) with FAISS pre‑selection when available
+  - Clean text segmentation (`segments`) and source deduplication for higher precision
+  - Adaptive chunking for very long texts to reduce CPU/memory footprint
+  - Query caching (TTL 600s) with LRU eviction to speed repeated queries
+- Generative Pipeline
+  - Title refinement with LLM + stopword removal and safe timeout fallback (700ms)
+  - Second pass NLP on titles (POS tagging + lemmatization/stemming + concept ranking)
+  - Node fields extended with `recurrence` (dedup strength) and `synonyms` (merged variants)
+- Mindmap UX
+  - Inline tooltip on node title hover showing fused synonyms and origin references (cached client‑side TTL 1h)
+  - Auto layout + zoom‑to‑fit once nodes load; compact rendering of summaries/activities
+  - Sorted by priority and, on tie, by recurrence
+- Metrics & Monitoring
+  - Prometheus export: `GET /metrics` and `GET /metrics/prometheus`
+  - RAG metrics: requests, cache hits, LLM timeouts, latency histogram
+
+### Technical References
+
+- Retrieval & NLP
+  - `backend/services/rag_service.py`: hybrid similarity, FAISS pre‑selection, caching, segments
+  - `backend/services/nlp_utils.py`: extract_nouns, normalize_terms (Snowball), rank_concepts (TF‑IDF)
+  - `backend/app/api/mindmap_expand.py`: LLM title refinement, NLP pass, dedup (Jaro‑Winkler), recurrence/synonyms
+- Frontend
+  - `frontend/src/components/MindmapExplorer.tsx`: tooltip inline, sorting, compact text
+  - `frontend/src/types/mindmap.ts`: `recurrence`, `synonyms` types
+- Metrics
+  - `backend/services/metrics.py`: Prometheus registry and JSON fallback
+  - `backend/app/api/metrics_rag.py`: endpoints `/metrics/rag`, `/metrics/prometheus`, `/metrics`
+
+## 📘 Usage Guide (Updated)
+
+### Mindmap Generation (Book/PDF)
+
+- Book scope
+  - Endpoint: `POST /mindmap/generate` with body `{ course_id, book_id, scope: "book" }`
+  - Behavior: aggregates concepts via RAG; titles refined (LLM + NLP); nodes include `recurrence`, `synonyms`
+- PDF scope
+  - Endpoint: `POST /mindmap/generate` with body `{ course_id, book_id, scope: "pdf", pdf_filename }`
+  - Behavior: concepts from current PDF with concise titles and 2–3 sub‑nodes
+- Legacy
+  - `POST /mindmap` forwards to `/mindmap/generate`
+
+### Tooltip & Caching
+
+- Hover a node title to see fused synonyms and origin references (document/chunk), cached via LocalStorage TTL 1h
+- Panel on the right also shows synonyms and references for the selected node
+
+### Metrics Endpoints
+
+- Prometheus scraping: `GET /metrics` or `GET /metrics/prometheus`
+- RAG JSON: `GET /metrics/rag` → `{ mode, retrieval_count, average_retrieval_time_ms, query_cache_size }`
+
+## 🧩 Examples
+
+### Generate a Book Mindmap
+
+```bash
+curl -X POST http://localhost:8000/mindmap/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "course_id": "90a903c0-4ef6-4415-ae3b-9dbc70ad69a9",
+    "book_id": "f92fed02-ecc3-48ea-b7af-7570464a2919",
+    "scope": "book"
+  }'
+```
+
+### Check Prometheus Metrics
+
+```bash
+curl http://localhost:8000/metrics
+curl http://localhost:8000/metrics/rag
+```
+
+### Frontend Tooltip Behavior
+
+- Hover the node title in the list to display synonyms and origin references overlay
+
+## 📦 New Dependencies & System Requirements
+
+- Optional (auto‑detected, safe fallbacks):
+  - spaCy + Italian model (`it_core_news_sm`) for POS tagging
+  - NLTK + SnowballStemmer for Italian stemming
+  - scikit‑learn (TF‑IDF & cosine similarity)
+  - FAISS for fast ANN pre‑selection (IndexFlatIP)
+  - prometheus‑client for metrics export
+- No remote LLM required for RAG: embeddings and retrieval are local
+- LLM provider should be set to “local” in settings
+
+## 🔄 Compatibility & Migration
+
+- Backwards‑compatible APIs:
+  - `POST /mindmap` remains available (forwarding to new generator)
+  - Frontend types extended (`recurrence`, `synonyms`); existing consumers continue to work
+- Migration Steps (optional features)
+  - Install optional NLP libs:
+    - `pip install spacy it-core-news-sm nltk scikit-learn`
+    - `python -m spacy download it_core_news_sm`
+  - FAISS install (optional): `pip install faiss-cpu`
+  - Metrics: `pip install prometheus-client`
+  - Ensure environment permits local LLM provider settings and timeouts
+
+## 📄 Documentation & Versioning
+
+- File format preserved; additions are in “What’s New”, “Usage Guide”, “Examples”, “Dependencies”, “Compatibility & Migration”
+- Cross‑references included to backend/frontend files and endpoints
+- Version entry: RAG & Mindmap Enhancements (2025‑11)
+- PDF export (recommended):
+  - Using pandoc: `pandoc CLAUDE.md -o docs/CLAUDE.pdf`
+  - Or any Markdown to PDF pipeline in CI/CD
+
+
 ### Test Coverage
 - ✅ Docker daemon and images
 - ✅ Container health and connectivity

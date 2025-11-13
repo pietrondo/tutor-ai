@@ -22,6 +22,7 @@ if (typeof window !== 'undefined') {
 }
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -521,6 +522,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
             const updated = mapAnnotationFromBackend(data.annotation);
             setAnnotations(prev => prev.map(ann => ann.id === updated.id ? updated : ann));
             onAnnotationUpdate?.(data.annotation);
+            toast.success('Annotazione aggiornata');
           }
         }
       } else {
@@ -552,6 +554,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
             const normalized = mapAnnotationFromBackend(data.annotation);
             setAnnotations(prev => [normalized, ...prev]);
             onAnnotationCreate?.(data.annotation);
+            toast.success('Annotazione salvata');
 
             if (shareWithChat && onChatWithContext) {
               onChatWithContext({
@@ -571,6 +574,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
       resetAnnotationState();
     } catch (error) {
       console.error('Errore salvataggio annotazione:', error);
+      toast.error('Errore nel salvataggio annotazione');
     } finally {
       setIsLoading(false);
     }
@@ -615,9 +619,11 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
         if (panelAnnotation?.id === annotationId) {
           resetAnnotationState();
         }
+        toast.success('Annotazione eliminata');
       }
     } catch (error) {
       console.error('Errore eliminazione annotazione:', error);
+      toast.error('Errore nell\'eliminazione annotazione');
     } finally {
       setIsLoading(false);
     }
@@ -626,6 +632,7 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
   // Esporta annotazioni
   const exportAnnotations = async () => {
     try {
+      toast.loading('Esportazione annotazioni…', { id: 'export-annotations' })
       const response = await fetch(`${API_BASE_URL}/annotations/${userId}/export?format=markdown&course_id=${courseId}&book_id=${bookId}`);
       if (response.ok) {
         const data = await response.json();
@@ -640,9 +647,11 @@ const EnhancedPDFReader: React.FC<EnhancedPDFReaderProps> = ({
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        toast.success('Annotazioni esportate', { id: 'export-annotations' })
       }
     } catch (error) {
       console.error('Errore esportazione annotazioni:', error);
+      toast.error('Errore esportazione annotazioni', { id: 'export-annotations' })
     }
   };
 

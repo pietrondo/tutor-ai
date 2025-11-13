@@ -92,14 +92,13 @@ class MindmapService {
     console.log('🔄 Generating new mindmap:', { courseId: request.courseId, bookId: request.bookId })
 
     try {
-      const response = await fetch(`${API_BASE_URL}/mindmap`, {
+      const response = await fetch(`${API_BASE_URL}/mindmap/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           course_id: request.courseId,
           book_id: request.bookId,
-          topic: request.topic || 'Contenuti del libro',
-          focus_areas: request.focusAreas || ['capitoli principali', 'concetti chiave', 'temi centrali']
+          scope: 'book'
         }),
       })
 
@@ -110,13 +109,16 @@ class MindmapService {
 
       const data = await response.json()
 
-      if (!data.success || !data.mindmap) {
+      const structured: StudyMindmap = Array.isArray(data?.nodes)
+        ? data
+        : (data?.mindmap as StudyMindmap)
+
+      if (!structured || !Array.isArray(structured.nodes)) {
         throw new Error('Generazione mappa fallita')
       }
 
-      // Salva in cache
       this.cacheMindmap(cacheKey, {
-        data: data.mindmap,
+        data: structured,
         timestamp: Date.now(),
         courseId: request.courseId,
         bookId: request.bookId,
@@ -128,8 +130,8 @@ class MindmapService {
         id: cacheKey,
         courseId: request.courseId,
         bookId: request.bookId,
-        title: data.mindmap.title || 'Mappa Concettuale',
-        mindmap: data.mindmap,
+        title: structured.title || 'Mappa Concettuale',
+        mindmap: structured,
         markdown: data.markdown,
         references: data.references,
         sources: data.sources,
@@ -138,7 +140,7 @@ class MindmapService {
       })
 
       console.log('✅ Mindmap generated and cached')
-      return { mindmap: data.mindmap, fromCache: false }
+      return { mindmap: structured, fromCache: false }
 
     } catch (error) {
       console.error('❌ Mindmap generation failed:', error)

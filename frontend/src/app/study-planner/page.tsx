@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
+import { Typography } from '@/components/ui/Typography'
+import { AppShell } from '@/components/layout/AppShell'
+import toast from 'react-hot-toast'
 import { Clock, BookOpen, Target, CheckCircle, Circle, Plus, Trash2, ChevronRight, BookMarked, MessageSquare } from 'lucide-react'
 import AIProviderBadge from '@/components/AIProviderBadge'
 
@@ -368,7 +371,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
 
   const createStudyPlan = async () => {
     if (!newPlan.course_id) {
-      alert('Seleziona un corso')
+      toast.error('Seleziona un corso')
       return
     }
 
@@ -455,7 +458,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
           progress: 0,
           message: 'Errore nella creazione del piano'
         })
-        alert('Errore nella creazione del piano di studio')
+        toast.error('Errore nella creazione del piano di studio')
       }
     } catch (error) {
       console.error('💥 Errore durante la creazione del piano:', error)
@@ -464,7 +467,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
         progress: 0,
         message: 'Errore di connessione al server'
       })
-      alert('Errore nella creazione del piano di studio')
+      toast.error('Errore nella creazione del piano di studio')
     } finally {
       setCreatingPlan(false)
     }
@@ -682,6 +685,8 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
     <Fragment>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="container-responsive py-8">
+          <AppShell>
+            <div className="col-span-12">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -690,9 +695,9 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
                 <BookMarked className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Piani di Studio</h1>
+                <Typography as="h1" variant="h1" className="text-neutral-900">Piani di Studio</Typography>
                 <div className="flex items-center space-x-3 mt-1">
-                  <p className="text-gray-600">Crea e gestisci piani di studio personalizzati</p>
+                  <Typography variant="body" muted className="text-sm">Crea e gestisci piani di studio personalizzati</Typography>
                   <AIProviderBadge showDetails={false} />
                 </div>
               </div>
@@ -711,7 +716,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
         {showCreateForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 w-full max-w-md">
-              <h3 className="text-xl font-bold mb-4">Crea Nuovo Piano di Studio</h3>
+              <Typography as="h3" variant="h3" className="mb-4">Crea Nuovo Piano di Studio</Typography>
 
               <div className="space-y-4">
                 <div>
@@ -1074,14 +1079,14 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
                       <div className="glass-card p-5">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                            <Typography as="h3" variant="h3" className="flex items-center space-x-2 text-neutral-900">
                               <span>{activeMission.title}</span>
                               {activeMission.badge && (
                                 <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
                                   {activeMission.badge}
                                 </span>
                               )}
-                            </h3>
+                            </Typography>
                             <p className="text-sm text-gray-600 mt-1">{activeMission.description}</p>
                             <p className="text-xs text-gray-500 mt-2">
                               {new Date(activeMission.start_date).toLocaleDateString()} → {new Date(activeMission.end_date).toLocaleDateString()}
@@ -1152,7 +1157,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
 
                   {/* Sessions List */}
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Sessioni di Studio</h3>
+                    <Typography as="h3" variant="h3" className="mb-4 text-neutral-900">Sessioni di Studio</Typography>
                     <div className="space-y-4">
                       {selectedPlan.sessions.map((session, index) => (
                         <div
@@ -1431,14 +1436,15 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <BookMarked className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Seleziona un piano di studio</h3>
-                  <p className="text-gray-600">Scegli un piano dalla lista per vedere i dettagli e le sessioni.</p>
+                  <Typography as="h3" variant="h3" className="mb-2 text-neutral-900">Seleziona un piano di studio</Typography>
+                  <Typography variant="body" muted>Scegli un piano dalla lista per vedere i dettagli e le sessioni.</Typography>
                 </div>
               )}
             </div>
           </div>
         )}
-      </div>
+          </AppShell>
+        </div>
       </div>
       {activeQuiz && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">

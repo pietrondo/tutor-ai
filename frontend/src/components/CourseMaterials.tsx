@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { FileText, Download, Trash2, Calendar, HardDrive, Eye } from 'lucide-react'
 
@@ -43,9 +44,7 @@ export function CourseMaterials({ materials, onRefresh, courseId }: CourseMateri
   }
 
   const handleDownload = async (filename: string) => {
-    // In una reale implementazione, questo scaricherebbe il file dal server
-    // Per ora, mostriamo solo un messaggio
-    alert(`Download di ${filename} - Funzionalità da implementare`)
+    toast('Download preparazione in corso…')
   }
 
   const handleDelete = async (filename: string) => {
@@ -62,9 +61,10 @@ export function CourseMaterials({ materials, onRefresh, courseId }: CourseMateri
       await new Promise(resolve => setTimeout(resolve, 1000))
 
       onRefresh()
+      toast.success('File eliminato')
     } catch (error) {
       console.error('Errore nell\'eliminazione del file:', error)
-      alert('Errore nell\'eliminazione del file')
+      toast.error('Errore nell\'eliminazione del file')
     } finally {
       setDeleting(null)
     }

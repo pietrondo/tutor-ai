@@ -2,8 +2,10 @@
 
 import type { MouseEvent } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BookOpen, FileText, Clock, Trash2, Brain, MessageCircle, Play, Eye } from 'lucide-react'
 import { fetchFromBackend } from '@/lib/api'
+import toast from 'react-hot-toast'
 
 interface BookChapter {
   title: string
@@ -33,6 +35,7 @@ interface BookCardProps {
 }
 
 export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
+  const router = useRouter()
   const handleDelete = async (event: MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -47,12 +50,13 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
       })
 
       if (response.ok) {
+        toast.success('Libro eliminato')
         onDelete?.(book.id)
       } else {
-        alert('Errore durante l\'eliminazione del libro')
+        toast.error('Errore durante l\'eliminazione del libro')
       }
     } catch {
-      alert('Errore durante l\'eliminazione del libro')
+      toast.error('Errore durante l\'eliminazione del libro')
     }
   }
 
@@ -84,7 +88,8 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
 
         <button
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+          aria-label={`Elimina libro ${book.title}`}
+          className="opacity-0 group-hover:opacity-100 p-2 text-danger-600 hover:text-danger-700 hover:bg-danger-50 rounded-lg transition-all duration-200"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -135,30 +140,30 @@ export default function BookCard({ book, courseId, onDelete }: BookCardProps) {
 
       {book.materials_count > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
-          <Link
-            href={`/courses/${courseId}/study?book=${book.id}`}
-            className="inline-flex items-center px-3 py-1.5 bg-green-100 text-green-700 text-xs font-medium rounded-lg hover:bg-green-200 transition-colors"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/courses/${courseId}/study?book=${book.id}`) }}
+            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-success-100 text-success-700 hover:bg-success-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={`Apri studio per ${book.title}`}
           >
             <Play className="h-3 w-3 mr-1" />
             Read & Study
-          </Link>
-          <Link
-            href={`/courses/${courseId}/books/${book.id}/mindmap`}
-            className="inline-flex items-center px-3 py-1.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-lg hover:bg-purple-200 transition-colors"
-            onClick={(e) => e.stopPropagation()}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/courses/${courseId}/books/${book.id}/mindmap`) }}
+            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-accent-100 text-accent-700 hover:bg-accent-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={`Apri mindmap per ${book.title}`}
           >
             <Brain className="h-3 w-3 mr-1" />
             Mindmap
-          </Link>
-          <Link
-            href={`/chat?course=${courseId}&book=${book.id}`}
-            className="inline-flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-200 transition-colors"
-            onClick={(e) => e.stopPropagation()}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/chat?course=${courseId}&book=${book.id}`) }}
+            className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary-100 text-primary-700 hover:bg-primary-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={`Apri chat tutor per ${book.title}`}
           >
             <MessageCircle className="h-3 w-3 mr-1" />
             Chat Tutor
-          </Link>
+          </button>
         </div>
       )}
 

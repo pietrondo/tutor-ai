@@ -218,6 +218,7 @@ class ProgressSummaryResponse(BaseModel):
     areas_detail: List[Dict[str, Any]]
 from app.api.slides import router as slides_router
 from app.api.mindmap_expand import router as mindmap_expand_router
+from app.api.metrics_rag import router as metrics_rag_router
 from app.api.mindmaps import router as mindmaps_router
 # Temporarily disabled enhanced APIs for startup
 # from app.api.enhanced_mindmaps import router as enhanced_mindmaps_router
@@ -461,6 +462,7 @@ app.mount("/course-files", StaticFiles(directory="data/courses"), name="course_f
 app.include_router(slides_router)
 app.include_router(mindmap_expand_router)
 app.include_router(mindmaps_router)
+app.include_router(metrics_rag_router)
 # Temporarily disabled enhanced routers for startup
 # app.include_router(enhanced_mindmaps_router)
 # app.include_router(enhanced_study_plans_router)
@@ -571,6 +573,32 @@ llm_service = LLMService()
 course_service = CourseService()
 book_service = BookService()
 study_tracker = StudyTracker()
+@app.get("/courses/{course_id}/progress")
+async def get_course_progress(course_id: str):
+    return study_tracker.get_progress(course_id)
+
+@app.get("/courses/{course_id}/study-sessions")
+async def get_course_sessions(course_id: str, limit: int = 10):
+    sessions = [s for s in study_tracker.get_sessions_raw() if s.get("course_id") == course_id]
+    sessions.sort(key=lambda s: s.get("start_time", ""), reverse=True)
+    return {"course_id": course_id, "sessions": sessions[:max(1, limit)]}
+
+@app.get("/courses/{course_id}/quiz/performance")
+async def get_quiz_performance(course_id: str):
+    return {"course_id": course_id, "quizzes": [], "summary": {"attempts": 0, "avg_score": 0.0}}
+
+@app.get("/courses/{course_id}/study-time/today")
+async def get_study_time_today(course_id: str):
+    total = 0
+    today = datetime.now().date()
+    for s in study_tracker.get_sessions_raw():
+        if s.get("course_id") == course_id:
+            try:
+                if datetime.fromisoformat(s.get("start_time")).date() == today:
+                    total += int(s.get("duration_minutes", 0))
+            except Exception:
+                continue
+    return {"course_id": course_id, "study_time_minutes": total}
 study_planner = StudyPlannerService()
 # enhanced_mindmap_service = EnhancedMindmapService()
 # Temporarily disabled for startup

@@ -5,9 +5,11 @@ import json
 import re
 import unicodedata
 from datetime import datetime
+from services.metrics import metrics
 
 from services.llm_service import LLMService
 from services.rag_service import RAGService
+from services.nlp_utils import extract_nouns, normalize_terms, rank_concepts
 
 router = APIRouter(prefix="/mindmap", tags=["mindmap"]) 
 
@@ -726,16 +728,167 @@ class StudyMindmapNode(BaseModel):
     priority: Optional[int] = None
     references: List[str] = []
     children: List[Dict[str, Any]] = []
+    recurrence: Optional[int] = None
+    synonyms: List[str] = []
 
 class StudyMindmapResponse(BaseModel):
     title: str
     overview: Optional[str] = None
     nodes: List[StudyMindmapNode]
     references: List[str] = []
+    study_plan: List[Dict[str, Any]] = []
 
 def _normalize_title(text: str) -> str:
     cleaned = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode("ascii")
     return re.sub(r"\s+", " ", cleaned).strip()
+
+def _is_valid_segment(seg: str) -> bool:
+    if not seg:
+        return False
+    s = seg.strip()
+    if len(s) < 25:
+        return False
+    words = re.findall(r"[A-Za-z][A-Za-z\-]+", s)
+    if len(words) < 4:
+        return False
+    letters = len(re.findall(r"[A-Za-z]", s))
+    ratio = letters / max(1, len(s))
+    if ratio < 0.5:
+        return False
+    bib_patterns = [r"\bpag\.?\b", r"\bp\.\b", r"\bvol\.?\b", r"\btomo\b", r"\bISBN\b",
+                    r"\bLibrairie\b", r"\bEdizioni\b", r"\bParis\b", r"\bLarousse\b"]
+    for pat in bib_patterns:
+        if re.search(pat, s, flags=re.IGNORECASE):
+            return False
+    if re.fullmatch(r"[\d\s,\.]+", s):
+        return False
+    if re.fullmatch(r"[A-Za-z]", s):
+        return False
+    return True
+
+def _is_valid_title(title: str) -> bool:
+    t = _normalize_title(title)
+    if not t or len(t) < 4:
+        return False
+    if re.fullmatch(r"[\d\s,\.]+", t):
+        return False
+    return True
+
+STOPWORDS_IT = {
+    "di","del","della","dei","delle","da","dal","dalla","su","sul","sulla","per","tra","fra",
+    "il","lo","la","i","gli","le","un","una","uno","e","ed","o","oppure","che","come"
+}
+
+def _strip_stopwords(text: str, max_words: int = 6) -> str:
+    tokens = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ\-]+", text)
+    filtered = [t for t in tokens if t.lower() not in STOPWORDS_IT]
+    return " ".join(filtered[:max_words])
+
+async def _refine_title_llm(llm_service: LLMService, raw: str) -> str:
+    import os, asyncio
+    prompt = (
+        "Riformula come sintagma nominale conciso (2-6 parole) in italiano, "
+        "senza numeri né citazioni: \n\n" + (raw or "")
+    )
+    temperature = float(os.getenv("LLM_TEMPERATURE", "0.3"))
+    max_tokens = int(os.getenv("LLM_MAX_TOKENS", "18"))
+    try:
+        t = await asyncio.wait_for(llm_service.generate_response(prompt=prompt, max_tokens=max_tokens), timeout=0.7)
+        t = _strip_stopwords(_normalize_title(t))
+        return t
+    except Exception:
+        try:
+            metrics.inc_llm_timeout()
+        except Exception:
+            pass
+        return _strip_stopwords(_normalize_title(raw))
+
+def _jaro(a: str, b: str) -> float:
+    if a == b:
+        return 1.0
+    la, lb = len(a), len(b)
+    if la == 0 or lb == 0:
+        return 0.0
+    md = max(la, lb) // 2 - 1
+    ma = [False] * la
+    mb = [False] * lb
+    m = 0
+    t = 0
+    for i in range(la):
+        s = max(0, i - md)
+        e = min(i + md + 1, lb)
+        for j in range(s, e):
+            if mb[j]:
+                continue
+            if a[i] != b[j]:
+                continue
+            ma[i] = True
+            mb[j] = True
+            m += 1
+            break
+    if m == 0:
+        return 0.0
+    k = 0
+    for i in range(la):
+        if not ma[i]:
+            continue
+        while not mb[k]:
+            k += 1
+        if a[i] != b[k]:
+            t += 1
+        k += 1
+    t /= 2
+    return (m / la + m / lb + (m - t) / m) / 3.0
+
+def _jaro_winkler(a: str, b: str) -> float:
+    j = _jaro(a, b)
+    l = 0
+    p = 0.1
+    for i in range(min(4, len(a), len(b))):
+        if a[i] == b[i]:
+            l += 1
+        else:
+            break
+    return j + l * p * (1 - j)
+
+def _dedupe_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for n in nodes:
+        name = _normalize_title(n.get("title", ""))
+        if not name:
+            continue
+        found = None
+        for o in out:
+            if _jaro_winkler(_normalize_title(o.get("title", "")), name) >= 0.90:
+                found = o
+                break
+        if found is None:
+            out.append({
+                "title": name,
+                "summary": n.get("summary", ""),
+                "ai_hint": n.get("ai_hint", ""),
+                "study_actions": list(n.get("study_actions", [])),
+                "priority": n.get("priority", 2),
+                "references": list(n.get("references", [])[:5]),
+                "recurrence": int(n.get("recurrence", 1))
+            })
+        else:
+            if n.get("summary") and len(n.get("summary","")) > len(found.get("summary","")):
+                found["summary"] = n.get("summary")
+            found["recurrence"] = int(found.get("recurrence",1)) + int(n.get("recurrence",1))
+            found["priority"] = max(int(found.get("priority",2)), int(n.get("priority",2)))
+            merged_refs = list(found.get("references", []))
+            for r in n.get("references", []):
+                if r not in merged_refs:
+                    merged_refs.append(r)
+            found["references"] = merged_refs[:5]
+            merged_actions = list(found.get("study_actions", []))
+            for a in n.get("study_actions", []):
+                if a not in merged_actions:
+                    merged_actions.append(a)
+            found["study_actions"] = merged_actions[:3]
+    out.sort(key=lambda d: (-(d.get("priority",2)), -(d.get("recurrence",1)), d.get("title","")))
+    return out
 
 @router.post("/generate", response_model=StudyMindmapResponse)
 async def generate_mindmap(
@@ -755,7 +908,102 @@ async def generate_mindmap(
         if request.scope == "book":
             concept_map = concept_service.get_concept_map(request.course_id, book_id=request.book_id)
             if not concept_map:
-                raise HTTPException(status_code=404, detail="Concept map non disponibile per questo libro")
+                # Attempt generation fallback (course-wide)
+                try:
+                    await concept_service.generate_concept_map(request.course_id, book_id=request.book_id, force=True)
+                    concept_map = concept_service.get_concept_map(request.course_id, book_id=request.book_id)
+                except Exception:
+                    concept_map = None
+                # If still missing, build basic nodes via RAG scoped to the book
+                if not concept_map:
+                    from services.rag_service import BookContentAnalyzer
+                    analyzer = BookContentAnalyzer(rag_service)
+                    analysis = await analyzer.analyze_book_content(request.course_id, request.book_id)
+                    concepts = (analysis.get("analysis", {}).get("key_concepts") or [])
+                    sources_list = analysis.get("analysis", {}).get("concept_context", {}).get("sources", [])
+                    built_nodes: List[StudyMindmapNode] = []
+                    for idx, c in enumerate(concepts[:10]):
+                        raw_title = c.get("title") or c.get("name") or c.get("concept") or ""
+                        t = await _refine_title_llm(llm_service, str(raw_title))
+                        # Secondo pass: POS + lemma/stem
+                        key_terms = normalize_terms(extract_nouns(t, max_terms=6))
+                        if key_terms:
+                            ranked = rank_concepts(key_terms, [c.get("summary") or ""])
+                            t = " ".join(ranked[:6])
+                        if not _is_valid_title(t):
+                            continue
+                        built_nodes.append(StudyMindmapNode(
+                            id=f"{request.book_id}-auto-{idx+1}",
+                            title=t,
+                            summary=(c.get("summary") or "")[:200],
+                            ai_hint="Approfondisci con esempi e quiz",
+                            study_actions=["Rivedi il capitolo correlato", "Crea flashcards"],
+                            priority=2,
+                            references=[_format_ref(s) for s in sources_list][:3],
+                            children=[],
+                            recurrence=1,
+                            synonyms=[_normalize_title(raw_title)]
+                        ))
+                    if not built_nodes:
+                        search_query = f"temi principali del libro {request.book_id}"
+                        rag_ctx = await rag_service.retrieve_context_hybrid(query=search_query, course_id=request.course_id, book_id=request.book_id, k=8)
+                        full_text = rag_ctx.get("text", "") if isinstance(rag_ctx, dict) else ""
+                        sources_list = rag_ctx.get("sources", []) if isinstance(rag_ctx, dict) else []
+                        raw_segments = [seg.strip() for seg in re.split(r"[\n\r\.;]", full_text) if seg.strip()]
+                        text_segments = [seg for seg in raw_segments if _is_valid_segment(seg)]
+                        for idx, seg in enumerate(text_segments[:8]):
+                            t = await _refine_title_llm(llm_service, seg)
+                            key_terms = normalize_terms(extract_nouns(t, max_terms=6))
+                            if key_terms:
+                                ranked = rank_concepts(key_terms, [seg])
+                                t = " ".join(ranked[:6])
+                            if not _is_valid_title(t):
+                                continue
+                            built_nodes.append(StudyMindmapNode(
+                                id=f"{request.book_id}-auto-{idx+1}",
+                                title=t,
+                                summary=seg[:200],
+                                ai_hint="Usa il tutor per esempi e quiz rapidi",
+                                study_actions=["Rivedi il capitolo correlato", "Crea flashcards"],
+                                priority=2,
+                                references=[_format_ref(s) for s in sources_list][:3],
+                                children=[],
+                                recurrence=1,
+                                synonyms=[_normalize_title(seg.split(':')[0][:80])]
+                            ))
+                    merged_dicts = _dedupe_nodes([n.dict() for n in built_nodes])
+                    deduped: List[StudyMindmapNode] = []
+                    for i, d in enumerate(merged_dicts, start=1):
+                        deduped.append(StudyMindmapNode(
+                            id=f"{request.book_id}-auto-{i}",
+                            title=d.get("title","Concetto"),
+                            summary=d.get("summary","")[:200],
+                            ai_hint=d.get("ai_hint") or "",
+                            study_actions=d.get("study_actions") or ["Rivedi il capitolo correlato","Crea flashcards"],
+                            priority=d.get("priority",2),
+                            references=d.get("references") or [],
+                            children=[],
+                            recurrence=d.get("recurrence",1),
+                            synonyms=list(set(d.get("synonyms", [])))
+                        ))
+                    if not deduped:
+                        deduped = [StudyMindmapNode(
+                            id=f"{request.book_id}-auto-1",
+                            title="Temi principali del libro",
+                            summary="Sintesi iniziale non strutturata",
+                            ai_hint="Richiedi al tutor i concetti chiave del capitolo",
+                            study_actions=["Identifica capitoli chiave", "Raccogli definizioni"],
+                            priority=1,
+                            references=[_format_ref(s) for s in sources_list][:3],
+                            children=[]
+                        )]
+                    return StudyMindmapResponse(
+                        title="Mappa di studio",
+                        overview="Mappa aggregata generata via RAG per il libro",
+                        nodes=deduped,
+                        references=[_format_ref(s) for s in sources_list][:5],
+                        study_plan=[]
+                    )
 
             concepts = concept_map.get("concepts", [])
             concepts = concept_service.aggregate_book_concepts(concepts)
@@ -782,7 +1030,8 @@ async def generate_mindmap(
                 title=_normalize_title(concept_map.get("course_name", "Mappa di studio")),
                 overview="Mappa concettuale aggregata del libro basata sui riassunti PDF",
                 nodes=nodes,
-                references=[]
+                references=[],
+                study_plan=[]
             )
 
         # scope == 'pdf': generate using RAG context filtered by pdf filename
@@ -856,10 +1105,29 @@ async def generate_mindmap(
             title=f"Mappa PDF: {request.pdf_filename}",
             overview="Mappa concettuale generata con RAG dal PDF corrente",
             nodes=nodes,
-            references=filtered_sources
+            references=filtered_sources,
+            study_plan=[]
         )
+
+def _format_ref(s: Any) -> str:
+    try:
+        src = s if isinstance(s, dict) else {}
+        mp = src.get('material_path') or src.get('source') or 'Fonte'
+        base = mp.split('/')[-1]
+        idx = src.get('chunk_index')
+        score = src.get('relevance_score')
+        return f"{base}#{idx} ({score})"
+    except Exception:
+        return str(s)
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate mindmap: {str(e)}")
+@router.post("", response_model=StudyMindmapResponse)
+async def generate_mindmap_legacy(
+    request: GenerateMindmapRequest,
+    llm_service: LLMService = Depends(get_llm_service),
+    rag_service: RAGService = Depends(get_rag_service)
+):
+    return await generate_mindmap(request, llm_service, rag_service)

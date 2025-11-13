@@ -56,8 +56,12 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "style-src-attr 'self' 'unsafe-inline'",
+              "font-src 'self' https://fonts.gstatic.com data:",
+              "upgrade-insecure-requests",
               "img-src 'self' data: blob: http: https:",
-              "font-src 'self' data: https: https://fonts.gstatic.com https://fonts.googleapis.com",
+              // Removed duplicate font-src directive; fonts are served from fonts.gstatic.com
               "connect-src 'self' http://localhost:8000 http://localhost:3000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234 https://api.openai.com https://openrouter.ai/api https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdnjs.cloudflare.com",
               "media-src 'self'",
               "object-src 'self'",

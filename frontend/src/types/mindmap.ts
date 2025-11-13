@@ -109,6 +109,8 @@ export interface StudyMindmapNode {
   priority?: number | null
   references?: string[]
   children: StudyMindmapNode[]
+  recurrence?: number
+  synonyms?: string[]
   session_metadata?: NodeSessionMetadata
   progress_data?: NodeProgressData
 }
