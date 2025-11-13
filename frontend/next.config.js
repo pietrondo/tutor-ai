@@ -62,7 +62,7 @@ const nextConfig = {
               "upgrade-insecure-requests",
               "img-src 'self' data: blob: http: https:",
               // Removed duplicate font-src directive; fonts are served from fonts.gstatic.com
-              "connect-src 'self' http://localhost:8000 http://localhost:3000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234 https://api.openai.com https://openrouter.ai/api https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdnjs.cloudflare.com",
+              "connect-src 'self' http://localhost:8000 http://localhost:3000 ws://localhost:3001 ws://localhost:8000 https://my.productfruits.com https://api.z.ai http://localhost:1234 ws://localhost:1234 https://api.openai.com https://openrouter.ai/api https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com https://cdnjs.cloudflare.com https://megallm.io",
               "media-src 'self'",
               "object-src 'self'",
               // Enhanced worker-src for PDF.js support in both dev and prod

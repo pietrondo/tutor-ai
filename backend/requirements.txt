@@ -66,3 +66,6 @@ pytest>=8.0.0
 pytest-asyncio>=0.24.0
 pytest-cov>=5.0.0
 httpx>=0.28.0
+# Local TTS
+TTS>=0.22.0
+pydub>=0.25.1

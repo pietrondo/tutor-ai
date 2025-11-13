@@ -1,7 +1,7 @@
 export interface LLMProvider {
   id: string
   name: string
-  type: 'openai' | 'openrouter' | 'local' | 'anthropic' | 'cohere' | 'zai'
+  type: 'openai' | 'openrouter' | 'local' | 'anthropic' | 'cohere' | 'zai' | 'megallm'
   apiKey?: string
   baseUrl?: string
   model: string
@@ -349,8 +349,26 @@ class LLMManager {
       }
     })
 
+    this.providers.set('megallm', {
+      id: 'megallm',
+      name: 'MegaLLM',
+      type: 'megallm',
+      baseUrl: 'https://megallm.io/api/v1',
+      model: 'megallm/gpt-compatible',
+      maxTokens: 4096,
+      temperature: 0.7,
+      contextWindow: 128000,
+      isAvailable: false,
+      capabilities: {
+        streaming: true,
+        functionCalling: false,
+        imageAnalysis: false,
+        codeExecution: false
+      }
+    })
+
     // Set fallback chain - prioritize Z.AI as default, then other options
-    this.fallbackChain = ['zai', 'lm-studio', 'openrouter', 'openai-gpt4o-mini', 'openai', 'openai-gpt5', 'openai-gpt4-turbo', 'openai-gpt35-turbo', 'openai-o1-mini']
+    this.fallbackChain = ['zai', 'megallm', 'lm-studio', 'openrouter', 'openai-gpt4o-mini', 'openai', 'openai-gpt5', 'openai-gpt4-turbo', 'openai-gpt35-turbo', 'openai-o1-mini']
   }
 
   private initializeVectorStore() {
@@ -370,6 +388,24 @@ class LLMManager {
     }
 
     try {
+      // Prefer backend test endpoints to avoid CORS/CSP issues for non-local providers
+      const testableProviders = new Set(['openai', 'openrouter', 'zai', 'megallm'])
+      if (testableProviders.has(providerId)) {
+        try {
+          const resp = await fetch(`/api/models/${providerId}/test`, { signal: AbortSignal.timeout(10000) })
+          if (resp.ok) {
+            const data = await resp.json()
+            const ok = !!data.connected || resp.status === 200
+            this.providers.get(providerId)!.isAvailable = ok
+            return ok
+          }
+        } catch (_) {
+          // If backend test fails for non-local providers, do not attempt direct network check to avoid CORS/CSP errors
+          this.providers.get(providerId)!.isAvailable = false
+          return false
+        }
+      }
+
       const baseUrl = provider.baseUrl || this.getDefaultBaseUrl(provider.type)
       if (!baseUrl) {
         console.warn(`No base URL configured for provider ${providerId}`)
@@ -377,48 +413,21 @@ class LLMManager {
         return false
       }
 
-      // Skip HTTPS check for local providers during development
       const isLocalProvider = provider.type === 'local' || provider.id === 'lm-studio'
-
       let controller: AbortController | null = new AbortController()
-      const timeoutId = setTimeout(() => {
-        if (controller) controller.abort()
-      }, isLocalProvider ? 3000 : 10000) // Shorter timeout for local providers
+      const timeoutId = setTimeout(() => { if (controller) controller.abort() }, isLocalProvider ? 3000 : 10000)
 
       try {
-        const response = await fetch(`${baseUrl}/models`, {
-          headers: this.getHeaders(provider),
-          signal: controller.signal
-        })
-
-        clearTimeout(timeoutId)
-        controller = null
-
+        const response = await fetch(`${baseUrl}/models`, { headers: this.getHeaders(provider), signal: controller.signal })
+        clearTimeout(timeoutId); controller = null
         const isAvailable = response.ok
         this.providers.get(providerId)!.isAvailable = isAvailable
-
-        if (isAvailable) {
-          console.log(`✅ Provider ${providerId} is available at ${baseUrl}`)
-        } else {
-          console.warn(`⚠️ Provider ${providerId} responded with status ${response.status}`)
-        }
-
+        if (isAvailable) console.log(`✅ Provider ${providerId} is available at ${baseUrl}`)
+        else console.warn(`⚠️ Provider ${providerId} responded with status ${response.status}`)
         return isAvailable
       } catch (fetchError) {
         clearTimeout(timeoutId)
-
-        if (fetchError instanceof Error) {
-          if (fetchError.name === 'AbortError') {
-            console.warn(`⏰ Provider ${providerId} check timed out`)
-          } else if (fetchError.message.includes('Failed to fetch')) {
-            console.warn(`🌐 Provider ${providerId} network error - CORS or connection issue`)
-          } else {
-            console.warn(`❌ Provider ${providerId} fetch error:`, fetchError.message)
-          }
-        } else {
-          console.warn(`❌ Provider ${providerId} unknown error:`, fetchError)
-        }
-
+        console.warn(`🌐 Provider ${providerId} availability check failed (likely CORS/CSP):`, (fetchError as any)?.message || fetchError)
         this.providers.get(providerId)!.isAvailable = false
         return false
       }
@@ -465,6 +474,8 @@ class LLMManager {
         return 'https://openrouter.ai/api/v1'
         case 'zai':
         return 'https://api.z.ai/api/paas/v4'
+      case 'megallm':
+        return 'https://megallm.io/api/v1'
       case 'local':
         return 'http://localhost:1234/v1'
       default:
@@ -488,6 +499,9 @@ class LLMManager {
           headers['X-Title'] = 'AI Tutor System'
           break
           case 'zai':
+          headers['Authorization'] = `Bearer ${provider.apiKey}`
+          break
+        case 'megallm':
           headers['Authorization'] = `Bearer ${provider.apiKey}`
           break
       }
@@ -584,6 +598,9 @@ class LLMManager {
         case 'zai':
         response = await this.callZAI(baseUrl, enhancedRequest, provider)
         break
+      case 'megallm':
+        response = await this.callMegaLLM(baseUrl, enhancedRequest, provider)
+        break
       default:
         throw new Error(`Unsupported provider type: ${provider.type}`)
     }
@@ -658,6 +675,20 @@ class LLMManager {
     })
   }
 
+  private async callMegaLLM(baseUrl: string, request: LLMRequest, provider: LLMProvider): Promise<Response> {
+    return fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: this.getHeaders(provider),
+      body: JSON.stringify({
+        model: provider.model,
+        messages: request.messages,
+        temperature: request.temperature || provider.temperature,
+        max_tokens: request.maxTokens || provider.maxTokens,
+        stream: request.stream
+      })
+    })
+  }
+
   private parseResponse(data: any, provider: LLMProvider, responseTime: number): LLMResponse {
     let content = ''
     let usage = undefined
@@ -667,6 +698,7 @@ class LLMManager {
       case 'openrouter':
       case 'local':
       case 'zai':
+      case 'megallm':
         content = data.choices?.[0]?.message?.content || ''
         usage = data.usage
         break
@@ -876,7 +908,6 @@ export function syncModelFromBackend(currentModel: string) {
 // Funzione per sincronizzare tutti i provider dal backend
 export async function syncAllProvidersFromBackend() {
   try {
-    // Recupera il provider attuale e il modello dal backend
     const response = await fetch('/api/models')
     if (response.ok) {
       const data = await response.json()

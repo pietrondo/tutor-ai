@@ -10,7 +10,7 @@
 
 **An intelligent tutoring system for university courses with AI-powered learning**
 
-[Quick Start](#-quick-start) • [Features](#-features) • [Architecture](#-architecture--technology-stack) • [API Docs](#-api-endpoints) • [Development](#-development-guidelines)
+[Quick Start](#-quick-start) • [Features](#-features) • [Architecture](#-architecture--technology-stack) • [API Docs](#-api-endpoints) • [Development](#-development-guidelines) • [Documentazione Correlata](#-documentazione-correlata)
 
 </div>
 
@@ -19,6 +19,33 @@
 - **[CLAUDE_QUICKSTART.md](./CLAUDE_QUICKSTART.md)** - Quick start guide & setup
 - **[CLAUDE_DETAILED.md](./CLAUDE_DETAILED.md)** - Complete system documentation
 - **[CLAUDE.md](./CLAUDE.md)** - This file - essential overview
+- **[DOCUMENTAZIONE_PERAGENT/](./DOCUMENTAZIONE_PERAGENT/)** - Vista per argomenti con documentazione tecnica correlata
+
+## 📚 Documentazione Correlata
+
+- Link diretto alla cartella: [DOCUMENTAZIONE_PERAGENT/](./DOCUMENTAZIONE_PERAGENT/)
+- Come usare questa documentazione:
+  - Apri la cartella per scegliere l'area: `backend/`, `frontend/`, `ai/`, `infrastructure/`, `product/`
+  - Usa i link diretti nella tabella per accedere subito al file desiderato
+  - Ogni file include riferimenti ai sorgenti e ad altri documenti utili
+  - Per una panoramica, consulta anche `DOCUMENTAZIONE_PERAGENT/README.md`
+
+| Nome file | Breve descrizione | Data ultima modifica | Link |
+| --- | --- | --- | --- |
+| README.md | Indice tecnico della documentazione correlata | 2025-11-11 23:33 | [DOCUMENTAZIONE_PERAGENT/README.md](./DOCUMENTAZIONE_PERAGENT/README.md) |
+| ai/models.md | Modelli e provider LLM; env vars e riferimenti | 2025-11-09 22:11 | [DOCUMENTAZIONE_PERAGENT/ai/models.md](./DOCUMENTAZIONE_PERAGENT/ai/models.md) |
+| ai/rag-llm.md | Stack RAG + LLM; retrieval e generazione | 2025-11-09 23:03 | [DOCUMENTAZIONE_PERAGENT/ai/rag-llm.md](./DOCUMENTAZIONE_PERAGENT/ai/rag-llm.md) |
+| backend/overview.md | Panoramica architettura backend FastAPI | 2025-11-11 23:40 | [DOCUMENTAZIONE_PERAGENT/backend/overview.md](./DOCUMENTAZIONE_PERAGENT/backend/overview.md) |
+| backend/endpoints.md | Referenza API FastAPI (endpoint principali) | 2025-11-11 23:36 | [DOCUMENTAZIONE_PERAGENT/backend/endpoints.md](./DOCUMENTAZIONE_PERAGENT/backend/endpoints.md) |
+| backend/services.md | Documentazione servizi backend | 2025-11-11 23:37 | [DOCUMENTAZIONE_PERAGENT/backend/services.md](./DOCUMENTAZIONE_PERAGENT/backend/services.md) |
+| backend/database.md | Schema database SQLAlchemy e modelli | 2025-11-11 23:38 | [DOCUMENTAZIONE_PERAGENT/backend/database.md](./DOCUMENTAZIONE_PERAGENT/backend/database.md) |
+| backend/logging.md | Sistema di logging backend | 2025-11-11 07:35 | [DOCUMENTAZIONE_PERAGENT/backend/logging.md](./DOCUMENTAZIONE_PERAGENT/backend/logging.md) |
+| frontend/overview.md | Panoramica frontend Next.js | 2025-11-09 23:03 | [DOCUMENTAZIONE_PERAGENT/frontend/overview.md](./DOCUMENTAZIONE_PERAGENT/frontend/overview.md) |
+| frontend/chat-study.md | Flusso UI Chat & Studio | 2025-11-09 23:03 | [DOCUMENTAZIONE_PERAGENT/frontend/chat-study.md](./DOCUMENTAZIONE_PERAGENT/frontend/chat-study.md) |
+| infrastructure/env-vars.md | Variabili d'ambiente principali | 2025-11-09 22:12 | [DOCUMENTAZIONE_PERAGENT/infrastructure/env-vars.md](./DOCUMENTAZIONE_PERAGENT/infrastructure/env-vars.md) |
+| infrastructure/setup.md | Setup & Infrastructure | 2025-11-09 23:08 | [DOCUMENTAZIONE_PERAGENT/infrastructure/setup.md](./DOCUMENTAZIONE_PERAGENT/infrastructure/setup.md) |
+| product/content-sources.md | Fonti contenuto e materiali | 2025-11-09 22:12 | [DOCUMENTAZIONE_PERAGENT/product/content-sources.md](./DOCUMENTAZIONE_PERAGENT/product/content-sources.md) |
+| product/ux-flows.md | Flussi prodotto & UX | 2025-11-09 22:12 | [DOCUMENTAZIONE_PERAGENT/product/ux-flows.md](./DOCUMENTAZIONE_PERAGENT/product/ux-flows.md) |
 
 ## 🚀 Quick Start
 

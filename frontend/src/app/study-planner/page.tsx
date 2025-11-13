@@ -1443,6 +1443,7 @@ const [planGenerationProgress, setPlanGenerationProgress] = useState({
             </div>
           </div>
         )}
+            </div>
           </AppShell>
         </div>
       </div>

@@ -135,6 +135,15 @@ OPENROUTER_CONFIG = {
     }
 }
 
+MEGALLM_CONFIG = {
+    "base_url": os.getenv("MEGALLM_BASE_URL", "https://megallm.io/api/v1"),
+    "chat_endpoint": "/chat/completions",
+    "models_endpoint": "/models",
+    "timeout": float(os.getenv("MEGALLM_TIMEOUT", "60.0")),
+    "max_retries": 3,
+    "supports_streaming": True
+}
+
 # Modelli OpenRouter disponibili con le loro caratteristiche
 OPENROUTER_MODELS = {
     # OpenAI Models via OpenRouter
@@ -922,6 +931,105 @@ class LocalModelManager:
             logger.error(f"Model test failed for {model_name}: {e}")
             return False
 
+class MegaLLMModelManager:
+    def __init__(self, api_key: str, base_url: str = None):
+        self.api_key = api_key
+        self.base_url = (base_url or MEGALLM_CONFIG["base_url"]).rstrip('/')
+        self.config = MEGALLM_CONFIG
+        self.timeout = self.config.get("timeout", 60.0)
+        self.max_retries = self.config.get("max_retries", 3)
+
+    async def check_connection(self) -> bool:
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            test_url = f"{self.base_url}{self.config['models_endpoint']}"
+            response = requests.get(test_url, headers=headers, timeout=10)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    async def list_available_models(self) -> List[str]:
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            response = requests.get(f"{self.base_url}{self.config['models_endpoint']}", headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return [m.get("id") or m.get("name") for m in data.get("data", []) if isinstance(m, dict)]
+            return []
+        except Exception:
+            return []
+
+    async def test_model(self, model_name: str) -> bool:
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": "Test"}],
+                "max_tokens": 10,
+                "stream": False
+            }
+            response = requests.post(
+                f"{self.base_url}{self.config['chat_endpoint']}",
+                headers=headers,
+                json=payload,
+                timeout=self.timeout
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    async def chat_completion(self, model_name: str, messages: List[Dict], **kwargs) -> Dict[str, Any]:
+        import time
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "max_tokens": kwargs.get("max_tokens", 1500),
+            "temperature": kwargs.get("temperature", 0.7),
+            "stream": kwargs.get("stream", False)
+        }
+        max_retries = self.config.get("max_retries", 3)
+        base_delay = 1.0
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    f"{self.base_url}{self.config['chat_endpoint']}",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                if response.status_code == 200:
+                    return response.json()
+                if 400 <= response.status_code < 500:
+                    raise Exception(str(response.text))
+                if attempt < max_retries:
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+                raise Exception(str(response.status_code))
+            except requests.exceptions.Timeout:
+                if attempt < max_retries:
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+                raise
+            except requests.exceptions.ConnectionError:
+                if attempt < max_retries:
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+                raise
+        raise Exception("MegaLLM chat completion failed")
+
 class ModelSelector:
     """Helper class per selezionare il modello migliore in base al task e al budget"""
 
@@ -1032,6 +1140,7 @@ class LLMService:
         self.local_manager = None
         self.zai_manager = None
         self.openrouter_manager = None
+        self.megallm_manager = None
 
         # Enhanced logging setup
         self.logger = get_structlog_logger("LLMService")
@@ -1063,6 +1172,8 @@ class LLMService:
             self.model_info = OPENAI_MODELS.get(self.default_model, OPENAI_MODELS["gpt-4o"])
         elif self.model_type == "openrouter":
             self.model_info = OPENROUTER_MODELS.get(self.default_model, OPENROUTER_MODELS["anthropic/claude-3-sonnet"])
+        elif self.model_type == "megallm":
+            self.model_info = {"name": self.default_model, "context_window": 128000, "max_tokens": 4096}
         else:
             self.model_info = LOCAL_MODELS.get(self.default_model, {"name": self.default_model})
 
@@ -1210,6 +1321,19 @@ class LLMService:
                 logger.error(f"Errore nell'inizializzazione del manager OpenRouter: {e}")
                 raise
 
+        elif self.model_type == "megallm":
+            api_key = os.getenv("MEGALLM_API_KEY")
+            base_url = os.getenv("MEGALLM_BASE_URL", MEGALLM_CONFIG["base_url"])
+            if not api_key:
+                self.model_type = "openai"
+                self.setup_client()
+                return
+            try:
+                self.megallm_manager = MegaLLMModelManager(api_key, base_url)
+                self.default_model = os.getenv("MEGALLM_MODEL", "megallm/gpt-compatible")
+            except Exception:
+                raise
+
         elif self.model_type in ["ollama", "lmstudio"]:
             # Per provider locali
             base_url = os.getenv("LOCAL_LLM_URL",
@@ -1224,6 +1348,41 @@ class LLMService:
             self.model = os.getenv("LOCAL_LLM_MODEL", "llama3.1")
             self.model_type = "local"
             logger.warning("Using legacy local LLM configuration. Consider using 'ollama' or 'lmstudio' type.")
+
+    def set_provider_keys(self, provider: str, api_key: str, base_url: Optional[str] = None) -> bool:
+        provider = (provider or "").lower()
+        try:
+            if provider == "openai":
+                if not base_url:
+                    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+                self.client = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=30.0, max_retries=3)
+                os.environ["OPENAI_API_KEY"] = api_key
+                os.environ["OPENAI_BASE_URL"] = base_url
+                return True
+            if provider == "openrouter":
+                if not base_url:
+                    base_url = os.getenv("OPENROUTER_BASE_URL", OPENROUTER_CONFIG["base_url"])
+                self.openrouter_manager = OpenRouterModelManager(api_key, base_url)
+                os.environ["OPENROUTER_API_KEY"] = api_key
+                os.environ["OPENROUTER_BASE_URL"] = base_url
+                return True
+            if provider == "zai":
+                if not base_url:
+                    base_url = os.getenv("ZAI_BASE_URL", ZAI_CONFIG["base_url"])
+                self.zai_manager = ZAIModelManager(api_key, base_url)
+                os.environ["ZAI_API_KEY"] = api_key
+                os.environ["ZAI_BASE_URL"] = base_url
+                return True
+            if provider == "megallm":
+                if not base_url:
+                    base_url = os.getenv("MEGALLM_BASE_URL", MEGALLM_CONFIG["base_url"])
+                self.megallm_manager = MegaLLMModelManager(api_key, base_url)
+                os.environ["MEGALLM_API_KEY"] = api_key
+                os.environ["MEGALLM_BASE_URL"] = base_url
+                return True
+            return False
+        except Exception:
+            return False
 
     async def get_available_models(self) -> Dict[str, Any]:
         """Restituisce la lista dei modelli disponibili con le loro caratteristiche"""
@@ -1263,6 +1422,27 @@ class LLMService:
                 result["models"] = OPENROUTER_MODELS
                 result["available_models"] = []
                 result["error"] = "Connessione con OpenRouter non riuscita"
+        elif self.model_type == "megallm" and self.megallm_manager:
+            is_connected = await self.megallm_manager.check_connection()
+            result["megallm_connection"] = is_connected
+            if is_connected:
+                available_models = await self.megallm_manager.list_available_models()
+                models_map = {}
+                for m in available_models:
+                    models_map[m] = {
+                        "name": m,
+                        "context_window": 128000,
+                        "max_tokens": 4096,
+                        "description": f"Modello {m}",
+                        "provider": "MegaLLM",
+                        "use_cases": ["chat"]
+                    }
+                result["models"] = models_map
+                result["available_models"] = available_models
+            else:
+                result["models"] = {}
+                result["available_models"] = []
+                result["error"] = "Connessione con MegaLLM non riuscita"
         elif self.model_type in ["ollama", "lmstudio"] and self.local_manager:
             # Prima controlla la connessione
             is_connected = await self.local_manager.check_connection()
@@ -1402,6 +1582,31 @@ class LLMService:
                 "url": None,
                 "available_models": []
             }
+
+    async def test_megallm_connection(self) -> Dict[str, Any]:
+        mgr = self.megallm_manager
+        if mgr is None:
+            api_key = os.getenv("MEGALLM_API_KEY")
+            base_url = os.getenv("MEGALLM_BASE_URL", MEGALLM_CONFIG["base_url"])
+            if api_key:
+                mgr = MegaLLMModelManager(api_key, base_url)
+        if mgr:
+            is_connected = await mgr.check_connection()
+            available_models = []
+            if is_connected:
+                available_models = await mgr.list_available_models()
+            return {
+                "connected": is_connected,
+                "provider": "megallm",
+                "url": mgr.base_url,
+                "available_models": available_models
+            }
+        return {
+            "connected": False,
+            "provider": "none",
+            "url": None,
+            "available_models": []
+        }
 
     async def test_local_connection(self) -> Dict[str, Any]:
         """Testa la connessione con il provider locale"""
@@ -1589,6 +1794,23 @@ class LLMService:
                     if model_info:
                         logger.info(f"ZAI Model: {model_to_use}, Estimated cost: Low (ZAI pricing)")
 
+                return response["choices"][0]["message"]["content"] if response and "choices" in response else "Risposta non disponibile"
+            elif self.model_type == "megallm" and self.megallm_manager:
+                model_info = self.model_info if isinstance(self.model_info, dict) else {}
+                if model_info and context_size > model_info.get("context_window", 128000) * 0.8:
+                    max_context = int(model_info.get("context_window", 128000) * 0.7)
+                    context_text = context_text[-max_context:]
+                    system_prompt = system_prompt.replace(f"{context.get('text', '')}", context_text)
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ]
+                response = await self.megallm_manager.chat_completion(
+                    model_name=self.default_model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=min(1500, model_info.get("max_tokens", 1500))
+                )
                 return response["choices"][0]["message"]["content"] if response and "choices" in response else "Risposta non disponibile"
             elif self.model_type == "openrouter" and self.openrouter_manager:
                 # Verifica se il modello OpenRouter ha abbastanza contesto

@@ -93,13 +93,19 @@ export default function SettingsPage() {
   const [apiKeys, setApiKeys] = useState({
     openai: '',
     openrouter: '',
-    zai: ''
+    zai: '',
+    megallm: ''
+  })
+
+  const [apiEndpoints, setApiEndpoints] = useState({
+    megallm: 'https://megallm.io/api/v1'
   })
 
   // Load settings from localStorage on mount
   useEffect(() => {
     const savedSettings = localStorage.getItem('app-settings')
     const savedApiKeys = localStorage.getItem('api-keys')
+    const savedEndpoints = localStorage.getItem('api-endpoints')
 
     if (savedSettings) {
       try {
@@ -112,18 +118,12 @@ export default function SettingsPage() {
             // Asincrono per non bloccare il caricamento
             setTimeout(async () => {
               try {
-                const response = await fetch('/models')
+                const response = await fetch('/api/models')
                 if (response.ok) {
                   const data = await response.json()
                   if (data.current_model !== parsed.zaiModel) {
                     // Aggiorna il modello nel backend se è diverso
-                    await fetch('/api/models', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({ model_name: parsed.zaiModel })
-                    })
+                    await fetch(`/api/models/${parsed.zaiModel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
                     // Sincronizza il LLM Manager
                     const { syncModelFromBackend } = await import('@/lib/llm-manager')
                     syncModelFromBackend(parsed.zaiModel)
@@ -143,18 +143,12 @@ export default function SettingsPage() {
         if (parsed.llmProvider === 'openrouter') {
           setTimeout(async () => {
             try {
-              const response = await fetch('/models')
+              const response = await fetch('/api/models')
               if (response.ok) {
                 const data = await response.json()
                 if (data.current_model !== parsed.openRouterModel) {
                   // Aggiorna il modello nel backend se è diverso
-                  await fetch('/api/models', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ model_name: parsed.openRouterModel })
-                  })
+                  await fetch(`/api/models/${parsed.openRouterModel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
                 }
               }
             } catch (error) {
@@ -179,6 +173,15 @@ export default function SettingsPage() {
       }
     }
 
+    if (savedEndpoints) {
+      try {
+        const eps = JSON.parse(savedEndpoints)
+        setApiEndpoints(prev => ({ ...prev, ...eps }))
+      } catch (e) {
+        console.error('Failed to parse saved API endpoints:', e)
+      }
+    }
+
     // Load available models
     loadAvailableModels()
 
@@ -194,12 +197,14 @@ export default function SettingsPage() {
     if (keys.openai) {
       llmManager.configureProvider('openai', { apiKey: keys.openai, isAvailable: false })
       await llmManager.checkProviderAvailability('openai')
+      await fetch('/api/models/openai/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: keys.openai }) })
     }
 
     // Configure OpenRouter
     if (keys.openrouter) {
       llmManager.configureProvider('openrouter', { apiKey: keys.openrouter, isAvailable: false })
       await llmManager.checkProviderAvailability('openrouter')
+      await fetch('/api/models/openrouter/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: keys.openrouter }) })
     }
 
     
@@ -207,6 +212,13 @@ export default function SettingsPage() {
     if (keys.zai) {
       llmManager.configureProvider('zai', { apiKey: keys.zai, isAvailable: false })
       await llmManager.checkProviderAvailability('zai')
+      await fetch('/api/models/zai/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: keys.zai }) })
+    }
+
+    if (keys.megallm) {
+      llmManager.configureProvider('megallm', { apiKey: keys.megallm, baseUrl: apiEndpoints.megallm, isAvailable: false })
+      await llmManager.checkProviderAvailability('megallm')
+      await fetch('/api/models/megallm/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: keys.megallm, base_url: apiEndpoints.megallm }) })
     }
 
     // Set default provider based on settings
@@ -220,7 +232,7 @@ export default function SettingsPage() {
   const loadAvailableModels = async () => {
     setModelsLoading(true)
     try {
-      const response = await fetch('/models')
+      const response = await fetch('/api/models')
       if (response.ok) {
         const data: AvailableModelsResponse = await response.json()
         if (data.model_type === 'zai' && data.models) {
@@ -246,13 +258,10 @@ export default function SettingsPage() {
     // Set the model in backend if ZAI is the current provider
     if (settings.llmProvider === 'zai') {
       try {
-        const response = await fetch('/api/models', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ model_name: newModel })
-        })
+          const response = await fetch(`/api/models/${newModel}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
 
         if (response.ok) {
           console.log('ZAI model updated successfully:', newModel)
@@ -286,12 +295,9 @@ export default function SettingsPage() {
     // If switching to ZAI, also set the selected model
     if (newProvider === 'zai' && selectedZaiModel) {
       try {
-        const response = await fetch('/api/models', {
+        const response = await fetch(`/api/models/${selectedZaiModel}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ model_name: selectedZaiModel })
+          headers: { 'Content-Type': 'application/json' }
         })
 
         if (response.ok) {
@@ -317,12 +323,9 @@ export default function SettingsPage() {
     // Set the model in backend if OpenRouter is the current provider
     if (settings.llmProvider === 'openrouter') {
       try {
-        const response = await fetch('/api/models', {
+        const response = await fetch(`/api/models/${newModel}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ model_name: newModel })
+          headers: { 'Content-Type': 'application/json' }
         })
 
         if (response.ok) {
@@ -365,7 +368,7 @@ export default function SettingsPage() {
     }))
 
     try {
-      const response = await fetch('/models/test', {
+      const response = await fetch('/api/models/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -431,6 +434,8 @@ export default function SettingsPage() {
   } = useOpenRouterModels()
 
   const [selectedOpenRouterModel, setSelectedOpenRouterModel] = useState('')
+  const [selectedMegaLLMModel, setSelectedMegaLLMModel] = useState('')
+  const [megaLLMModels, setMegaLLMModels] = useState<string[]>([])
 
   // Test API key function
   const testApiKey = async (provider: string, apiKey: string) => {
@@ -445,12 +450,12 @@ export default function SettingsPage() {
 
       switch (provider) {
         case 'openai':
-          // Test directly against OpenAI API
+          await fetch('/api/models/openai/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: apiKey }) })
           testUrl = 'https://api.openai.com/v1/models'
           headers['Authorization'] = `Bearer ${apiKey}`
           break
         case 'openrouter':
-          // Test directly against OpenRouter API
+          await fetch('/api/models/openrouter/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: apiKey }) })
           testUrl = 'https://openrouter.ai/api/v1/models'
           headers['Authorization'] = `Bearer ${apiKey}`
           headers['HTTP-Referer'] = window.location.origin
@@ -465,9 +470,10 @@ export default function SettingsPage() {
           // Configure LLM Manager first
           await configureLLMManager(updatedKeys)
 
+          await fetch('/api/models/zai/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: apiKey }) })
           // Test through backend API for ZAI to avoid CORS issues
           try {
-            const response = await fetch('/models/zai/test', {
+            const response = await fetch('/api/models/zai/test', {
               method: 'GET',
               signal: AbortSignal.timeout(15000)
             })
@@ -501,6 +507,52 @@ export default function SettingsPage() {
             testUrl = 'https://api.z.ai/api/paas/v4/models'
             headers['Authorization'] = `Bearer ${apiKey}`
             break
+          }
+        }
+        case 'megallm': {
+          const updatedKeys = { ...apiKeys, [provider]: apiKey }
+          setApiKeys(updatedKeys)
+          localStorage.setItem('api-keys', JSON.stringify(updatedKeys))
+
+          await configureLLMManager(updatedKeys)
+
+          try {
+            await fetch('/api/models/megallm/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: apiKey, base_url: apiEndpoints.megallm }) })
+            const response = await fetch('/api/models/megallm/test', {
+              method: 'GET',
+              signal: AbortSignal.timeout(15000)
+            })
+
+            if (response.ok) {
+              const result = await response.json()
+              if (result.connected) {
+                setKeyStatus(prev => ({
+                  ...prev,
+                  [provider]: { valid: true, message: '✅ API Key MegaLLM valida e funzionante!' }
+                }))
+                return
+              } else {
+                setKeyStatus(prev => ({
+                  ...prev,
+                  [provider]: { valid: false, message: `❌ MegaLLM non funzionante: ${result.error || 'Errore di configurazione'}` }
+                }))
+                return
+              }
+            } else {
+              const errorData = await response.json().catch(() => ({}))
+              setKeyStatus(prev => ({
+                ...prev,
+                [provider]: { valid: false, message: `❌ Errore ${response.status}: ${errorData.detail || response.statusText}` }
+              }))
+              return
+            }
+          } catch (error) {
+            // Do not attempt direct remote test to avoid CORS/CSP errors; rely on backend test only
+            setKeyStatus(prev => ({
+              ...prev,
+              [provider]: { valid: false, message: '❌ Test backend fallito o CORS remoto bloccato' }
+            }))
+            return
           }
         }
         default:
@@ -545,6 +597,39 @@ export default function SettingsPage() {
     }
   }
 
+  const loadMegaLLMModels = async () => {
+    try {
+      const response = await fetch('/api/models?provider=megallm')
+      if (response.ok) {
+        const data = await response.json()
+        const modelsObj = data.models || {}
+        const ids = Object.keys(modelsObj)
+        setMegaLLMModels(ids)
+      }
+    } catch (e) {
+      void e
+    }
+  }
+
+  const handleMegaLLMModelChange = async (newModel: string) => {
+    setSelectedMegaLLMModel(newModel)
+    const updatedSettings = { ...settings, megallmModel: newModel }
+    setSettings(updatedSettings)
+    localStorage.setItem('app-settings', JSON.stringify(updatedSettings))
+
+    if (settings.llmProvider === 'megallm') {
+      try {
+        const response = await fetch(`/api/models/${newModel}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        if (response.ok) {
+          const { llmManager } = await import('@/lib/llm-manager')
+          llmManager.configureProvider('megallm', { model: newModel })
+        }
+      } catch (_) {
+        void _
+      }
+    }
+  }
+
   const toggleApiKeyVisibility = (provider: string) => {
     setShowApiKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
   }
@@ -557,6 +642,7 @@ export default function SettingsPage() {
       // Save settings to localStorage
       localStorage.setItem('app-settings', JSON.stringify(settings))
       localStorage.setItem('api-keys', JSON.stringify(apiKeys))
+      localStorage.setItem('api-endpoints', JSON.stringify(apiEndpoints))
 
       // Configure LLM Manager with new API keys
       await configureLLMManager(apiKeys)
@@ -589,6 +675,7 @@ export default function SettingsPage() {
             { value: 'openai', label: 'OpenAI (GPT-4, GPT-4o, etc.)' },
             { value: 'openrouter', label: 'OpenRouter' },
               { value: 'zai', label: 'Z.AI (GLM-4.6)' },
+              { value: 'megallm', label: 'MegaLLM' },
               { value: 'lmstudio', label: 'LM Studio (Locale)' },
             { value: 'local', label: 'Locale (Legacy)' }
           ]
@@ -1001,6 +1088,65 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+              {/* MegaLLM API Key */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-800 flex items-center">
+                  <Globe className="h-4 w-4 mr-2 text-red-600" />
+                  MegaLLM
+                </h4>
+                <div className="relative">
+                  <input
+                    type={showApiKeys.megallm ? 'text' : 'password'}
+                    value={apiKeys.megallm}
+                    onChange={(e) => setApiKeys(prev => ({ ...prev, megallm: e.target.value }))}
+                    placeholder="mlm-..."
+                    className="w-full px-4 py-3 pr-20 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleApiKeyVisibility('megallm')}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                  >
+                    {showApiKeys.megallm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Endpoint MegaLLM</label>
+                  <input
+                    type="text"
+                    value={apiEndpoints.megallm}
+                    onChange={(e) => setApiEndpoints(prev => ({ ...prev, megallm: e.target.value }))}
+                    placeholder="https://megallm.io/api/v1"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300 bg-white/80 backdrop-blur"
+                  />
+                </div>
+                <button
+                  onClick={() => testApiKey('megallm', apiKeys.megallm)}
+                  disabled={!apiKeys.megallm || testingKey === 'megallm'}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium transition-all duration-300 hover:from-red-600 hover:to-red-700 hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {testingKey === 'megallm' ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Test...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Test</span>
+                    </>
+                  )}
+                </button>
+                {keyStatus.megallm && (
+                  <div className={`p-3 rounded-lg border text-sm ${
+                    keyStatus.megallm.valid
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    {keyStatus.megallm.message}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1175,6 +1321,39 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {settings.llmProvider === 'megallm' && (
+          <div className="glass-card rounded-2xl p-6 mb-8 border border-gray-200/50 hover:border-red-200/50 transition-all duration-500 group relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 via-orange-500/5 to-pink-500/5 opacity-50"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-pink-500"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-gradient-to-br from-red-100 to-orange-100 rounded-xl shadow-lg">
+                    <Settings className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Modello MegaLLM</h3>
+                    <p className="text-sm text-gray-600">Seleziona il modello disponibile</p>
+                  </div>
+                </div>
+                <button onClick={loadMegaLLMModels} className="px-4 py-2 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg font-medium">Aggiorna modelli</button>
+              </div>
+              <div className="space-y-3">
+                <select
+                  value={selectedMegaLLMModel}
+                  onChange={(e) => handleMegaLLMModelChange(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  <option value="">Seleziona un modello</option>
+                  {megaLLMModels.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}

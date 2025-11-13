@@ -16,7 +16,7 @@ import structlog
 import asyncio
 
 from services.rag_service import RAGService
-from services.llm_service import LLMService
+from services.llm_service import LLMService, OPENROUTER_MODELS, ZAI_MODELS, OPENAI_MODELS, LOCAL_MODELS
 from services.course_service import CourseService
 from services.concept_map_service import concept_map_service
 # from services.enhanced_mindmap_service import EnhancedMindmapService, StudySessionContext
@@ -229,6 +229,10 @@ from app.api.mindmaps import router as mindmaps_router
 # from app.api.continuous_improvement import router as continuous_improvement_router
 from app.api.concepts import router as concepts_router
 from app.api.unified_learning import router as unified_learning_router
+try:
+    from app.api.tts import router as tts_router
+except ImportError:
+    tts_router = None
 
 # Import security and error handling utilities
 from utils.security import (
@@ -457,6 +461,11 @@ app.mount("/slides/static", StaticFiles(directory="data/slides"), name="slides_s
 
 # Alternative mount for course files
 app.mount("/course-files", StaticFiles(directory="data/courses"), name="course_files")
+try:
+    os.makedirs("data/audio", exist_ok=True)
+    app.mount("/audio", StaticFiles(directory="data/audio"), name="audio")
+except Exception:
+    pass
 
 # Include API routers
 app.include_router(slides_router)
@@ -472,6 +481,8 @@ app.include_router(metrics_rag_router)
 # app.include_router(continuous_improvement_router)
 app.include_router(concepts_router)
 app.include_router(unified_learning_router)
+if tts_router:
+    app.include_router(tts_router)
 
 # Security and rate limiting middleware
 @app.middleware("http")
@@ -691,6 +702,15 @@ class MissionTaskUpdate(BaseModel):
 
 class BudgetModeRequest(BaseModel):
     enabled: bool
+
+class ProviderKeysRequest(BaseModel):
+    provider: Optional[str] = None
+    api_key: str
+    base_url: Optional[str] = None
+
+class ModelTestRequest(BaseModel):
+    provider: str
+    model_name: str
 
 class MindmapRequest(BaseModel):
     course_id: str
@@ -3308,15 +3328,31 @@ async def get_available_models(
             }
         }
 
-        # Filter by provider if specified
-        if provider and provider in all_models:
-            provider_models = all_models[provider]
-            if isinstance(provider_models, dict) and "models" in provider_models:
-                models_data = provider_models["models"]
-            else:
-                models_data = provider_models
+        # Select models for requested provider explicitly, independent of current provider
+        if provider == "openrouter":
+            models_data = OPENROUTER_MODELS
+        elif provider == "zai":
+            models_data = ZAI_MODELS
+        elif provider == "megallm":
+            # Build MegaLLM models map dynamically from available models
+            try:
+                test = await llm_service.test_megallm_connection()
+                avail = test.get("available_models", []) or []
+                models_map = {}
+                for m in avail:
+                    models_map[m] = {
+                        "name": m,
+                        "context_window": 128000,
+                        "max_tokens": 4096,
+                        "description": f"Modello {m}",
+                        "provider": "MegaLLM",
+                        "use_cases": ["chat"]
+                    }
+                models_data = models_map
+            except Exception:
+                models_data = {}
         else:
-            # Use all models from current provider
+            # Use models from current provider
             models_data = all_models.get("models", {})
 
         # Enhanced model categorization and filtering
@@ -3445,6 +3481,12 @@ def get_connection_status(all_models: dict, provider: Optional[str]) -> dict:
             "available_models_count": len(all_models.get("available_models", [])),
             "error": all_models.get("error")
         }
+    elif provider == "megallm":
+        return {
+            "connected": all_models.get("megallm_connection", False),
+            "available_models_count": len(all_models.get("available_models", [])),
+            "error": all_models.get("error")
+        }
     else:
         return {"connected": True, "provider": "openai"}
 
@@ -3527,6 +3569,66 @@ async def test_zai_connection():
         return await llm_service.test_zai_connection()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/models/megallm/test")
+async def test_megallm_connection():
+    try:
+        return await llm_service.test_megallm_connection()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/models/test")
+async def test_model(req: ModelTestRequest):
+    try:
+        provider = (req.provider or "").lower()
+        model = req.model_name
+        valid = False
+        if provider == "zai" and llm_service.zai_manager:
+            valid = await llm_service.zai_manager.test_model(model)
+        elif provider == "openrouter" and llm_service.openrouter_manager:
+            valid = await llm_service.openrouter_manager.test_model(model)
+        elif provider == "megallm" and hasattr(llm_service, "megallm_manager") and llm_service.megallm_manager:
+            valid = await llm_service.megallm_manager.test_model(model)
+        elif provider in ("ollama", "lmstudio") and llm_service.local_manager:
+            valid = await llm_service.local_manager.test_model(model)
+        else:
+            # Fallback: try setting the model via LLMService and assume valid
+            valid = await llm_service.set_model(model)
+        return {"valid": bool(valid)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/models/provider/keys")
+async def set_provider_keys(req: ProviderKeysRequest):
+    try:
+        ok = llm_service.set_provider_keys(req.provider, req.api_key, req.base_url)
+        if not ok:
+            raise HTTPException(status_code=400, detail="Invalid provider or configuration")
+        return {"success": True, "provider": req.provider}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/models/openai/keys")
+async def set_openai_keys(req: ProviderKeysRequest):
+    req.provider = "openai"
+    return await set_provider_keys(req)
+
+@app.post("/models/openrouter/keys")
+async def set_openrouter_keys(req: ProviderKeysRequest):
+    req.provider = "openrouter"
+    return await set_provider_keys(req)
+
+@app.post("/models/zai/keys")
+async def set_zai_keys(req: ProviderKeysRequest):
+    req.provider = "zai"
+    return await set_provider_keys(req)
+
+@app.post("/models/megallm/keys")
+async def set_megallm_keys(req: ProviderKeysRequest):
+    req.provider = "megallm"
+    return await set_provider_keys(req)
 
 @app.get("/rag/status")
 async def get_rag_status():

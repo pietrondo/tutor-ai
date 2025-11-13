@@ -6,10 +6,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-      cache_from:
-        - tutor-ai-backend:cache
       args:
-        BUILDKIT_INLINE_CACHE: 1
+        REQUIREMENTS_FILE: requirements-optimized.txt
     image: tutor-ai-backend:latest
     container_name: tutor-ai-backend
     ports:
@@ -41,10 +39,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: runner
-      cache_from:
-        - tutor-ai-frontend:cache
       args:
-        BUILDKIT_INLINE_CACHE: 1
         NODE_ENV: production
         NEXT_TELEMETRY_DISABLED: 1
     image: tutor-ai-frontend:latest

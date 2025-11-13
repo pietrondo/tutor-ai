@@ -5,10 +5,7 @@ services:
   backend:
     build:
       target: development
-      cache_from:
-        - tutor-ai-backend:dev-cache
-      args:
-        BUILDKIT_INLINE_CACHE: 1
+      args: {}
     image: tutor-ai-backend:dev
     volumes:
       # Bind mount del codice sorgente per hot reload
@@ -40,10 +37,7 @@ services:
   frontend:
     build:
       target: development
-      cache_from:
-        - tutor-ai-frontend:dev-cache
       args:
-        BUILDKIT_INLINE_CACHE: 1
         NODE_ENV: development
     image: tutor-ai-frontend:dev
     volumes:

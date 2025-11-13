@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG APP_HOME=/app
-ARG RUNTIME_PACKAGES="curl tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1"
+ARG RUNTIME_PACKAGES="curl ffmpeg tesseract-ocr tesseract-ocr-ita tesseract-ocr-eng libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1"
 ARG BUILD_PACKAGES="build-essential"
 
 ########################
@@ -43,11 +43,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Python dependencies (only when requirements.txt changes)
-COPY requirements.txt* ./
+# Install Python dependencies (only when requirements files change)
+ARG REQUIREMENTS_FILE="requirements.txt"
+COPY requirements*.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r ${REQUIREMENTS_FILE}
 
 ########################
 # Stage: runtime base

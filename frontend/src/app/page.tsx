@@ -8,6 +8,8 @@ import { CourseCard } from '@/components/CourseCard'
 import { StatsOverview } from '@/components/StatsOverview'
 import { Button } from '@/components/ui/Button'
 import AIProviderBadge from '@/components/AIProviderBadge'
+import TTSPanel from '@/components/audio/TTSPanel'
+import AudioLibrary from '@/components/audio/AudioLibrary'
 
 interface Course {
   id: string
@@ -164,6 +166,14 @@ export default function HomePage() {
       <section className="py-16 bg-white">
         <div className="max-w-6xl mx-auto px-6">
           <StatsOverview courses={courses} />
+        </div>
+      </section>
+
+      {/* TTS Section */}
+      <section className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-8">
+          <TTSPanel />
+          <AudioLibrary />
         </div>
       </section>
 

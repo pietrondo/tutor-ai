@@ -233,6 +233,15 @@ export default function RAGStatusPage() {
     )
   }
 
+  useEffect(() => {
+    if (!reindexing) return
+    const id = setInterval(() => {
+      setProgressUi((p) => (p < 95 ? p + 5 : p))
+      fetchRAGStatus()
+    }, 1200)
+    return () => clearInterval(id)
+  }, [reindexing])
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -642,11 +651,3 @@ export default function RAGStatusPage() {
     </div>
   )
 }
-  useEffect(() => {
-    if (!reindexing) return
-    const id = setInterval(() => {
-      setProgressUi((p) => (p < 95 ? p + 5 : p))
-      fetchRAGStatus()
-    }, 1200)
-    return () => clearInterval(id)
-  }, [reindexing])

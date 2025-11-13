@@ -419,6 +419,18 @@ main() {
     echo
 
     check_docker
+
+    if [ "$MODE" = "prod" ]; then
+        export COMPOSE_DOCKER_CLI_BUILD=1
+        export DOCKER_BUILDKIT=1
+        if [ -z "$DOCKER_CONFIG" ]; then
+            export DOCKER_CONFIG="$(pwd)/.docker-config"
+        fi
+        mkdir -p "$DOCKER_CONFIG"
+        if [ ! -f "$DOCKER_CONFIG/config.json" ]; then
+            echo '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+        fi
+    fi
     if $is_start_mode; then
         create_directories
     fi

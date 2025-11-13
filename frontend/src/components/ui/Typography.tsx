@@ -14,7 +14,7 @@ type Variant =
   | 'code'
 
 interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
-  as?: keyof JSX.IntrinsicElements
+  as?: React.ElementType
   variant?: Variant
   muted?: boolean
 }

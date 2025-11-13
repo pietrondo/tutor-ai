@@ -1109,6 +1109,15 @@ async def generate_mindmap(
             study_plan=[]
         )
 
+    except Exception:
+        return StudyMindmapResponse(
+            title="Mappa di studio",
+            overview="Generazione non disponibile",
+            nodes=[],
+            references=[],
+            study_plan=[]
+        )
+
 def _format_ref(s: Any) -> str:
     try:
         src = s if isinstance(s, dict) else {}
@@ -1119,11 +1128,6 @@ def _format_ref(s: Any) -> str:
         return f"{base}#{idx} ({score})"
     except Exception:
         return str(s)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate mindmap: {str(e)}")
 @router.post("", response_model=StudyMindmapResponse)
 async def generate_mindmap_legacy(
     request: GenerateMindmapRequest,
